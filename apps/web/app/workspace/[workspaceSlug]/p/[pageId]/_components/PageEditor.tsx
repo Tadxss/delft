@@ -133,7 +133,7 @@ export function PageEditor({ page }: { page: Page }) {
           value={title}
           onChange={(e) => handleTitleChange(e.target.value)}
           placeholder="Untitled"
-          className="w-full flex-1 border-none bg-transparent text-4xl font-bold text-ink-800 outline-none placeholder:text-ink-400"
+          className="w-full flex-1 border-none bg-transparent text-4xl font-bold leading-snug text-ink-800 outline-none placeholder:text-ink-400"
         />
         <div className="flex shrink-0 items-center gap-2 pt-2">
           <button
