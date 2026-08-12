@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuthUser, useSignOut } from "@delft/shared";
-import { AuthGate } from "./_components/AuthGate";
+import { AuthGate } from "../_components/AuthGate";
 import { ThemeToggle } from "../_components/ThemeToggle";
 
 function TopBar() {
@@ -18,6 +18,9 @@ function TopBar() {
       </Link>
       <div className="flex items-center gap-3 text-xs text-ink-500">
         <ThemeToggle />
+        <Link href="/account" className="rounded px-2 py-1 hover:bg-paper-100">
+          Account
+        </Link>
         <span>{user?.email}</span>
         <button
           type="button"
