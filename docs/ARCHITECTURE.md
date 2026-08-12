@@ -223,5 +223,69 @@ RLS: every table requires membership (`workspace_members`) except one deliberate
     `app/workspace/page.tsx`) instead of a raw Postgres error, and `AuthGate` naturally redirects to
     the login screen once signed out.
 
+14. **Password sign-in (add-on) + Google OAuth.** ✅ *done*. Magic link remains the only way to
+    *create* an account — this adds two more ways to sign into an existing one. New
+    `packages/shared/src/hooks/`: `useSetPassword` (`supabase.auth.updateUser({ password })`,
+    called from a new `/account` page, requires an active session — no current-password check,
+    the session itself is the proof of identity), `useSignInWithPassword`
+    (`supabase.auth.signInWithPassword`), and `useSignInWithGoogle`
+    (`supabase.auth.signInWithOAuth({ provider: 'google' })`). No new callback route needed for
+    Google — `detectSessionInUrl: true` (already set for magic link) parses its redirect too, so
+    it lands back on `/` exactly like magic link does. `AuthGate` moved from
+    `app/workspace/_components/` to `app/_components/` so the new `/account` route can reuse it
+    without reaching into another route's private folder.
+
+    `supabase/config.toml` gained a real `[auth.external.google]` block (the file previously only
+    had a commented-out `apple` example). Needs a Google Cloud OAuth 2.0 Client ID (free) with
+    `http://127.0.0.1:54321/auth/v1/callback` registered as an authorized redirect URI for local
+    dev; client ID/secret are supplied via a gitignored root `.env` (see `.env.example`) — the
+    Supabase CLI's `env()` substitution reads `.env` at the repo root, not `apps/web/.env.local`.
+
+15. **Login flow redesign, real Google branding, and popup-based Google OAuth.** ✅ *done*.
+    Follow-ups to step 14, all in `apps/web/app/page.tsx` unless noted:
+
+    - **Staged login UI.** Replaced "everything visible at once" (Google button + email + password
+      + magic-link button, all on screen together) with a `step: "email" | "password" | "sent"`
+      state machine: email + "Continue" first, then a password field + "Continue" with a
+      lower-emphasis "Email me a sign-in link instead" fallback once the password attempt fails or
+      was never set — no separate forgot-password flow, the magic link re-establishes a session
+      `/account` can then use to set a new password. Deliberately **no** server-side "does this
+      email have a password" check (would need the service-role key — the first server-side auth
+      code in an otherwise fully-client-side app — and could be used to enumerate accounts).
+
+      **Real bug found (test-locator ambiguity, not app bug):** the e2e suite's
+      `button:has-text("Continue")` matched **both** "Continue with Google" and the email step's
+      plain "Continue" button — since it's a substring match, Playwright clicked the Google button
+      first and landed on Google's real "invalid_client" error page. Fixed by switching
+      `e2e/helpers.ts`'s `signIn()` and `password-sign-in.spec.ts` to
+      `getByRole("button", { name: "Continue", exact: true })`.
+
+    - **Google button branding.** Replaced the generic bordered-rectangle placeholder with Google's
+      actual four-color "G" logomark (inlined SVG, `GoogleLogo` in `page.tsx`) and Google's
+      documented button colors — fixed white/`#747775`-border in light mode, fixed
+      `#131314`/`#8e918f`-border in dark mode via `next-themes`' `resolvedTheme` — rather than
+      inheriting this app's own `paper`/`ink` theme tokens, since real Google buttons intentionally
+      don't reskin to match the host page.
+
+    - **Google OAuth as a popup, not a full-tab redirect.** `useSignInWithGoogle`
+      (`packages/shared/src/hooks/`) now calls `signInWithOAuth` with `skipBrowserRedirect: true`
+      and returns the authorize URL instead of navigating itself; `page.tsx`'s `handleGoogleClick`
+      opens that URL in a small centered `window.open(...)` popup (falling back to a full-page
+      redirect if the popup is blocked). Confirmed by reading the vendored `@supabase/auth-js`
+      source that this needs no custom `postMessage`/polling plumbing to work: `GoTrueClient`
+      already opens a same-origin `BroadcastChannel` keyed by `storageKey` and broadcasts
+      session/`SIGNED_IN` events to every other same-origin tab — so once the popup's own fresh
+      client completes the PKCE exchange and writes the session to `localStorage`, the main tab's
+      existing `useAuthUser()` picks it up automatically. The popup self-closes once it detects its
+      own signed-in state (checked via `window.opener` + a `?authPopup=1` marker on its
+      `redirectTo`, so this never fires for a normal tab/magic-link landing).
+
+    - **Page title spacing/size.** `PageEditor.tsx`: `pt-20` → `pt-28`, title `text-3xl` →
+      `text-4xl`, matching a Notion reference screenshot's proportions more closely.
+
+    Verified manually (Google's real consent screen and the popup-blocked fallback aren't things
+    the Mailpit-based e2e setup can drive) plus a full `pnpm --filter web test:e2e` run (all 6
+    specs) and `pnpm lint`/`check-types`/`build` after each change.
+
 **Deferred, not started:** Credentials Manager, Excalidraw Canvas, hosted (non-local) Supabase
 project + Vercel deployment — see **Next Up** above for the concrete plan on each.

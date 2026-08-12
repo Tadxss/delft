@@ -38,7 +38,8 @@ export async function getLatestMagicLink(email: string): Promise<string> {
 export async function signIn(page: Page, email: string): Promise<void> {
   await page.goto("/");
   await page.fill('input[type="email"]', email);
-  await page.click('button:has-text("Send magic link")');
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await page.click('button:has-text("Email me a sign-in link instead")');
   await page.waitForSelector("text=Check", { timeout: 15000 });
   const link = await getLatestMagicLink(email);
   await page.goto(link);

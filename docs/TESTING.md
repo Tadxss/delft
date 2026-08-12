@@ -7,9 +7,13 @@ npx supabase start   # boots local Postgres/Auth/Storage/Mailpit — requires Do
 pnpm dev --filter=web
 ```
 
-Delft signs in via magic-link email (not a password). Locally, "sending an email" lands in
-Mailpit, not a real inbox — open `http://127.0.0.1:54324` and click the link there. The e2e suite
-does this same lookup programmatically via Mailpit's REST API (`e2e/helpers.ts`).
+Magic-link email is still the only way to *create* an account. Locally, "sending an email" lands
+in Mailpit, not a real inbox — open `http://127.0.0.1:54324` and click the link there. The e2e
+suite does this same lookup programmatically via Mailpit's REST API (`e2e/helpers.ts`). Once
+signed in, `/account` lets a user set a password for future sign-ins, and the login page also
+offers "Continue with Google" (opens as a popup — see `docs/ARCHITECTURE.md` Build Order step 15)
+— Google sign-in needs real OAuth credentials configured (step 14) and isn't covered by the
+automated suite.
 
 ## Automated suite
 
@@ -21,6 +25,7 @@ practice this is rare since every spec uses a freshly generated unique email per
 | `e2e/*.spec.ts` | Covers |
 |---|---|
 | `sign-in.spec.ts` | Magic-link sign-in end-to-end (send → Mailpit → verify URL → landed signed in, URL fragment stripped); signed-out visitors get redirected off authenticated routes. |
+| `password-sign-in.spec.ts` | Set a password from `/account`, sign out, sign back in with email+password (no magic-link email round-trip). |
 | `workspace-pages.spec.ts` | Create workspace → create page → edit title + BlockNote content → autosave persists across a reload → nested sub-page creation and tree display. |
 | `publish-share.spec.ts` | Publish toggle → `/share/[slug]` renders content read-only (zero `[contenteditable]` elements) to a fully separate signed-out browser context → unpublish takes the share URL back down to a 404. |
 | `workspace-isolation.spec.ts` | A second real user can neither see user A's workspace in their own switcher, nor read anything by navigating directly to user A's workspace URL — RLS-level isolation, not just UI filtering. |
@@ -47,6 +52,11 @@ actually producing and eyeballing a PDF is a manual step).
 5. Approach Supabase Storage's free-tier limit (1GB) with real usage and confirm the compression
    settings in `PageEditor.tsx`'s `uploadFile` are still appropriate — this was flagged as a
    zero-cost risk to revisit once there's real data, not a one-time check.
+6. Click "Continue with Google" with real OAuth credentials configured: confirm a small centered
+   popup opens (not a full-tab navigation away from Delft), completes Google's consent screen, then
+   self-closes with the main tab landing signed in on `/workspace`. Separately, block popups for
+   `localhost`/`127.0.0.1` in the browser and confirm it falls back to a full-page redirect instead
+   of silently doing nothing.
 
 ## Resetting between test runs
 
