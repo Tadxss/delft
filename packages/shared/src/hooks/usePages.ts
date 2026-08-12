@@ -1,0 +1,37 @@
+import { useQuery } from "@tanstack/react-query";
+import type { Page } from "@delft/types";
+import { useSupabaseClient } from "../supabase/context";
+import { mapPageRow } from "../supabase/mappers";
+
+export interface UsePagesOptions {
+  // Filter to direct children of a specific parent (including `null` for top-level pages). Leave
+  // undefined to fetch every page in the workspace at once — the sidebar tree wants the whole set
+  // in one query and builds the parent_id tree client-side, rather than one query per expand.
+  parentId?: string | null;
+}
+
+// Direct RLS-gated read — pages_select_member already limits this to the caller's own workspace.
+export function usePages(workspaceId: string | undefined, options: UsePagesOptions = {}) {
+  const supabase = useSupabaseClient();
+  const { parentId } = options;
+
+  return useQuery<Page[]>({
+    queryKey: ["pages", workspaceId, parentId],
+    enabled: Boolean(workspaceId),
+    queryFn: async () => {
+      let query = supabase
+        .from("pages")
+        .select("*")
+        .eq("workspace_id", workspaceId as string)
+        .order("created_at", { ascending: true });
+
+      if (parentId !== undefined) {
+        query = parentId === null ? query.is("parent_id", null) : query.eq("parent_id", parentId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data ?? []).map(mapPageRow);
+    },
+  });
+}

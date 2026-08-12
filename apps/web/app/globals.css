@@ -1,0 +1,87 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --paper-50: #faf9f7;
+  --paper-100: #f3f1ed;
+  --paper-200: #e6e2da;
+  --paper-300: #d3ccc0;
+  --ink-400: #8a8478;
+  --ink-500: #6b655a;
+  --ink-600: #524d44;
+  --ink-700: #3a362f;
+  --ink-800: #28251f;
+  --ink-900: #1a1815;
+  --accent-500: #6b7f6e;
+  --accent-600: #566a59;
+
+  --background: var(--paper-50);
+  --surface: #ffffff;
+  --border: var(--paper-200);
+  --foreground: var(--ink-800);
+  --foreground-muted: var(--ink-500);
+}
+
+/* Notion-dark-inspired, not a literal copy — a cooler, more technical palette than the light
+   theme's warm paper tones, with a muted indigo accent in place of light mode's sage green. */
+:root.dark {
+  --paper-50: #191919;
+  --paper-100: #202020;
+  --paper-200: #2b2b2b;
+  --paper-300: #3a3a3a;
+  --ink-400: #5a5954;
+  --ink-500: #797874;
+  --ink-600: #9b9a97;
+  --ink-700: #d4d4d2;
+  --ink-800: #e9e9e7;
+  --ink-900: #f5f5f4;
+  --accent-500: #7c8cf5;
+  --accent-600: #94a1f7;
+
+  --background: var(--paper-50);
+  --surface: #232323;
+  --border: var(--paper-200);
+  --foreground: var(--ink-800);
+  --foreground-muted: var(--ink-500);
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: clip;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+a {
+  color: inherit;
+}
+
+/* BlockNote ships its own (Mantine-based) styling via @blocknote/mantine/style.css — these few
+   overrides just tone its default accent down to the app's muted palette instead of BlockNote's
+   default blue, so the editor doesn't look like a different product from the rest of the app. */
+.bn-container {
+  --bn-colors-editor-text: var(--foreground);
+  --bn-colors-editor-background: transparent;
+}
+
+/* BlockNote's own editor.css hardcodes `.bn-editor { padding-inline: 54px; }` — space reserved
+   for the drag-handle/+ gutter that appears on hover. Our layout already gives the whole editor
+   column its left margin via the surrounding `px-8` container (see PageEditor.tsx), so this extra
+   padding just pushes the first line of content well to the right of the title above it. Collapse
+   it so the title and the content's left edge line up, matching Notion. */
+.bn-container .bn-editor {
+  padding-inline: 0;
+}
+
+/* /share/[slug] mounts a read-only BlockNoteView (see SharedPageView, editable={false} with every
+   default UI piece explicitly disabled) rather than a raw HTML export, so it inherits
+   @blocknote/mantine's own styling directly — no separate read-only stylesheet needed here. */

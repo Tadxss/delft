@@ -1,0 +1,14 @@
+node_modules
+.next
+dist
+.turbo
+.env
+.env.local
+!.env.local.example
+.DS_Store
+*.log
+supabase/.branches
+supabase/.temp
+test-results
+playwright-report
+blob-report
