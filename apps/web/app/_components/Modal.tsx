@@ -37,7 +37,7 @@ export function Modal({
       <div
         role="presentation"
         onClick={(e) => e.stopPropagation()}
-        className={`flex max-h-[85vh] w-full ${widthClassName} flex-col overflow-hidden rounded-lg border border-paper-200 bg-paper-50 shadow-lg`}
+        className={`flex max-h-[85vh] w-full ${widthClassName} flex-col overflow-hidden rounded-lg border border-paper-200 bg-paper-50 shadow-lg transition-[max-width] duration-200 ease-out [animation:modal-panel-in_150ms_ease-out]`}
       >
         {children}
       </div>
