@@ -11,11 +11,16 @@ export function Modal({
   onClose,
   children,
   widthClassName = "max-w-lg",
+  heightClassName = "",
 }: {
   open: boolean;
   onClose: () => void;
   children: React.ReactNode;
   widthClassName?: string;
+  // Content-driven height (the default) is fine for short, simple dialogs — but a modal whose
+  // content varies a lot between states (loading / empty / populated) should pass a fixed height
+  // here, or it'll visibly shrink-wrap to whichever state currently has the least content.
+  heightClassName?: string;
 }) {
   useEffect(() => {
     if (!open) return;
@@ -37,7 +42,7 @@ export function Modal({
       <div
         role="presentation"
         onClick={(e) => e.stopPropagation()}
-        className={`flex max-h-[85vh] w-full ${widthClassName} flex-col overflow-hidden rounded-lg border border-paper-200 bg-paper-50 shadow-lg transition-[max-width] duration-200 ease-out [animation:modal-panel-in_150ms_ease-out]`}
+        className={`flex max-h-[85vh] w-full ${widthClassName} ${heightClassName} flex-col overflow-hidden rounded-lg border border-paper-200 bg-paper-50 shadow-lg [animation:modal-panel-in_150ms_ease-out]`}
       >
         {children}
       </div>
