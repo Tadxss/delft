@@ -48,8 +48,8 @@ export function CredentialsModal({
       : null;
 
   return (
-    <Modal open={open} onClose={handleClose} widthClassName="max-w-3xl">
-      <div className="flex items-center justify-between border-b border-paper-200 px-4 py-2">
+    <Modal open={open} onClose={handleClose} widthClassName="max-w-3xl" heightClassName="h-[600px]">
+      <div className="flex shrink-0 items-center justify-between border-b border-paper-200 px-4 py-2">
         <span className="text-sm font-medium text-ink-800">Credentials</span>
         <button
           type="button"
@@ -61,41 +61,48 @@ export function CredentialsModal({
         </button>
       </div>
 
-      {!workspace ? (
-        <p className="p-6 text-sm text-ink-400">Loading…</p>
-      ) : !vaultKey.isUnlocked || !vaultKey.key ? (
-        <VaultUnlockPanel workspaceId={workspaceId} vaultSalt={workspace.vaultSalt} />
-      ) : (
-        <div className="flex min-h-0 flex-1">
-          <CredentialList
-            credentials={credentials ?? []}
-            selectedId={selectedId === "new" ? null : selectedId}
-            onSelect={setSelectedId}
-            onNew={() => setSelectedId("new")}
-          />
-          <div className="flex-1 overflow-y-auto">
-            {selectedId === "new" ? (
-              <CredentialDetail
-                workspaceId={workspaceId}
-                credential={null}
-                vaultKey={vaultKey.key}
-                onSaved={setSelectedId}
-                onDeleted={() => setSelectedId(null)}
-              />
-            ) : selectedCredential ? (
-              <CredentialDetail
-                workspaceId={workspaceId}
-                credential={selectedCredential}
-                vaultKey={vaultKey.key}
-                onSaved={setSelectedId}
-                onDeleted={() => setSelectedId(null)}
-              />
-            ) : (
-              <p className="p-6 text-sm text-ink-400">Select a credential, or create a new one.</p>
-            )}
-          </div>
-        </div>
-      )}
+      {/* A fixed modal height (above) means every state below must actually fill it — flex's
+          default align-items:stretch does that for whichever single child renders here, as long
+          as that child doesn't set its own conflicting height. */}
+      <div className="flex min-h-0 flex-1">
+        {!workspace ? (
+          <p className="flex flex-1 items-center justify-center text-sm text-ink-400">Loading…</p>
+        ) : !vaultKey.isUnlocked || !vaultKey.key ? (
+          <VaultUnlockPanel workspaceId={workspaceId} vaultSalt={workspace.vaultSalt} />
+        ) : (
+          <>
+            <CredentialList
+              credentials={credentials ?? []}
+              selectedId={selectedId === "new" ? null : selectedId}
+              onSelect={setSelectedId}
+              onNew={() => setSelectedId("new")}
+            />
+            <div className="flex-1 overflow-y-auto">
+              {selectedId === "new" ? (
+                <CredentialDetail
+                  workspaceId={workspaceId}
+                  credential={null}
+                  vaultKey={vaultKey.key}
+                  onSaved={setSelectedId}
+                  onDeleted={() => setSelectedId(null)}
+                />
+              ) : selectedCredential ? (
+                <CredentialDetail
+                  workspaceId={workspaceId}
+                  credential={selectedCredential}
+                  vaultKey={vaultKey.key}
+                  onSaved={setSelectedId}
+                  onDeleted={() => setSelectedId(null)}
+                />
+              ) : (
+                <p className="flex h-full items-center justify-center text-sm text-ink-400">
+                  Select a credential, or create a new one.
+                </p>
+              )}
+            </div>
+          </>
+        )}
+      </div>
     </Modal>
   );
 }
