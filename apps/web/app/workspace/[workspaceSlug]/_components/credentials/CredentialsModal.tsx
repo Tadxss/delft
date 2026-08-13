@@ -47,10 +47,8 @@ export function CredentialsModal({
       ? (credentials ?? []).find((c) => c.id === selectedId) ?? null
       : null;
 
-  const isUnlocked = Boolean(workspace) && vaultKey.isUnlocked && vaultKey.key;
-
   return (
-    <Modal open={open} onClose={handleClose} widthClassName={isUnlocked ? "max-w-3xl" : "max-w-md"}>
+    <Modal open={open} onClose={handleClose} widthClassName="max-w-3xl">
       <div className="flex items-center justify-between border-b border-paper-200 px-4 py-2">
         <span className="text-sm font-medium text-ink-800">Credentials</span>
         <button
