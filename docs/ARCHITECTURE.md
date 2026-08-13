@@ -417,5 +417,64 @@ reasoning.
     Live at `https://delft.vercel.app`, verified via direct `curl` (status code and real page
     content, e.g. "Careful records. Quiet craft"), not just a successful build log.
 
+19. **Workspace deletion, and Credentials moved from a page to a modal.** ✅ *done*. Two gaps
+    reported after using the deployed app for real.
+
+    - **Workspace deletion had genuinely never been wired up** — confirmed by grepping the RLS/
+      grants migrations before writing any code: no `for delete` policy and no `DELETE` grant
+      existed on `workspaces` at all, not even client-side dead code calling a missing endpoint.
+      New `supabase/migrations/*_workspaces_delete.sql`: an owner-only policy mirroring
+      `workspaces_update_owner`'s `owner_id = auth.uid()` gate, plus the grant. No extra cleanup
+      needed beyond that — `workspace_members`/`pages`/`credentials`/`canvases` all already
+      reference `workspace_id` with `on delete cascade`, so deleting the workspace row cascades
+      everything else for free. New `useDeleteWorkspace` hook; a "Delete" action (hover-revealed,
+      `window.confirm`-gated, matching existing destructive-action conventions) added next to each
+      workspace on the `/workspace` switcher list, only rendered when the signed-in user is that
+      workspace's owner (RLS enforces this regardless — the client-side check is just UX, not the
+      real boundary). Verified: anon gets `42501 permission denied` on a raw REST `DELETE` call
+      (same pattern used to verify every other table's grants), and a new e2e spec deletes a
+      workspace that has a page in it, confirms it disappears from the switcher, and confirms its
+      old URL resolves to "no pages" (the row is actually gone, not just hidden).
+    - **Credentials Manager moved from a route (`/workspace/[slug]/credentials`) to a modal**,
+      opened via a "Credentials" button in the sidebar from anywhere in a workspace, and — per an
+      explicit user request — **always re-prompts for the vault passphrase on every open**, not
+      once per browser session. This is a deliberate security/friction tradeoff the user chose
+      after being told a 6-digit PIN (their first request) would be dramatically weaker than a
+      passphrase against offline brute-force if the DB ever leaked; they kept the stronger
+      passphrase and asked for the always-re-prompt behavior instead of switching to a PIN.
+      Implementation: `CredentialsModal`'s `open` effect calls `vaultKey.lock()` (the same
+      `VaultKeyContext` from Build Order step 16, unchanged) whenever it transitions to closed —
+      covers the explicit × button, Escape, and backdrop-click uniformly, so there's no path that
+      leaves a derived key cached across a close/reopen. New `apps/web/app/_components/Modal.tsx`
+      is the **first modal primitive in this codebase** (backdrop + panel, Escape + backdrop-click
+      to close via a portal to `document.body`, deliberately no focus trap or dialog library —
+      matches how little UI infrastructure the rest of the app has needed). The three existing
+      credential subcomponents (`VaultUnlockPanel`/`CredentialList`/`CredentialDetail`) moved
+      (`git mv`, history preserved) from the now-deleted route's `_components/` into
+      `[workspaceSlug]/_components/credentials/`, unchanged internally — only their container
+      changed from a full page to a modal body.
+
+    Verified via 2 new/rewritten e2e specs (`workspace-delete.spec.ts`, and `credentials.spec.ts`
+    rewritten for the modal — click-to-open instead of URL navigation, and the "close then reopen
+    without a reload" flow as the direct test of the new always-re-prompt behavior, not just the
+    pre-existing reload check) plus the full suite (10 specs total), `pnpm lint`/`check-types`/
+    `build`, and the anon-DELETE REST check above.
+
+20. **Real bug found and fixed: Vercel Preview builds failing (missing env var scope).** ✅ *done*.
+    Pushing to `develop` opened a PR into `master`, and its Vercel check failed with
+    `useSupabaseClient must be used within a SupabaseProvider` while statically prerendering `/`.
+    Root cause, confirmed via `vercel env ls` before touching anything: `NEXT_PUBLIC_SUPABASE_URL`/
+    `NEXT_PUBLIC_SUPABASE_ANON_KEY` (set in Build Order step 18) were scoped to **Production only**.
+    Vercel's git integration deploys every branch as a Preview, and `apps/web/app/providers.tsx`
+    deliberately skips mounting `SupabaseProvider` when those vars are absent — so any hook calling
+    `useSupabaseClient()` (e.g. `app/page.tsx`'s `useAuthUser`) throws, and Next.js hits that during
+    the build's prerender pass for `/`, failing the whole build. Fixed by adding both vars to the
+    **Preview** and **Development** Vercel environments too, same hosted-project values already
+    used for Production — this app has no separate staging Supabase project, so reusing the one
+    hosted project across all three Vercel environments is correct here, not a shortcut. No source
+    change needed. Verified via a real Preview deploy (`vercel`, not `--prod`) reaching `READY` and
+    a direct `curl` of the resulting preview URL confirming real page content — not just a green
+    build log.
+
 **Deferred, not started:** revisiting `PageEditor.tsx`'s image-compression settings against real
 Storage usage — see **Next Up** above.

@@ -29,8 +29,9 @@ practice this is rare since every spec uses a freshly generated unique email per
 | `workspace-pages.spec.ts` | Create workspace → create page → edit title + BlockNote content → autosave persists across a reload → nested sub-page creation and tree display. |
 | `publish-share.spec.ts` | Publish toggle → `/share/[slug]` renders content read-only (zero `[contenteditable]` elements) to a fully separate signed-out browser context → unpublish takes the share URL back down to a 404. |
 | `workspace-isolation.spec.ts` | A second real user can neither see user A's workspace in their own switcher, nor read anything by navigating directly to user A's workspace URL — RLS-level isolation, not just UI filtering. |
-| `credentials.spec.ts` | Vault setup → add a credential (all fields) → lock → reload → re-unlock → decrypt round trip (confirms the derived key is genuinely gone after lock/reload, not cached anywhere); a wrong-passphrase case confirms a decrypt failure surfaces as a clear error instead of garbage data. |
+| `credentials.spec.ts` | Opens the Credentials **modal** (not a route) → vault setup → add a credential (all fields) → close the modal → reopen it → confirms it re-prompts for the passphrase every time (no session-cached unlock) → decrypt round trip; a wrong-passphrase case confirms a decrypt failure surfaces as a clear error instead of garbage data. |
 | `canvas.spec.ts` | Create a canvas → draw a real rectangle (keyboard shortcut + mouse drag) → confirm autosave actually persisted element data (verified via a direct REST call, since Excalidraw's `<canvas>` has no addressable per-shape DOM to assert against in the UI) → title survives a reload → delete. |
+| `workspace-delete.spec.ts` | Delete a workspace that has a page in it from the `/workspace` switcher → confirms it disappears from the list and its old URL resolves to "no pages" (RLS-level gone, not just hidden from the UI). |
 
 Not covered by the automated suite (manual-only): Google OAuth (needs real credentials, see
 scenario 6 below), visual/design polish, and the browser's native print-to-PDF output from a

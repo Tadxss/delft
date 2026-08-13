@@ -10,7 +10,13 @@ import { PageTreeNode } from "./PageTreeNode";
 // Fetches the whole workspace's pages in one query and builds the parent_id tree client-side —
 // simpler than a query-per-expand for a personal-scale page count, and lets the whole tree be
 // searched/filtered later without extra round-trips.
-export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
+export function Sidebar({
+  onCollapse,
+  onOpenCredentials,
+}: {
+  onCollapse: () => void;
+  onOpenCredentials: () => void;
+}) {
   const params = useParams<{ workspaceSlug: string; canvasId?: string }>();
   const workspaceId = parseWorkspaceSlug(params.workspaceSlug);
   const router = useRouter();
@@ -63,12 +69,13 @@ export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
 
   return (
     <nav className="flex w-64 shrink-0 flex-col gap-2 border-r border-paper-200 bg-paper-50 p-3">
-      <Link
-        href={`/workspace/${params.workspaceSlug}/credentials`}
-        className="flex items-center gap-2 rounded px-1 py-1 text-sm text-ink-600 hover:bg-paper-100 hover:text-ink-800"
+      <button
+        type="button"
+        onClick={onOpenCredentials}
+        className="flex items-center gap-2 rounded px-1 py-1 text-left text-sm text-ink-600 hover:bg-paper-100 hover:text-ink-800"
       >
         Credentials
-      </Link>
+      </button>
 
       <div className="flex items-center justify-between px-1">
         <span className="text-xs font-medium uppercase tracking-wide text-ink-500">Pages</span>

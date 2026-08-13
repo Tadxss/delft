@@ -9,7 +9,7 @@ const STORAGE_KEY = "delft-sidebar-collapsed";
 // next-themes' pattern (read on mount, avoid rendering the collapsed-vs-expanded choice until
 // then) is overkill for something with no light/dark-style flash-of-wrong-content risk: the
 // sidebar is always visible either way, so there's nothing to briefly render incorrectly.
-export function SidebarShell() {
+export function SidebarShell({ onOpenCredentials }: { onOpenCredentials: () => void }) {
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
@@ -36,5 +36,5 @@ export function SidebarShell() {
     );
   }
 
-  return <Sidebar onCollapse={() => setAndPersist(true)} />;
+  return <Sidebar onCollapse={() => setAndPersist(true)} onOpenCredentials={onOpenCredentials} />;
 }
