@@ -1,10 +1,11 @@
 import type { Database } from "@delft/types";
-import type { Credential, Page, Workspace, WorkspaceMember } from "@delft/types";
+import type { Canvas, Credential, Page, Workspace, WorkspaceMember } from "@delft/types";
 
 type WorkspaceRow = Database["public"]["Tables"]["workspaces"]["Row"];
 type WorkspaceMemberRow = Database["public"]["Tables"]["workspace_members"]["Row"];
 type PageRow = Database["public"]["Tables"]["pages"]["Row"];
 type CredentialRow = Database["public"]["Tables"]["credentials"]["Row"];
+type CanvasRow = Database["public"]["Tables"]["canvases"]["Row"];
 
 // The Supabase client is typed snake_case (matching the Postgres columns directly, see
 // packages/types/src/database.ts); every hook maps rows through here into the hand-written
@@ -50,6 +51,17 @@ export function mapCredentialRow(row: CredentialRow): Credential {
     url: row.url,
     secretCiphertext: row.secret_ciphertext,
     secretIv: row.secret_iv,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function mapCanvasRow(row: CanvasRow): Canvas {
+  return {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    title: row.title,
+    scene: row.scene,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

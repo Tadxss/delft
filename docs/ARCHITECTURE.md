@@ -14,21 +14,15 @@ when something ships. Entries accumulate; don't edit or delete old ones, append 
 
 Read this section first in a new session — it's the answer to "what should I work on."
 
-1. **Excalidraw Canvas** (not started). Standalone workspace items (own table, own sidebar
-   presence, not embedded in Pages yet — embedding is explicitly deferred further). Scene data
-   (elements + appState) stored as JSON in Postgres, no rendered image/binary. `@excalidraw/
-   excalidraw` (MIT, free) for the canvas UI.
-
-2. **Hosted deployment** (not started). Everything so far has only run against the local Supabase
+1. **Hosted deployment** (not started). Everything so far has only run against the local Supabase
    stack. Needs: create/link a real hosted Supabase project (`supabase link`, `supabase db push`),
    a Vercel project with `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY` set for the
    hosted project, and revisiting the image-compression settings in `PageEditor.tsx` against real
    Storage usage once there's real data (flagged in step 3 below as a zero-cost risk to recheck,
    not a one-time check).
 
-**Credentials Manager shipped** — see Build Order step 16 below for the final design (some details
-differ from what was originally sketched here, e.g. username/password/notes end up bundled into
-one ciphertext per credential rather than separate columns).
+**Credentials Manager and Excalidraw Canvas both shipped** — see Build Order steps 16 and 17 below
+for the final designs (some details differ from what was originally sketched here).
 
 ## Data model
 
@@ -44,11 +38,16 @@ one ciphertext per credential rather than separate columns).
   updated_at)` — `title`/`url` plaintext (list view + search); `secret_ciphertext`/`secret_iv` are
   one AES-GCM ciphertext+iv pair encrypting a `{username, password, notes}` JSON payload per
   credential. See Build Order step 16.
+- `canvases (id, workspace_id, title, scene jsonb, created_at, updated_at)` — flat, no `parent_id`
+  (standalone items, not a tree like `pages`). `scene` is Excalidraw's own `{elements, appState}`
+  shape; the `files` argument from Excalidraw's `onChange` (embedded image binaries) is never
+  persisted. See Build Order step 17.
 
 RLS: every table requires membership (`workspace_members`) except one deliberate hole —
 `pages_select_published_anon`, readable by `anon`, scoped strictly to `is_published = true`.
-`credentials` has no anon policy or grant at all — unlike `pages`, it has no public share surface.
-See `supabase/migrations/*_rls.sql` for the full policy set and its inline reasoning.
+`credentials` and `canvases` have no anon policy or grant at all — unlike `pages`, neither has a
+public share surface. See `supabase/migrations/*_rls.sql` for the full policy set and its inline
+reasoning.
 
 ## Build Order
 
@@ -323,5 +322,49 @@ See `supabase/migrations/*_rls.sql` for the full policy set and its inline reaso
     Plus the anon-grant REST check above, `pnpm lint`/`check-types`/`build`, and the full existing
     e2e suite (8 specs total) passing unmodified.
 
-**Deferred, not started:** Excalidraw Canvas, hosted (non-local) Supabase project + Vercel
-deployment — see **Next Up** above for the concrete plan on each.
+17. **Excalidraw Canvas.** ✅ *done*. Standalone per-workspace canvases (`@excalidraw/excalidraw`
+    0.18.1, MIT), own table, own flat sidebar section — not embedded in Pages, not nested (no
+    `parent_id`), matching the "standalone workspace items" design already decided under "Next Up."
+
+    - **First `next/dynamic(..., { ssr: false })` in this codebase.** Excalidraw touches
+      `window`/`document` at module load and cannot be server-rendered at all — unlike BlockNote
+      (the Pages editor), which tolerates SSR fine as a plain `"use client"` import. Since `ssr:
+      false` means the server renders nothing for it, there's no server/client HTML to diverge —
+      no hydration-mismatch risk the way the Google-button `resolvedTheme` bug was (step 15), so no
+      `mounted`-guard was needed here; the canvas's `theme` prop reads `resolvedTheme` directly.
+    - **No rendered image/binary, enforced two ways, not just documented.** `scene` (jsonb) stores
+      only Excalidraw's `elements`/`appState` — the third `onChange` argument (`files`, embedded
+      image binaries) is never included in what gets saved. To avoid the confusing experience of a
+      pasted image rendering during the session then silently vanishing on reload, the
+      image-insertion tool itself is hidden via `UIOptions={{ tools: { image: false } }}` — what's
+      offered matches what's actually persisted. `appState.collaborators` (a live `Map`, irrelevant
+      in this non-collaborative app) is also stripped before saving.
+    - **Schema/RLS/hooks**: `supabase/migrations/*_canvases.sql` + `*_canvases_rls.sql`, mirroring
+      `pages`'/`credentials`' exact conventions (same trigger shape, same `to authenticated`
+      scoping) — no anon policy or grant at all, verified via the same direct-REST-call approach as
+      step 16 (`42501 permission denied for table canvases`). `packages/shared/src/hooks/`:
+      `useCanvases`/`useCanvas`/`useCreateCanvas`/`useUpdateCanvas`/`useDeleteCanvas`, identical
+      shape to the Pages hooks (query keys `["canvases", workspaceId]` / `["canvas", id]`).
+    - **Autosave**: `CanvasEditor.tsx` uses the exact same 800ms-debounced merge-pending-patch
+      `scheduleSave` pattern as `PageEditor.tsx` (title + scene can both change within the debounce
+      window and must not clobber each other — the bug already found and fixed once for Pages,
+      step 3, deliberately not re-introduced here).
+    - **Sidebar**: a new flat "Canvas" section in `Sidebar.tsx` (header + `+` + row list) — no
+      `PageTreeNode`-style recursion, since canvases don't nest.
+
+    **Real bug found (test-only, not app code):** the first e2e attempt drew a rectangle at
+    coordinates that landed on Excalidraw's own floating tool-properties panel (stroke/background/
+    etc., which docks over the canvas's left edge whenever a drawing tool is active) instead of the
+    canvas itself — the shape silently failed to get created. Fixed by drawing further right,
+    clear of the panel. Root-caused via the test's own failure screenshot, not guesswork.
+
+    Verified via a new `e2e/canvas.spec.ts`: create a canvas, draw a real rectangle (keyboard
+    shortcut to select the tool, real mouse drag), and — since Excalidraw renders to a `<canvas>`
+    element with no addressable per-shape DOM nodes to assert against — confirm the autosave
+    actually persisted real element data by reading the signed-in user's access token out of
+    `localStorage` and querying the REST API directly for `scene.elements.length > 0`, rather than
+    trusting a UI-only check. Plus title-persistence-after-reload and delete. All passed on the
+    fixed attempt. Full suite (9 specs total) plus `pnpm lint`/`check-types`/`build` all green.
+
+**Deferred, not started:** hosted (non-local) Supabase project + Vercel deployment — see
+**Next Up** above for the concrete plan.

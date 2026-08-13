@@ -27,3 +27,8 @@ export * from "./hooks/useCreateCredential";
 export * from "./hooks/useUpdateCredential";
 export * from "./hooks/useDeleteCredential";
 export * from "./hooks/useSetVaultSalt";
+export * from "./hooks/useCanvases";
+export * from "./hooks/useCanvas";
+export * from "./hooks/useCreateCanvas";
+export * from "./hooks/useUpdateCanvas";
+export * from "./hooks/useDeleteCanvas";

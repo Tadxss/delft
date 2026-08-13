@@ -45,3 +45,16 @@ export interface CredentialSecret {
   password: string;
   notes: string;
 }
+
+// `scene` is Excalidraw's own { elements, appState } shape (its onChange callback's first two
+// arguments) — deliberately never the third `files` argument, so no image/binary data is ever
+// persisted. Typed `unknown` here since Excalidraw's own types aren't imported into this
+// framework-agnostic package; apps/web casts at the boundary.
+export interface Canvas {
+  id: string;
+  workspaceId: string;
+  title: string;
+  scene: unknown;
+  createdAt: string;
+  updatedAt: string;
+}

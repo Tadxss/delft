@@ -4,18 +4,20 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import type { Page } from "@delft/types";
-import { useCreatePage, usePages, parseWorkspaceSlug } from "@delft/shared";
+import { useCreateCanvas, useCreatePage, useCanvases, usePages, parseWorkspaceSlug } from "@delft/shared";
 import { PageTreeNode } from "./PageTreeNode";
 
 // Fetches the whole workspace's pages in one query and builds the parent_id tree client-side —
 // simpler than a query-per-expand for a personal-scale page count, and lets the whole tree be
 // searched/filtered later without extra round-trips.
 export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
-  const params = useParams<{ workspaceSlug: string }>();
+  const params = useParams<{ workspaceSlug: string; canvasId?: string }>();
   const workspaceId = parseWorkspaceSlug(params.workspaceSlug);
   const router = useRouter();
   const { data: pages, isLoading } = usePages(workspaceId);
+  const { data: canvases, isLoading: canvasesLoading } = useCanvases(workspaceId);
   const createPage = useCreatePage();
+  const createCanvas = useCreateCanvas();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const childrenByParent = useMemo(() => {
@@ -49,6 +51,13 @@ export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
           router.push(`/workspace/${params.workspaceSlug}/p/${page.id}`);
         },
       },
+    );
+  }
+
+  function createNewCanvas() {
+    createCanvas.mutate(
+      { workspaceId },
+      { onSuccess: (canvas) => router.push(`/workspace/${params.workspaceSlug}/canvas/${canvas.id}`) },
     );
   }
 
@@ -98,6 +107,40 @@ export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
               onCreateChild={(parentId) => createChild(parentId)}
               depth={0}
             />
+          ))}
+        </ul>
+      )}
+
+      <div className="mt-2 flex items-center justify-between px-1">
+        <span className="text-xs font-medium uppercase tracking-wide text-ink-500">Canvas</span>
+        <button
+          type="button"
+          onClick={createNewCanvas}
+          aria-label="New canvas"
+          className="rounded px-1.5 py-0.5 text-sm text-ink-500 hover:bg-paper-100 hover:text-ink-800"
+        >
+          +
+        </button>
+      </div>
+      {canvasesLoading ? (
+        <p className="px-1 text-sm text-ink-400">Loading…</p>
+      ) : (canvases ?? []).length === 0 ? (
+        <p className="px-1 text-sm text-ink-400">No canvases yet.</p>
+      ) : (
+        <ul className="flex flex-col gap-0.5">
+          {(canvases ?? []).map((canvas) => (
+            <li key={canvas.id}>
+              <Link
+                href={`/workspace/${params.workspaceSlug}/canvas/${canvas.id}`}
+                className={`block truncate rounded-md px-1 py-1 text-sm hover:bg-paper-100 ${
+                  params.canvasId === canvas.id
+                    ? "bg-paper-100 font-medium text-ink-800"
+                    : "text-ink-600"
+                }`}
+              >
+                {canvas.title || "Untitled"}
+              </Link>
+            </li>
           ))}
         </ul>
       )}

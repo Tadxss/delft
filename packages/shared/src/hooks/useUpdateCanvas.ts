@@ -1,0 +1,41 @@
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import type { Canvas, Database, Json } from "@delft/types";
+import { useSupabaseClient } from "../supabase/context";
+import { mapCanvasRow } from "../supabase/mappers";
+
+type CanvasesUpdate = Database["public"]["Tables"]["canvases"]["Update"];
+
+export interface UpdateCanvasInput {
+  id: string;
+  title?: string;
+  scene?: unknown;
+}
+
+// Backs both the title field and the canvas autosave (apps/web debounces calls to this hook,
+// same ~800ms pattern as useUpdatePage — no debounce logic lives here). `updated_at` is
+// maintained server-side by canvases_set_updated_at, not passed in.
+export function useUpdateCanvas() {
+  const supabase = useSupabaseClient();
+  const queryClient = useQueryClient();
+
+  return useMutation<Canvas, Error, UpdateCanvasInput>({
+    mutationFn: async ({ id, title, scene }) => {
+      const patch: CanvasesUpdate = {};
+      if (title !== undefined) patch.title = title;
+      if (scene !== undefined) patch.scene = scene as Json;
+
+      const { data, error } = await supabase
+        .from("canvases")
+        .update(patch)
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw error;
+      return mapCanvasRow(data);
+    },
+    onSuccess: (canvas) => {
+      queryClient.setQueryData<Canvas>(["canvas", canvas.id], canvas);
+      queryClient.invalidateQueries({ queryKey: ["canvases", canvas.workspaceId] });
+    },
+  });
+}

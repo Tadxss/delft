@@ -30,12 +30,12 @@ practice this is rare since every spec uses a freshly generated unique email per
 | `publish-share.spec.ts` | Publish toggle → `/share/[slug]` renders content read-only (zero `[contenteditable]` elements) to a fully separate signed-out browser context → unpublish takes the share URL back down to a 404. |
 | `workspace-isolation.spec.ts` | A second real user can neither see user A's workspace in their own switcher, nor read anything by navigating directly to user A's workspace URL — RLS-level isolation, not just UI filtering. |
 | `credentials.spec.ts` | Vault setup → add a credential (all fields) → lock → reload → re-unlock → decrypt round trip (confirms the derived key is genuinely gone after lock/reload, not cached anywhere); a wrong-passphrase case confirms a decrypt failure surfaces as a clear error instead of garbage data. |
+| `canvas.spec.ts` | Create a canvas → draw a real rectangle (keyboard shortcut + mouse drag) → confirm autosave actually persisted element data (verified via a direct REST call, since Excalidraw's `<canvas>` has no addressable per-shape DOM to assert against in the UI) → title survives a reload → delete. |
 
-Not covered by the automated suite (manual-only): Canvas (not built yet — see
-`docs/ARCHITECTURE.md`'s Build Order), Google OAuth (needs real credentials, see scenario 6 below),
-visual/design polish, and the browser's native print-to-PDF output from a `/share/[slug]` page
-(Playwright can assert the page renders correctly; actually producing and eyeballing a PDF is a
-manual step).
+Not covered by the automated suite (manual-only): Google OAuth (needs real credentials, see
+scenario 6 below), visual/design polish, and the browser's native print-to-PDF output from a
+`/share/[slug]` page (Playwright can assert the page renders correctly; actually producing and
+eyeballing a PDF is a manual step).
 
 ## Manual scenarios
 
@@ -65,6 +65,9 @@ manual step).
    recovery path (by design — the server never has the passphrase or key). Also confirm the
    password generator's output actually works as a real password on some external site, and that
    copy-to-clipboard for username/password does what it says.
+8. Open a canvas and confirm there's no way to insert an image (the tool is intentionally hidden —
+   see `docs/ARCHITECTURE.md` Build Order step 17). Draw a variety of shapes/text, reload, and
+   confirm everything survived; confirm dark/light theme switches correctly.
 
 ## Resetting between test runs
 
