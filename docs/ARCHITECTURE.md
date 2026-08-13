@@ -3,8 +3,10 @@
 Delft is a personal, zero-cost management platform (Pages, Credentials Manager, Excalidraw
 Canvas) built on Next.js + Supabase + Vercel free tiers, with every feature scoped per-workspace
 and isolated via Postgres Row Level Security. See the root [README.md](../README.md) for the
-elevator pitch and local dev setup, and [docs/TESTING.md](TESTING.md) for how the e2e suite maps
-to manual test scenarios.
+elevator pitch and local dev setup, [docs/TESTING.md](TESTING.md) for how the e2e suite maps
+to manual test scenarios, and [docs/BETA_READINESS.md](BETA_READINESS.md) for the outstanding
+audit findings (autosave error handling, mobile layout, modal accessibility, Storage cleanup) to
+work through before calling this BETA.
 
 This file's **Build Order** section below is the single source of truth for what has shipped, in
 what order, why, and what was deliberately deferred — update *it*, not the README's status line,
@@ -14,16 +16,18 @@ when something ships. Entries accumulate; don't edit or delete old ones, append 
 
 Read this section first in a new session — it's the answer to "what should I work on."
 
-**Every item originally on this roadmap has shipped** — Pages, auth (password + Google), Credentials
+**Every originally-planned feature has shipped** — Pages, auth (password + Google), Credentials
 Manager, Excalidraw Canvas, and hosted deployment (live at `https://delft.vercel.app`, auto-deploying
-on push to `master`, verified end-to-end: pushed a commit, watched Vercel build it, confirmed the
-production domain served the new build). See Build Order below for how each shipped.
+on push to `master`). See Build Order below for how each shipped.
 
-The one recurring (not one-time) item to keep revisiting: the image-compression settings in
-`PageEditor.tsx` against real Storage usage as real data accumulates — Supabase Storage's free tier
-caps at 1GB.
+**Current focus: working through [docs/BETA_READINESS.md](BETA_READINESS.md)** before calling this
+BETA — a full audit found real gaps (silent autosave failures, no mobile layout, `Modal.tsx`
+missing dialog semantics, Storage orphaning on delete, and more, ranked by severity in that doc).
+Nothing in it has been fixed yet as of Build Order step 20.
 
-No other feature is currently planned — treat this section as empty until the user names a new one.
+The one recurring (not one-time) item to keep revisiting alongside that: the image-compression
+settings in `PageEditor.tsx` against real Storage usage as real data accumulates — Supabase
+Storage's free tier caps at 1GB.
 
 ## Data model
 
