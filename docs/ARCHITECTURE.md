@@ -14,24 +14,16 @@ when something ships. Entries accumulate; don't edit or delete old ones, append 
 
 Read this section first in a new session — it's the answer to "what should I work on."
 
-**Hosted deployment is live but has 3 manual steps still outstanding** (all need the browser, not
-scriptable from here) — see Build Order step 18 for exactly what's done vs. pending:
+**Every item originally on this roadmap has shipped** — Pages, auth (password + Google), Credentials
+Manager, Excalidraw Canvas, and hosted deployment (live at `https://delft.vercel.app`, auto-deploying
+on push to `master`, verified end-to-end: pushed a commit, watched Vercel build it, confirmed the
+production domain served the new build). See Build Order below for how each shipped.
 
-1. Authorize Vercel's GitHub App for `Tadxss/delft` so pushes to `master` auto-deploy (right now
-   every deploy is a manual `vercel --prod`).
-2. Set the hosted Supabase project's Auth **Site URL**/**Redirect URLs** to `https://delft.vercel.app`
-   (Dashboard → Authentication → URL Configuration) — magic-link emails will keep using the local
-   `127.0.0.1:3000` default until this is set.
-3. Enable the Google provider on the *hosted* project (Dashboard → Authentication → Providers →
-   Google, same Client ID/Secret as local `.env`) and add
-   `https://xxpesmgtnuzlhnlqyrje.supabase.co/auth/v1/callback` as an authorized redirect URI in
-   Google Cloud Console.
+The one recurring (not one-time) item to keep revisiting: the image-compression settings in
+`PageEditor.tsx` against real Storage usage as real data accumulates — Supabase Storage's free tier
+caps at 1GB.
 
-After those: revisit the image-compression settings in `PageEditor.tsx` against real Storage usage
-once there's real data (a recurring check, not one-time) — the only remaining item after that.
-
-**Credentials Manager and Excalidraw Canvas both shipped** — see Build Order steps 16 and 17 below
-for the final designs (some details differ from what was originally sketched here).
+No other feature is currently planned — treat this section as empty until the user names a new one.
 
 ## Data model
 
@@ -375,11 +367,10 @@ reasoning.
     trusting a UI-only check. Plus title-persistence-after-reload and delete. All passed on the
     fixed attempt. Full suite (9 specs total) plus `pnpm lint`/`check-types`/`build` all green.
 
-18. **Hosted deployment.** 🟡 *mostly done, 3 manual dashboard steps remain* (see "Next Up" above
-    for exactly what). `master` and `develop` were both pushed to `origin` for the first time this
-    step (they'd only ever existed locally before) — `master` fast-forwarded cleanly to `develop`'s
-    tip, merged with an existing GitHub-side PR merge commit that turned out to have identical
-    content (confirmed via an empty `git diff` before merging, not assumed).
+18. **Hosted deployment.** ✅ *done*. `master` and `develop` were both pushed to `origin` for the
+    first time this step (they'd only ever existed locally before) — `master` fast-forwarded cleanly
+    to `develop`'s tip, merged with an existing GitHub-side PR merge commit that turned out to have
+    identical content (confirmed via an empty `git diff` before merging, not assumed).
 
     - **Supabase**: a hosted project named "delft" (ref `xxpesmgtnuzlhnlqyrje`, `ap-southeast-2`)
       already existed from a previous session — linked via `supabase link --project-ref ...`, then
@@ -409,10 +400,19 @@ reasoning.
     - Project renamed `web` → `delft` (`vercel project rename`) purely for a cleaner domain; the
       auto-generated original alias didn't update on rename, so `delft.vercel.app` and
       `delft-tadxss-projects.vercel.app` were added explicitly via `vercel alias set`.
-    - **Git integration is not yet connected** — `vercel git connect` failed (repo is public, so
-      not a visibility issue; almost certainly Vercel's GitHub App isn't authorized for this repo
-      yet, which needs a one-time browser action only the user can do). Until that's done, deploys
-      are manual (`vercel --prod` from the repo root) rather than automatic on push to `master`.
+    - **Git integration**: `vercel git connect` initially failed (repo is public, so not a
+      visibility issue) — Vercel's GitHub App wasn't yet authorized for this repo, a one-time
+      browser action only the user could do. Once authorized, re-running `vercel git connect`
+      confirmed the connection; auto-deploy was then verified for real (not just assumed working):
+      merged and pushed a commit to `master`, watched a new deployment start building ~20s later
+      via `vercel ls`, waited for it to reach `Ready`, then `curl`'d `delft.vercel.app` again to
+      confirm the production alias actually served that fresh build.
+    - **Hosted auth config**: the hosted project's Auth Site URL/Redirect URLs (Dashboard →
+      Authentication → URL Configuration → `https://delft.vercel.app`) and the Google provider
+      (Dashboard → Authentication → Providers → Google, same Client ID/Secret as local `.env`, plus
+      `https://xxpesmgtnuzlhnlqyrje.supabase.co/auth/v1/callback` added as an authorized redirect
+      URI in Google Cloud Console) were both set by the user via their respective dashboards —
+      deliberately not scripted, per the `config push` risk noted above.
 
     Live at `https://delft.vercel.app`, verified via direct `curl` (status code and real page
     content, e.g. "Careful records. Quiet craft"), not just a successful build log.
