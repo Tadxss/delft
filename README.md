@@ -64,10 +64,11 @@ npx supabase db reset     # reapply all migrations from scratch (destructive to 
 npx supabase gen types typescript --local > packages/types/src/database.ts
 ```
 
-This repo is **not** yet linked to a hosted Supabase project (`supabase link`) — everything so far
-has only been run against the local stack. See `packages/types/src/database.ts`'s header comment
-for the type-regeneration command, and `supabase/migrations/` for the schema (workspaces,
-workspace_members, pages) and its RLS/grants reasoning.
+This repo is linked (`supabase link`) to a hosted project, live at `https://delft.vercel.app` — see
+`docs/ARCHITECTURE.md` Build Order step 18 for the deployment setup and what's still manual (git
+auto-deploy, hosted auth URL/Google provider config). `npx supabase db push` applies local
+migrations to the hosted database. See `packages/types/src/database.ts`'s header comment for the
+type-regeneration command, and `supabase/migrations/` for the schema and its RLS/grants reasoning.
 
 ## Remote Caching
 
