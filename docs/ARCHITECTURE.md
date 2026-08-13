@@ -460,5 +460,21 @@ reasoning.
     pre-existing reload check) plus the full suite (10 specs total), `pnpm lint`/`check-types`/
     `build`, and the anon-DELETE REST check above.
 
+20. **Real bug found and fixed: Vercel Preview builds failing (missing env var scope).** ✅ *done*.
+    Pushing to `develop` opened a PR into `master`, and its Vercel check failed with
+    `useSupabaseClient must be used within a SupabaseProvider` while statically prerendering `/`.
+    Root cause, confirmed via `vercel env ls` before touching anything: `NEXT_PUBLIC_SUPABASE_URL`/
+    `NEXT_PUBLIC_SUPABASE_ANON_KEY` (set in Build Order step 18) were scoped to **Production only**.
+    Vercel's git integration deploys every branch as a Preview, and `apps/web/app/providers.tsx`
+    deliberately skips mounting `SupabaseProvider` when those vars are absent — so any hook calling
+    `useSupabaseClient()` (e.g. `app/page.tsx`'s `useAuthUser`) throws, and Next.js hits that during
+    the build's prerender pass for `/`, failing the whole build. Fixed by adding both vars to the
+    **Preview** and **Development** Vercel environments too, same hosted-project values already
+    used for Production — this app has no separate staging Supabase project, so reusing the one
+    hosted project across all three Vercel environments is correct here, not a shortcut. No source
+    change needed. Verified via a real Preview deploy (`vercel`, not `--prod`) reaching `READY` and
+    a direct `curl` of the resulting preview URL confirming real page content — not just a green
+    build log.
+
 **Deferred, not started:** revisiting `PageEditor.tsx`'s image-compression settings against real
 Storage usage — see **Next Up** above.
