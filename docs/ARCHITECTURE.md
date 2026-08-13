@@ -14,12 +14,21 @@ when something ships. Entries accumulate; don't edit or delete old ones, append 
 
 Read this section first in a new session — it's the answer to "what should I work on."
 
-1. **Hosted deployment** (not started). Everything so far has only run against the local Supabase
-   stack. Needs: create/link a real hosted Supabase project (`supabase link`, `supabase db push`),
-   a Vercel project with `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY` set for the
-   hosted project, and revisiting the image-compression settings in `PageEditor.tsx` against real
-   Storage usage once there's real data (flagged in step 3 below as a zero-cost risk to recheck,
-   not a one-time check).
+**Hosted deployment is live but has 3 manual steps still outstanding** (all need the browser, not
+scriptable from here) — see Build Order step 18 for exactly what's done vs. pending:
+
+1. Authorize Vercel's GitHub App for `Tadxss/delft` so pushes to `master` auto-deploy (right now
+   every deploy is a manual `vercel --prod`).
+2. Set the hosted Supabase project's Auth **Site URL**/**Redirect URLs** to `https://delft.vercel.app`
+   (Dashboard → Authentication → URL Configuration) — magic-link emails will keep using the local
+   `127.0.0.1:3000` default until this is set.
+3. Enable the Google provider on the *hosted* project (Dashboard → Authentication → Providers →
+   Google, same Client ID/Secret as local `.env`) and add
+   `https://xxpesmgtnuzlhnlqyrje.supabase.co/auth/v1/callback` as an authorized redirect URI in
+   Google Cloud Console.
+
+After those: revisit the image-compression settings in `PageEditor.tsx` against real Storage usage
+once there's real data (a recurring check, not one-time) — the only remaining item after that.
 
 **Credentials Manager and Excalidraw Canvas both shipped** — see Build Order steps 16 and 17 below
 for the final designs (some details differ from what was originally sketched here).
@@ -366,5 +375,47 @@ reasoning.
     trusting a UI-only check. Plus title-persistence-after-reload and delete. All passed on the
     fixed attempt. Full suite (9 specs total) plus `pnpm lint`/`check-types`/`build` all green.
 
-**Deferred, not started:** hosted (non-local) Supabase project + Vercel deployment — see
-**Next Up** above for the concrete plan.
+18. **Hosted deployment.** 🟡 *mostly done, 3 manual dashboard steps remain* (see "Next Up" above
+    for exactly what). `master` and `develop` were both pushed to `origin` for the first time this
+    step (they'd only ever existed locally before) — `master` fast-forwarded cleanly to `develop`'s
+    tip, merged with an existing GitHub-side PR merge commit that turned out to have identical
+    content (confirmed via an empty `git diff` before merging, not assumed).
+
+    - **Supabase**: a hosted project named "delft" (ref `xxpesmgtnuzlhnlqyrje`, `ap-southeast-2`)
+      already existed from a previous session — linked via `supabase link --project-ref ...`, then
+      all 8 local migrations applied cleanly via `supabase db push` to what was an empty database.
+      Deliberately did **not** run `supabase config push` — it would push the *entire* resolved
+      `config.toml`, including `site_url = "http://127.0.0.1:3000"` (correct for local dev, wrong
+      for production), silently breaking hosted auth redirects. The `[auth]` URL settings and the
+      Google provider are hosted-only Dashboard configuration instead, kept deliberately decoupled
+      from local `config.toml` rather than introducing a shared-state hazard between the two
+      environments.
+    - **Vercel**: **Real bug found and fixed** — linking (`vercel link`) and deploying directly from
+      `apps/web` failed with `npm install exited 1`, because that only uploads the subdirectory's
+      101KB, not the monorepo root's `pnpm-lock.yaml`/`pnpm-workspace.yaml` that `workspace:*`
+      dependencies need to resolve. Fixed by removing that link, re-linking from the **repo root**
+      instead (uploads the full monorepo, ~81MB), and setting the project's Root Directory to
+      `apps/web` via `vercel project update web --root-directory apps/web` — that combination is
+      what lets Vercel's build run `pnpm install` at the true workspace root while still building
+      only the Next.js app. `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY` set for
+      Production via `vercel env add ... --value`, pointed at the hosted project above.
+    - **Second real bug found and fixed**: the project's default `*.vercel.app` domains (including
+      the freshly-claimed `delft.vercel.app`) returned a 302 to Vercel's SSO login — deployment
+      protection was set to `all_except_custom_domains` by default, which gates every `vercel.app`
+      subdomain (not just previews) behind team login. For a personal app meant to be reachable by
+      just visiting the URL, that's wrong — disabled via
+      `vercel project protection disable delft --sso`, confirmed publicly reachable (`200`, real
+      page content) afterward, not just assumed from the command succeeding.
+    - Project renamed `web` → `delft` (`vercel project rename`) purely for a cleaner domain; the
+      auto-generated original alias didn't update on rename, so `delft.vercel.app` and
+      `delft-tadxss-projects.vercel.app` were added explicitly via `vercel alias set`.
+    - **Git integration is not yet connected** — `vercel git connect` failed (repo is public, so
+      not a visibility issue; almost certainly Vercel's GitHub App isn't authorized for this repo
+      yet, which needs a one-time browser action only the user can do). Until that's done, deploys
+      are manual (`vercel --prod` from the repo root) rather than automatic on push to `master`.
+
+    Live at `https://delft.vercel.app`, verified via direct `curl` (status code and real page
+    content, e.g. "Careful records. Quiet craft"), not just a successful build log.
+
+**Deferred, not started:** revisiting `PageEditor.tsx`'s image-compression settings against real
+Storage usage — see **Next Up** above.
