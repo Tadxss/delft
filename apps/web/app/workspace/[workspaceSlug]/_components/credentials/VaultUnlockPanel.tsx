@@ -52,8 +52,8 @@ export function VaultUnlockPanel({
   }
 
   return (
-    <div className="flex items-center justify-center p-10">
-      <div className="w-full max-w-sm">
+    <div className="flex flex-1 items-center p-10">
+      <div className="mx-auto w-full max-w-sm">
         <h2 className="text-sm font-medium text-ink-800">
           {isSetup ? "Set up this workspace's vault" : "Unlock vault"}
         </h2>
