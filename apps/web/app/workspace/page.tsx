@@ -2,14 +2,29 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { buildWorkspaceHref, useAuthUser, useCreateWorkspace, useWorkspaces } from "@delft/shared";
+import {
+  buildWorkspaceHref,
+  useAuthUser,
+  useCreateWorkspace,
+  useDeleteWorkspace,
+  useWorkspaces,
+} from "@delft/shared";
 
 export default function WorkspaceSwitcherPage() {
   const router = useRouter();
   const { user } = useAuthUser();
   const { data: workspaces, isLoading } = useWorkspaces(user?.id);
   const createWorkspace = useCreateWorkspace(user?.id);
+  const deleteWorkspace = useDeleteWorkspace(user?.id);
   const [name, setName] = useState("");
+
+  function handleDelete(e: React.MouseEvent, workspaceId: string, workspaceName: string) {
+    e.stopPropagation();
+    if (!window.confirm(`Delete "${workspaceName}" and everything in it? This can't be undone.`)) {
+      return;
+    }
+    deleteWorkspace.mutate({ id: workspaceId });
+  }
 
   function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -34,19 +49,31 @@ export default function WorkspaceSwitcherPage() {
       ) : workspaces && workspaces.length > 0 ? (
         <ul className="flex flex-col gap-2">
           {workspaces.map((workspace) => (
-            <li key={workspace.id}>
+            <li key={workspace.id} className="group relative">
               <button
                 type="button"
                 onClick={() => router.push(buildWorkspaceHref(workspace))}
-                className="w-full rounded-md border border-paper-200 bg-paper-100 px-4 py-3 text-left text-sm text-ink-800 transition-colors hover:border-accent-500"
+                className="w-full rounded-md border border-paper-200 bg-paper-100 px-4 py-3 pr-16 text-left text-sm text-ink-800 transition-colors hover:border-accent-500"
               >
                 {workspace.name}
               </button>
+              {workspace.ownerId === user?.id && (
+                <button
+                  type="button"
+                  onClick={(e) => handleDelete(e, workspace.id, workspace.name)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded px-2 py-1 text-xs text-ink-400 opacity-0 hover:bg-paper-200 hover:text-red-700 group-hover:opacity-100"
+                >
+                  Delete
+                </button>
+              )}
             </li>
           ))}
         </ul>
       ) : (
         <p className="text-sm text-ink-500">No workspaces yet — create your first one below.</p>
+      )}
+      {deleteWorkspace.isError && (
+        <p className="text-xs text-red-700">{deleteWorkspace.error.message}</p>
       )}
 
       <form onSubmit={handleCreate} className="flex flex-col gap-2 border-t border-paper-200 pt-6">

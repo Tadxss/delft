@@ -14,6 +14,7 @@ export * from "./hooks/useSignOut";
 export * from "./hooks/useWorkspaces";
 export * from "./hooks/useWorkspace";
 export * from "./hooks/useCreateWorkspace";
+export * from "./hooks/useDeleteWorkspace";
 export * from "./hooks/usePages";
 export * from "./hooks/usePage";
 export * from "./hooks/useCreatePage";

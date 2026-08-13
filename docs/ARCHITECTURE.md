@@ -417,5 +417,48 @@ reasoning.
     Live at `https://delft.vercel.app`, verified via direct `curl` (status code and real page
     content, e.g. "Careful records. Quiet craft"), not just a successful build log.
 
+19. **Workspace deletion, and Credentials moved from a page to a modal.** ✅ *done*. Two gaps
+    reported after using the deployed app for real.
+
+    - **Workspace deletion had genuinely never been wired up** — confirmed by grepping the RLS/
+      grants migrations before writing any code: no `for delete` policy and no `DELETE` grant
+      existed on `workspaces` at all, not even client-side dead code calling a missing endpoint.
+      New `supabase/migrations/*_workspaces_delete.sql`: an owner-only policy mirroring
+      `workspaces_update_owner`'s `owner_id = auth.uid()` gate, plus the grant. No extra cleanup
+      needed beyond that — `workspace_members`/`pages`/`credentials`/`canvases` all already
+      reference `workspace_id` with `on delete cascade`, so deleting the workspace row cascades
+      everything else for free. New `useDeleteWorkspace` hook; a "Delete" action (hover-revealed,
+      `window.confirm`-gated, matching existing destructive-action conventions) added next to each
+      workspace on the `/workspace` switcher list, only rendered when the signed-in user is that
+      workspace's owner (RLS enforces this regardless — the client-side check is just UX, not the
+      real boundary). Verified: anon gets `42501 permission denied` on a raw REST `DELETE` call
+      (same pattern used to verify every other table's grants), and a new e2e spec deletes a
+      workspace that has a page in it, confirms it disappears from the switcher, and confirms its
+      old URL resolves to "no pages" (the row is actually gone, not just hidden).
+    - **Credentials Manager moved from a route (`/workspace/[slug]/credentials`) to a modal**,
+      opened via a "Credentials" button in the sidebar from anywhere in a workspace, and — per an
+      explicit user request — **always re-prompts for the vault passphrase on every open**, not
+      once per browser session. This is a deliberate security/friction tradeoff the user chose
+      after being told a 6-digit PIN (their first request) would be dramatically weaker than a
+      passphrase against offline brute-force if the DB ever leaked; they kept the stronger
+      passphrase and asked for the always-re-prompt behavior instead of switching to a PIN.
+      Implementation: `CredentialsModal`'s `open` effect calls `vaultKey.lock()` (the same
+      `VaultKeyContext` from Build Order step 16, unchanged) whenever it transitions to closed —
+      covers the explicit × button, Escape, and backdrop-click uniformly, so there's no path that
+      leaves a derived key cached across a close/reopen. New `apps/web/app/_components/Modal.tsx`
+      is the **first modal primitive in this codebase** (backdrop + panel, Escape + backdrop-click
+      to close via a portal to `document.body`, deliberately no focus trap or dialog library —
+      matches how little UI infrastructure the rest of the app has needed). The three existing
+      credential subcomponents (`VaultUnlockPanel`/`CredentialList`/`CredentialDetail`) moved
+      (`git mv`, history preserved) from the now-deleted route's `_components/` into
+      `[workspaceSlug]/_components/credentials/`, unchanged internally — only their container
+      changed from a full page to a modal body.
+
+    Verified via 2 new/rewritten e2e specs (`workspace-delete.spec.ts`, and `credentials.spec.ts`
+    rewritten for the modal — click-to-open instead of URL navigation, and the "close then reopen
+    without a reload" flow as the direct test of the new always-re-prompt behavior, not just the
+    pre-existing reload check) plus the full suite (10 specs total), `pnpm lint`/`check-types`/
+    `build`, and the anon-DELETE REST check above.
+
 **Deferred, not started:** revisiting `PageEditor.tsx`'s image-compression settings against real
 Storage usage — see **Next Up** above.
