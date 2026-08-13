@@ -14,50 +14,41 @@ when something ships. Entries accumulate; don't edit or delete old ones, append 
 
 Read this section first in a new session — it's the answer to "what should I work on."
 
-1. **Credentials Manager** (not started). Per-workspace encrypted vault: add/edit/delete entries
-   (title, username, password, URL, notes), copy-to-clipboard, no credential values in logs/errors/
-   HTML exports. Encryption design already decided, do not re-litigate it without the user's
-   explicit sign-off:
-   - A **per-workspace vault passphrase**, distinct from the user's login/magic-link identity —
-     entering the workspace's vault for the first time in a session prompts for it.
-   - Client-side key derivation via the **Web Crypto API**: PBKDF2 (high iteration count) from the
-     passphrase + a random per-credential (or per-vault — decide at implementation time, per-vault
-     is simpler and adequate for v1) salt, producing an AES-GCM key.
-   - The derived key is held **in memory only** (a module-level variable or React context, never
-     `localStorage`/`sessionStorage`) — re-entering the passphrase is expected every new browser
-     session, that's the point.
-   - Postgres/Supabase only ever stores ciphertext + salt + iv columns. RLS still scopes rows to
-     workspace members (same pattern as `pages`), but that's a secondary defense — the real
-     confidentiality boundary is that the server never has the key.
-   - New table (not yet migrated): something like `credentials (id, workspace_id, title, username
-     text, password_ciphertext, url text, notes_ciphertext, salt, iv, created_at, updated_at)` —
-     decide exact column shape (which fields are encrypted vs. plaintext-searchable, e.g. `title`
-     probably stays plaintext for the list view) when starting this.
-
-2. **Excalidraw Canvas** (not started). Standalone workspace items (own table, own sidebar
+1. **Excalidraw Canvas** (not started). Standalone workspace items (own table, own sidebar
    presence, not embedded in Pages yet — embedding is explicitly deferred further). Scene data
    (elements + appState) stored as JSON in Postgres, no rendered image/binary. `@excalidraw/
    excalidraw` (MIT, free) for the canvas UI.
 
-3. **Hosted deployment** (not started). Everything so far has only run against the local Supabase
+2. **Hosted deployment** (not started). Everything so far has only run against the local Supabase
    stack. Needs: create/link a real hosted Supabase project (`supabase link`, `supabase db push`),
    a Vercel project with `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY` set for the
    hosted project, and revisiting the image-compression settings in `PageEditor.tsx` against real
    Storage usage once there's real data (flagged in step 3 below as a zero-cost risk to recheck,
    not a one-time check).
 
+**Credentials Manager shipped** — see Build Order step 16 below for the final design (some details
+differ from what was originally sketched here, e.g. username/password/notes end up bundled into
+one ciphertext per credential rather than separate columns).
+
 ## Data model
 
-- `workspaces (id, owner_id, name, created_at)`
+- `workspaces (id, owner_id, name, vault_salt, created_at)` — `vault_salt` is the Credentials
+  Manager's per-workspace PBKDF2 salt (plaintext; salts aren't secret), null until that workspace's
+  vault passphrase is first set up.
 - `workspace_members (workspace_id, user_id, role)` — every RLS policy keys off membership rather
   than `owner_id` directly, so extending to real multi-user sharing later is a data change, not a
   schema/policy rewrite.
 - `pages (id, workspace_id, parent_id, title, content jsonb, is_published, published_slug,
   created_at, updated_at)` — `parent_id` self-references `pages` for the sidebar tree.
+- `credentials (id, workspace_id, title, url, secret_ciphertext, secret_iv, created_at,
+  updated_at)` — `title`/`url` plaintext (list view + search); `secret_ciphertext`/`secret_iv` are
+  one AES-GCM ciphertext+iv pair encrypting a `{username, password, notes}` JSON payload per
+  credential. See Build Order step 16.
 
 RLS: every table requires membership (`workspace_members`) except one deliberate hole —
-`pages_select_published_anon`, readable by `anon`, scoped strictly to `is_published = true`. See
-`supabase/migrations/*_rls.sql` for the full policy set and its inline reasoning.
+`pages_select_published_anon`, readable by `anon`, scoped strictly to `is_published = true`.
+`credentials` has no anon policy or grant at all — unlike `pages`, it has no public share surface.
+See `supabase/migrations/*_rls.sql` for the full policy set and its inline reasoning.
 
 ## Build Order
 
@@ -287,5 +278,50 @@ RLS: every table requires membership (`workspace_members`) except one deliberate
     the Mailpit-based e2e setup can drive) plus a full `pnpm --filter web test:e2e` run (all 6
     specs) and `pnpm lint`/`check-types`/`build` after each change.
 
-**Deferred, not started:** Credentials Manager, Excalidraw Canvas, hosted (non-local) Supabase
-project + Vercel deployment — see **Next Up** above for the concrete plan on each.
+16. **Credentials Manager.** ✅ *done*. Per-workspace encrypted vault (title, username, password,
+    URL, notes), matching the design already sketched under "Next Up" with the exact-shape
+    decisions made at implementation time:
+
+    - **Schema**: `supabase/migrations/*_credentials.sql` + `*_credentials_rls.sql`. One new
+      `credentials` table plus `workspaces.vault_salt` (see Data model above). RLS mirrors `pages`'
+      member-based policies exactly (same `to authenticated` scoping, same reasoning) but with
+      **no anon policy or grant at all** — verified via a direct REST call with the anon key
+      (`42501 permission denied for table credentials`), confirming zero exposure rather than
+      trusting RLS alone.
+    - **Field shape decided**: `title`/`url` stay plaintext (needed for the list view and search
+      without decrypting everything up front). `username`/`password`/`notes` are bundled into
+      **one** JSON payload, encrypted together as a single ciphertext+IV pair per credential —
+      simpler than three separate ciphertext columns, and decryption only happens when a specific
+      entry is opened, not for the whole list.
+    - **Crypto**: new `packages/shared/src/lib/vaultCrypto.ts` — PBKDF2-SHA256 at 310,000
+      iterations (current OWASP-recommended minimum, deliberately not configurable — bumping it
+      later would strand existing ciphertext without a re-encrypt migration) deriving a
+      non-extractable AES-GCM `CryptoKey`, plus `generatePassword()` for the add/edit form's
+      "Generate" button. One salt per workspace (`vault_salt`), not per-credential.
+    - **In-memory key only**: new `packages/shared/src/vault/VaultKeyContext.tsx` holds derived
+      keys in a `Map<workspaceId, CryptoKey>` inside a ref (never `localStorage`/`sessionStorage`).
+      `VaultKeyProvider` is mounted in `apps/web/app/workspace/layout.tsx` **inside** `AuthGate`'s
+      authenticated render, so signing out (which unmounts everything under `AuthGate`) discards
+      every derived key for free — no extra sign-out wiring needed.
+    - **No passphrase verification beyond decryption itself** — there's no server-side check
+      possible by design (the server never sees the passphrase or key). A wrong passphrase just
+      means the first `decryptSecret` call throws (AES-GCM's built-in auth tag fails on a wrong
+      key), surfaced as "Couldn't decrypt — check your vault passphrase." Known, intentional
+      limitation of zero-knowledge encryption, not a bug.
+    - **UI**: `apps/web/app/workspace/[workspaceSlug]/credentials/` — a vault-unlock gate
+      (`VaultUnlockPanel.tsx`, first-time setup vs. enter-passphrase depending on whether
+      `vault_salt` is set) then a master-detail view (`CredentialList.tsx` +
+      `CredentialDetail.tsx`), reachable via a "Credentials" link added to `Sidebar.tsx`. No new
+      modal/dialog primitive was introduced — this codebase had none before, and destructive
+      actions already use plain `window.confirm(...)` (mirrored here for delete), so the add/edit
+      form is an inline panel instead, consistent with existing patterns.
+
+    Verified via 2 new e2e specs (`e2e/credentials.spec.ts`): full vault-setup → add-credential →
+    lock → reload → re-unlock → decrypt round trip (confirming the key is genuinely gone after
+    lock/reload, not silently cached anywhere), and a wrong-passphrase case confirming the decrypt
+    failure surfaces as a clear error rather than garbage data. Both passed on the first real run.
+    Plus the anon-grant REST check above, `pnpm lint`/`check-types`/`build`, and the full existing
+    e2e suite (8 specs total) passing unmodified.
+
+**Deferred, not started:** Excalidraw Canvas, hosted (non-local) Supabase project + Vercel
+deployment — see **Next Up** above for the concrete plan on each.

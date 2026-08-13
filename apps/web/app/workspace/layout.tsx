@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useAuthUser, useSignOut } from "@delft/shared";
+import { useAuthUser, useSignOut, VaultKeyProvider } from "@delft/shared";
 import { AuthGate } from "../_components/AuthGate";
 import { ThemeToggle } from "../_components/ThemeToggle";
 
@@ -37,10 +37,12 @@ function TopBar() {
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthGate>
-      <div className="flex min-h-screen flex-col">
-        <TopBar />
-        <div className="flex flex-1">{children}</div>
-      </div>
+      <VaultKeyProvider>
+        <div className="flex min-h-screen flex-col">
+          <TopBar />
+          <div className="flex flex-1">{children}</div>
+        </div>
+      </VaultKeyProvider>
     </AuthGate>
   );
 }

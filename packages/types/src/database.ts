@@ -34,6 +34,47 @@ export type Database = {
   }
   public: {
     Tables: {
+      credentials: {
+        Row: {
+          created_at: string
+          id: string
+          secret_ciphertext: string
+          secret_iv: string
+          title: string
+          updated_at: string
+          url: string | null
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          secret_ciphertext: string
+          secret_iv: string
+          title?: string
+          updated_at?: string
+          url?: string | null
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          secret_ciphertext?: string
+          secret_iv?: string
+          title?: string
+          updated_at?: string
+          url?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credentials_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pages: {
         Row: {
           content: Json
@@ -117,18 +158,21 @@ export type Database = {
           id: string
           name: string
           owner_id: string
+          vault_salt: string | null
         }
         Insert: {
           created_at?: string
           id?: string
           name: string
           owner_id: string
+          vault_salt?: string | null
         }
         Update: {
           created_at?: string
           id?: string
           name?: string
           owner_id?: string
+          vault_salt?: string | null
         }
         Relationships: []
       }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import type { Page } from "@delft/types";
 import { useCreatePage, usePages, parseWorkspaceSlug } from "@delft/shared";
@@ -53,6 +54,13 @@ export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
 
   return (
     <nav className="flex w-64 shrink-0 flex-col gap-2 border-r border-paper-200 bg-paper-50 p-3">
+      <Link
+        href={`/workspace/${params.workspaceSlug}/credentials`}
+        className="flex items-center gap-2 rounded px-1 py-1 text-sm text-ink-600 hover:bg-paper-100 hover:text-ink-800"
+      >
+        Credentials
+      </Link>
+
       <div className="flex items-center justify-between px-1">
         <span className="text-xs font-medium uppercase tracking-wide text-ink-500">Pages</span>
         <div className="flex items-center gap-0.5">

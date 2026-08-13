@@ -29,11 +29,13 @@ practice this is rare since every spec uses a freshly generated unique email per
 | `workspace-pages.spec.ts` | Create workspace → create page → edit title + BlockNote content → autosave persists across a reload → nested sub-page creation and tree display. |
 | `publish-share.spec.ts` | Publish toggle → `/share/[slug]` renders content read-only (zero `[contenteditable]` elements) to a fully separate signed-out browser context → unpublish takes the share URL back down to a 404. |
 | `workspace-isolation.spec.ts` | A second real user can neither see user A's workspace in their own switcher, nor read anything by navigating directly to user A's workspace URL — RLS-level isolation, not just UI filtering. |
+| `credentials.spec.ts` | Vault setup → add a credential (all fields) → lock → reload → re-unlock → decrypt round trip (confirms the derived key is genuinely gone after lock/reload, not cached anywhere); a wrong-passphrase case confirms a decrypt failure surfaces as a clear error instead of garbage data. |
 
-Not covered by the automated suite (manual-only): Credentials Manager and Canvas (not built yet —
-see `docs/ARCHITECTURE.md`'s Build Order), visual/design polish, and the browser's native
-print-to-PDF output from a `/share/[slug]` page (Playwright can assert the page renders correctly;
-actually producing and eyeballing a PDF is a manual step).
+Not covered by the automated suite (manual-only): Canvas (not built yet — see
+`docs/ARCHITECTURE.md`'s Build Order), Google OAuth (needs real credentials, see scenario 6 below),
+visual/design polish, and the browser's native print-to-PDF output from a `/share/[slug]` page
+(Playwright can assert the page renders correctly; actually producing and eyeballing a PDF is a
+manual step).
 
 ## Manual scenarios
 
@@ -57,6 +59,12 @@ actually producing and eyeballing a PDF is a manual step).
    self-closes with the main tab landing signed in on `/workspace`. Separately, block popups for
    `localhost`/`127.0.0.1` in the browser and confirm it falls back to a full-page redirect instead
    of silently doing nothing.
+7. Set up a workspace's vault passphrase, add a few credentials, then deliberately "forget" the
+   passphrase (use a different one on the next unlock) — confirm every existing credential fails to
+   decrypt with a clear error rather than silently corrupting data, and that there is genuinely no
+   recovery path (by design — the server never has the passphrase or key). Also confirm the
+   password generator's output actually works as a real password on some external site, and that
+   copy-to-clipboard for username/password does what it says.
 
 ## Resetting between test runs
 

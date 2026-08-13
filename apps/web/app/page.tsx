@@ -39,6 +39,12 @@ function GoogleLogo() {
 export default function LoginPage() {
   const router = useRouter();
   const { resolvedTheme } = useTheme();
+  // See ThemeToggle.tsx — resolvedTheme is undefined on the server/first client render, so the
+  // Google button's colors must not depend on it until mounted, or the client's real (possibly
+  // "dark") value diverges from the deterministic light-mode SSR output and React flags a
+  // hydration mismatch.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const { user, loading } = useAuthUser();
   const signIn = useSignInWithMagicLink();
   const signInWithPassword = useSignInWithPassword();
@@ -149,7 +155,7 @@ export default function LoginPage() {
               onClick={handleGoogleClick}
               disabled={signInWithGoogle.isPending || awaitingGooglePopup}
               style={
-                resolvedTheme === "dark"
+                mounted && resolvedTheme === "dark"
                   ? { backgroundColor: "#131314", borderColor: "#8e918f", color: "#e3e3e3" }
                   : { backgroundColor: "#ffffff", borderColor: "#747775", color: "#1f1f1f" }
               }
