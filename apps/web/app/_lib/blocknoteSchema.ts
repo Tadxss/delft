@@ -1,4 +1,5 @@
 import { BlockNoteSchema, defaultBlockSpecs } from "@blocknote/core";
+import { customCodeBlockSpec } from "./customCodeBlockSpec";
 
 // Video/Audio/File are deliberately held back for a future paid tier — not implemented as an
 // access-control/role check, just not offered as insertable block types at all right now. An
@@ -18,7 +19,7 @@ export const restrictedBlockSchema = BlockNoteSchema.create({
     numberedListItem: defaultBlockSpecs.numberedListItem,
     checkListItem: defaultBlockSpecs.checkListItem,
     toggleListItem: defaultBlockSpecs.toggleListItem,
-    codeBlock: defaultBlockSpecs.codeBlock,
+    codeBlock: customCodeBlockSpec(),
     table: defaultBlockSpecs.table,
     divider: defaultBlockSpecs.divider,
     image: defaultBlockSpecs.image,

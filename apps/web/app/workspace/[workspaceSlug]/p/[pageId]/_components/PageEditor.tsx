@@ -6,6 +6,7 @@ import { useTheme } from "next-themes";
 import { BlockNoteView } from "@blocknote/mantine";
 import { useCreateBlockNote } from "@blocknote/react";
 import type { PartialBlock } from "@blocknote/core";
+import { syntaxHighlighter } from "@blocknote/code-block";
 import "@blocknote/mantine/style.css";
 import imageCompression from "browser-image-compression";
 import type { Page } from "@delft/types";
@@ -25,7 +26,9 @@ const AUTOSAVE_DEBOUNCE_MS = 800;
 // non-empty array (it throws otherwise), so an empty/never-edited page falls back to `undefined`,
 // which makes BlockNote seed its own single empty paragraph.
 function toInitialContent(content: unknown): PartialBlock[] | undefined {
-  return Array.isArray(content) && content.length > 0 ? (content as PartialBlock[]) : undefined;
+  return Array.isArray(content) && content.length > 0
+    ? (content as PartialBlock[])
+    : undefined;
 }
 
 export function PageEditor({ page }: { page: Page }) {
@@ -50,6 +53,7 @@ export function PageEditor({ page }: { page: Page }) {
   const editor = useCreateBlockNote(
     {
       schema: restrictedBlockSchema,
+      extensions: [syntaxHighlighter],
       initialContent: toInitialContent(page.content),
       uploadFile: async (file) => {
         // Resize/convert/strip-EXIF client-side before it ever leaves the browser — keeps
@@ -161,7 +165,12 @@ export function PageEditor({ page }: { page: Page }) {
       {shareUrl && (
         <div className="flex items-center gap-2 rounded-md bg-paper-100 px-3 py-2 text-xs text-ink-600">
           <span>Live at</span>
-          <a href={shareUrl} target="_blank" rel="noreferrer" className="truncate underline">
+          <a
+            href={shareUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="truncate underline"
+          >
             {shareUrl}
           </a>
         </div>
