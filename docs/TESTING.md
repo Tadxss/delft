@@ -36,7 +36,10 @@ practice this is rare since every spec uses a freshly generated unique email per
 Not covered by the automated suite (manual-only): Google OAuth (needs real credentials, see
 scenario 6 below), visual/design polish, and the browser's native print-to-PDF output from a
 `/share/[slug]` page (Playwright can assert the page renders correctly; actually producing and
-eyeballing a PDF is a manual step).
+eyeballing a PDF is a manual step). Also the Pages code block toolbar (`apps/web/app/_lib/CodeBlockView.tsx` —
+syntax highlighting, language search/select, copy button, keyboard navigation, Ctrl+A scoping; see
+`docs/ARCHITECTURE.md` Build Order step 21) — verified via ad-hoc Playwright scripts at
+implementation time, not a permanent spec.
 
 ## Manual scenarios
 

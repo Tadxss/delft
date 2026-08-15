@@ -480,5 +480,53 @@ reasoning.
     a direct `curl` of the resulting preview URL confirming real page content — not just a green
     build log.
 
+21. **Notion-style code block toolbar for Pages.** ✅ *done*. The editor's `codeBlock` had no
+    syntax highlighting or language picker at all (`defaultBlockSpecs.codeBlock` from
+    `@blocknote/core`) — replaced end to end, in three passes as real problems surfaced.
+
+    - **Pass 1 — syntax highlighting.** Added `@blocknote/code-block` (bumping
+      `@blocknote/core`/`react`/`mantine` 0.53.0 → 0.54.0 for its peer requirement) and wired
+      `codeBlockOptions` + the `syntaxHighlighter` extension (Shiki-based, 48 languages) into
+      `restrictedBlockSchema` (`apps/web/app/_lib/blocknoteSchema.ts`) and both `useCreateBlockNote`
+      call sites (`PageEditor.tsx`, `SharedPageView.tsx`).
+    - **Pass 2 — replacing the picker + fixing a real Enter bug.** `createCodeBlockSpec`'s
+      language picker is a bare, unstyled native `<select>`, and — a genuine bug, not a style
+      complaint — plain `Enter` silently exits the block after two blank lines with no warning,
+      confirmed reproducible with exactly three consecutive `Enter` presses. Neither is patchable
+      in place: the picker and the keyboard-shortcuts extension that causes the Enter behavior are
+      both internal, not part of `@blocknote/core`'s public API. Replaced the whole spec with a
+      custom one built from what *is* public — `createCodeBlockConfig`,
+      `parsePreCode`/`parsePreCodeContent`, `createExtension` — new files under `apps/web/app/_lib/`:
+      `customCodeBlockSpec.tsx` (assembly), `codeBlockKeyboardShortcuts.ts` (a local port of the
+      internal shortcuts extension, with the auto-exit-on-blank-lines heuristic removed — `Enter`
+      always inserts a newline now; keyboard exit still works via normal arrow-key navigation past
+      the block boundary), and `CodeBlockView.tsx` (the new toolbar: searchable language picker +
+      copy button).
+    - **Real bug found and fixed: toolbar broke the block's own boxed look.** The first toolbar
+      layout wrapped `<pre>` in an extra `<div>`, which silently broke
+      `.bn-block-content[data-content-type=codeBlock]>pre{padding:24px}` — a rule BlockNote ships
+      keyed to `<pre>` being a **direct child** of the block wrapper. Root-caused by tracing the
+      actual loaded CSS chain (`@blocknote/mantine/style.css` → `blocknoteStyles.css` →
+      `@blocknote/react/style.css`, not just assumed from `@blocknote/core`'s copy). Fixed by
+      returning the toolbar and `<pre>` as siblings instead of nesting them, and made the toolbar
+      always-visible (not hover-revealed) at the same time, per a reference screenshot.
+    - **Toolbar UX**: language search is fully keyboard-navigable (opens with the current language
+      pre-highlighted and scrolled into view, arrow keys move the highlight, Enter selects, Escape
+      closes) with `listbox`/`option`/`aria-selected`/`aria-expanded` wired up, not just mouse-only.
+    - **Real bug found and fixed: Ctrl/Cmd+A inside a code block selected the whole document.**
+      Added a `Mod-a` handler to `codeBlockKeyboardShortcuts.ts` that scopes the selection to the
+      block's own text via `prosemirror-state`'s `TextSelection` — added as a new direct dependency
+      of `apps/web`, deliberately pinned to the exact version range `@blocknote/core` itself
+      resolves (`^1.4.4`) so pnpm dedupes to the same install rather than risking a second copy
+      (BlockNote's own code does `instanceof TextSelection` checks internally, which only hold
+      across a single shared copy).
+
+    **Not covered by the automated e2e suite** — verified instead via ad-hoc Playwright scripts run
+    against the live dev server at each step (multi-line entry via repeated `Enter`, language
+    search/select, copy-to-clipboard content, keyboard nav, Ctrl+A scoping, light/dark theme, the
+    read-only `/share/[slug]` view) plus screenshots compared against reference images, none of
+    which were kept as permanent spec files. `pnpm lint`/`check-types` and the full existing e2e
+    suite (10 specs, unmodified) were re-run clean after every pass.
+
 **Deferred, not started:** revisiting `PageEditor.tsx`'s image-compression settings against real
 Storage usage — see **Next Up** above.
