@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useCredentials, useVaultKey, useWorkspace } from "@delft/shared";
+import {
+  useCredentialFolders,
+  useCredentials,
+  useVaultKey,
+  useWorkspace,
+} from "@delft/shared";
 import { Modal } from "../../../../_components/Modal";
 import { VaultUnlockPanel } from "./VaultUnlockPanel";
 import { CredentialList } from "./CredentialList";
@@ -28,7 +33,15 @@ export function CredentialsModal({
   // makes a credential available for VaultUnlockPanel to test-decrypt the passphrase against
   // *before* granting access, rather than only after.
   const { data: credentials } = useCredentials(open ? workspaceId : undefined);
+  const { data: folders } = useCredentialFolders(
+    open ? workspaceId : undefined,
+  );
   const [selectedId, setSelectedId] = useState<string | null | "new">(null);
+  // Which folder a brand-new credential should default into — set from wherever "New credential"
+  // was clicked (the root toolbar, or a specific folder's own hover action in the tree).
+  const [newCredentialFolderId, setNewCredentialFolderId] = useState<
+    string | null
+  >(null);
 
   // Reset per-open state (selection) and guarantee the key is gone whenever the modal isn't
   // visible, not just when the user explicitly clicks a lock button.
@@ -36,14 +49,34 @@ export function CredentialsModal({
     if (!open) {
       vaultKey.lock();
       setSelectedId(null);
+      setNewCredentialFolderId(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-run on open/close, not on every vaultKey identity change
   }, [open]);
 
+  // If the credential currently open was deleted out from under this session (another tab, another
+  // device), bounce back to the empty state rather than getting stuck on a dead reference.
+  useEffect(() => {
+    if (!credentials) return;
+    if (
+      selectedId &&
+      selectedId !== "new" &&
+      !credentials.some((c) => c.id === selectedId)
+    ) {
+      setSelectedId(null);
+    }
+  }, [credentials, selectedId]);
+
   function handleClose() {
     vaultKey.lock();
     setSelectedId(null);
+    setNewCredentialFolderId(null);
     onClose();
+  }
+
+  function handleNewCredential(folderId: string | null) {
+    setNewCredentialFolderId(folderId);
+    setSelectedId("new");
   }
 
   const selectedCredential =
@@ -56,7 +89,7 @@ export function CredentialsModal({
       open={open}
       onClose={handleClose}
       widthClassName="max-w-3xl"
-      heightClassName="h-[600px]"
+      heightClassName="h-[720px]"
     >
       <div className="flex shrink-0 items-center justify-between border-b border-paper-200 px-4 py-2">
         <span className="text-sm font-medium text-ink-800">Credentials</span>
@@ -89,16 +122,20 @@ export function CredentialsModal({
         ) : (
           <>
             <CredentialList
+              workspaceId={workspaceId}
               credentials={credentials ?? []}
+              folders={folders ?? []}
               selectedId={selectedId === "new" ? null : selectedId}
               onSelect={setSelectedId}
-              onNew={() => setSelectedId("new")}
+              onNewCredential={handleNewCredential}
             />
             <div className="flex-1 overflow-y-auto">
               {selectedId === "new" ? (
                 <CredentialDetail
                   workspaceId={workspaceId}
                   credential={null}
+                  newCredentialFolderId={newCredentialFolderId}
+                  folders={folders ?? []}
                   vaultKey={vaultKey.key}
                   onSaved={setSelectedId}
                   onDeleted={() => setSelectedId(null)}
@@ -107,6 +144,8 @@ export function CredentialsModal({
                 <CredentialDetail
                   workspaceId={workspaceId}
                   credential={selectedCredential}
+                  newCredentialFolderId={newCredentialFolderId}
+                  folders={folders ?? []}
                   vaultKey={vaultKey.key}
                   onSaved={setSelectedId}
                   onDeleted={() => setSelectedId(null)}

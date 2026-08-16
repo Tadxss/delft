@@ -31,18 +31,29 @@ Storage's free tier caps at 1GB.
 
 ## Data model
 
-- `workspaces (id, owner_id, name, vault_salt, created_at)` — `vault_salt` is the Credentials
-  Manager's per-workspace PBKDF2 salt (plaintext; salts aren't secret), null until that workspace's
-  vault passphrase is first set up.
+- `workspaces (id, owner_id, name, vault_salt, vault_verifier, vault_verifier_iv, created_at)` —
+  `vault_salt` is the Credentials Manager's per-workspace PBKDF2 salt (plaintext; salts aren't
+  secret), null until that workspace's vault passphrase is first set up. `vault_verifier`/
+  `vault_verifier_iv` are a small AES-GCM ciphertext+iv pair, meaningless in content, used purely
+  to verify a typed passphrase is correct before ever granting vault access — see Build Order
+  step 22/23.
 - `workspace_members (workspace_id, user_id, role)` — every RLS policy keys off membership rather
   than `owner_id` directly, so extending to real multi-user sharing later is a data change, not a
   schema/policy rewrite.
 - `pages (id, workspace_id, parent_id, title, content jsonb, is_published, published_slug,
   created_at, updated_at)` — `parent_id` self-references `pages` for the sidebar tree.
-- `credentials (id, workspace_id, title, url, secret_ciphertext, secret_iv, created_at,
+- `credentials (id, workspace_id, folder_id, title, url, secret_ciphertext, secret_iv, created_at,
   updated_at)` — `title`/`url` plaintext (list view + search); `secret_ciphertext`/`secret_iv` are
   one AES-GCM ciphertext+iv pair encrypting a `{username, password, notes}` JSON payload per
-  credential. See Build Order step 16.
+  credential. See Build Order step 16. `folder_id` (nullable, `on delete set null`) places it in a
+  `credential_folders` folder, or at root when null — see Build Order step 24.
+- `credential_folders (id, workspace_id, parent_folder_id, name, created_at, updated_at)` — pure
+  containers (name only, no secret of their own), nesting arbitrarily deep via `parent_folder_id`
+  (self-referencing, `on delete cascade` — unlike `credentials.folder_id`, which is deliberately
+  `on delete set null` so deleting a folder never destroys the credentials inside it). Two triggers
+  (`check_credential_folder_parent`, `check_credential_folder_workspace`) guard against cycles and
+  cross-workspace linking, since RLS's flat per-row membership check can't catch either on its own.
+  See Build Order step 24.
 - `canvases (id, workspace_id, title, scene jsonb, created_at, updated_at)` — flat, no `parent_id`
   (standalone items, not a tree like `pages`). `scene` is Excalidraw's own `{elements, appState}`
   shape; the `files` argument from Excalidraw's `onChange` (embedded image binaries) is never
@@ -50,9 +61,9 @@ Storage's free tier caps at 1GB.
 
 RLS: every table requires membership (`workspace_members`) except one deliberate hole —
 `pages_select_published_anon`, readable by `anon`, scoped strictly to `is_published = true`.
-`credentials` and `canvases` have no anon policy or grant at all — unlike `pages`, neither has a
-public share surface. See `supabase/migrations/*_rls.sql` for the full policy set and its inline
-reasoning.
+`credentials`, `credential_folders`, and `canvases` have no anon policy or grant at all — unlike
+`pages`, none of them has a public share surface. See `supabase/migrations/*_rls.sql` for the full
+policy set and its inline reasoning.
 
 ## Build Order
 
@@ -599,6 +610,77 @@ reasoning.
     Verified via a new e2e case ("wrong passphrase is rejected even on a brand-new vault with zero
     credentials" — the exact scenario that used to be an open gap) plus the full suite (11 specs)
     and `pnpm lint`/`check-types`, all green.
+
+24. **Nested folders for the Credentials Manager.** ✅ *done*. Credentials were flat per-workspace
+    — no grouping. Added arbitrarily-deep nested folders (a folder holds both credentials and more
+    sub-folders), plus the ability to move an existing credential or folder afterward, not just
+    create-in-place. Researched Pages' existing `parent_id` tree first and mirrored it deliberately,
+    with two differences explained below.
+
+    - **Schema**: `supabase/migrations/20260816090000_credential_folders.sql` +
+      `20260816090010_credential_folders_rls.sql` — new `credential_folders` table
+      (`parent_folder_id` self-references, `on delete cascade`) plus `credentials.folder_id`
+      (nullable, **`on delete set null`**, not cascade — the one deliberate deviation from
+      `pages.parent_id`'s uniform cascade: deleting a folder must never destroy the credentials
+      inside it, since a lost password is often costly to recover — reset it on the real site —
+      unlike a lost empty folder shell). RLS is the exact 4-policy member-scoped shape as
+      `credentials`/`pages`, no anon policy, plus the required companion grants migration.
+    - **Two new integrity triggers**, needed because "move a folder" is new ground Pages has never
+      had to guard (nothing lets a client retarget a page's `parent_id` today): 1)
+      `check_credential_folder_parent` rejects self-parenting and moving a folder into one of its
+      own descendants (recursive CTE) 2) both it and `check_credential_folder_workspace` (on
+      `credentials.folder_id`) reject cross-workspace linking — RLS's flat per-row membership check
+      can't catch a two-workspace member linking a folder in workspace A to a parent in workspace B,
+      since both rows independently satisfy membership.
+    - **Real bug found via `rls-reviewer` before ever applying the migration**: both triggers were
+      initially scoped to `before update of parent_folder_id` / `before update of folder_id` only —
+      updating `workspace_id` directly (bypassing those columns) slipped past both checks entirely.
+      Fixed by also watching `workspace_id` in each trigger's column list. Verified directly via
+      `psql` afterward: self-parent, multi-level cycle, and both cross-workspace paths (including
+      the fixed `workspace_id` bypass) all correctly rejected; a legitimate rename still succeeds;
+      the cascade/set-null interaction (delete root → cascades to child folder → credential inside
+      survives with `folder_id` nulled) works with no orphan and no error.
+    - **UI**: initially shipped as Finder-style drill-down with a breadcrumb trail, then redesigned
+      (same day) to an always-visible collapsible tree — `CredentialFolderTreeNode.tsx` mirrors
+      `PageTreeNode.tsx`'s exact shape (same `depth * 14 + 4`px indentation, `▾`/`▸` toggle hidden
+      via `invisible` when a folder has nothing to expand, same `group`/`group-hover:flex`
+      hover-reveal), extended for two child types per folder — sub-folders (recursed as more tree
+      nodes) and credentials (plain leaf rows, `CredentialLeafRow`, shared with the root-level list
+      in `CredentialList.tsx`). `CredentialList.tsx` owns an `expanded: Set<string>` exactly like
+      `Sidebar.tsx`'s, not a `currentFolderId`; there's no "active folder" concept — the toolbar's
+      "+ folder"/"+ credential" always create at root (mirroring `Sidebar.tsx`'s top `+` always
+      calling `createChild(null)`), while each folder row's own hover-revealed icons create directly
+      inside that folder and auto-expand it afterward so the new item is immediately visible. Other
+      pieces are unchanged from the original build: inline rename (no dialog), a small new
+      `MoveCredentialFolderModal.tsx` (wraps the existing `Modal.tsx` primitive) whose folder picker
+      excludes the folder itself and all its descendants client-side (mirroring the server trigger's
+      check), and a plain native `<select>` added to `CredentialDetail.tsx`'s existing edit form to
+      move a credential. Search stayed global (matches folder names and credential title/url across
+      the whole tree) whenever non-empty; clicking a matched folder now expands it and all its
+      ancestors in place (`revealFolder`) instead of navigating into it. Separately, the modal grew
+      from `h-[600px]` to `h-[720px]` so the credential list/detail panes fit without scrolling.
+    - **Real bug found and fixed during live verification, not by static review**: creating a
+      credential or folder and immediately referencing its new id (opening it / entering inline
+      rename) could transiently disappear — `useCreateCredential`/`useCreateCredentialFolder` only
+      called `invalidateQueries` on success, which triggers a background refetch, not a synchronous
+      cache update. A stale-state recovery effect added to `CredentialsModal.tsx` (bounces
+      `currentFolderId`/`selectedId` back toward root if they ever stop resolving against a fresh
+      fetch — needed for the real case of a folder or credential being deleted from another tab)
+      would see the brand-new id "missing" from the still-stale cached list for one render and
+      incorrectly reset the selection. Caught by the *existing* `credentials.spec.ts` suite failing,
+      not by new-feature testing — a good reminder that root-level regression coverage earns its
+      keep. Fixed by having both create hooks merge the new row into the query cache synchronously
+      (`setQueryData`) in addition to invalidating, so the id is always resolvable the instant a
+      caller acts on it.
+
+    Verified via `e2e/credential-folders.spec.ts` (rewritten for the tree redesign: expand/collapse
+    controls visibility rather than drill-down navigation, moving a credential via the edit form and
+    a folder via the move dialog, and — the single most important case given what's at stake —
+    deleting a folder with a credential inside it and confirming the credential survives at root)
+    plus the *existing* `credentials.spec.ts` (confirms root-level/no-folder behavior wasn't
+    disturbed — this is what caught the cache-race bug above), the full suite (14 specs), `pnpm
+    lint`/`check-types`, direct `psql` trigger testing, and a live screenshot confirming the tree's
+    indentation/icons visually match `Sidebar.tsx`'s.
 
 **Deferred, not started:** revisiting `PageEditor.tsx`'s image-compression settings against real
 Storage usage — see **Next Up** above.

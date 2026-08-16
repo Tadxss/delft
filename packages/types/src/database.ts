@@ -69,9 +69,52 @@ export type Database = {
           },
         ]
       }
+      credential_folders: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          parent_folder_id: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name?: string
+          parent_folder_id?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          parent_folder_id?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credential_folders_parent_folder_id_fkey"
+            columns: ["parent_folder_id"]
+            isOneToOne: false
+            referencedRelation: "credential_folders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credential_folders_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       credentials: {
         Row: {
           created_at: string
+          folder_id: string | null
           id: string
           secret_ciphertext: string
           secret_iv: string
@@ -82,6 +125,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          folder_id?: string | null
           id?: string
           secret_ciphertext: string
           secret_iv: string
@@ -92,6 +136,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          folder_id?: string | null
           id?: string
           secret_ciphertext?: string
           secret_iv?: string
@@ -101,6 +146,13 @@ export type Database = {
           workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "credentials_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "credential_folders"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "credentials_workspace_id_fkey"
             columns: ["workspace_id"]

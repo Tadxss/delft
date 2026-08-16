@@ -7,6 +7,7 @@ type CredentialsUpdate = Database["public"]["Tables"]["credentials"]["Update"];
 
 export interface UpdateCredentialInput {
   id: string;
+  folderId?: string | null;
   title?: string;
   url?: string | null;
   secretCiphertext?: string;
@@ -21,11 +22,20 @@ export function useUpdateCredential() {
   const queryClient = useQueryClient();
 
   return useMutation<Credential, Error, UpdateCredentialInput>({
-    mutationFn: async ({ id, title, url, secretCiphertext, secretIv }) => {
+    mutationFn: async ({
+      id,
+      folderId,
+      title,
+      url,
+      secretCiphertext,
+      secretIv,
+    }) => {
       const patch: CredentialsUpdate = {};
+      if (folderId !== undefined) patch.folder_id = folderId;
       if (title !== undefined) patch.title = title;
       if (url !== undefined) patch.url = url;
-      if (secretCiphertext !== undefined) patch.secret_ciphertext = secretCiphertext;
+      if (secretCiphertext !== undefined)
+        patch.secret_ciphertext = secretCiphertext;
       if (secretIv !== undefined) patch.secret_iv = secretIv;
 
       const { data, error } = await supabase
@@ -38,8 +48,13 @@ export function useUpdateCredential() {
       return mapCredentialRow(data);
     },
     onSuccess: (credential) => {
-      queryClient.setQueryData<Credential>(["credential", credential.id], credential);
-      queryClient.invalidateQueries({ queryKey: ["credentials", credential.workspaceId] });
+      queryClient.setQueryData<Credential>(
+        ["credential", credential.id],
+        credential,
+      );
+      queryClient.invalidateQueries({
+        queryKey: ["credentials", credential.workspaceId],
+      });
     },
   });
 }
