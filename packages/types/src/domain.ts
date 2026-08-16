@@ -3,6 +3,8 @@ export interface Workspace {
   ownerId: string;
   name: string;
   vaultSalt: string | null;
+  vaultVerifier: string | null;
+  vaultVerifierIv: string | null;
   createdAt: string;
 }
 

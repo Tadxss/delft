@@ -528,5 +528,77 @@ reasoning.
     which were kept as permanent spec files. `pnpm lint`/`check-types` and the full existing e2e
     suite (10 specs, unmodified) were re-run clean after every pass.
 
+22. **Real bug found and fixed: the vault's wrong-passphrase case wasn't rejected until one click
+    too late.** ✅ *done*. Reported as "I can access the passwords with an incorrect passphrase" —
+    investigated in full before touching anything; no secret was ever actually decrypted/shown with
+    a wrong passphrase (AES-GCM's auth tag makes that cryptographically impossible, confirmed by
+    tracing `CredentialDetail.tsx`'s decrypt-failure branch, which renders only the error, never
+    stale/partial plaintext). The real gap was upstream of that: `VaultKeyContext.unlock()`
+    (Build Order step 16) derives a PBKDF2 key and unconditionally marks the workspace "unlocked" —
+    PBKDF2 can't fail on a wrong passphrase, it just deterministically derives a *different* key —
+    so **any** passphrase, right or wrong, passed straight through the unlock screen to the
+    credential list, with wrongness only surfacing later, quietly, the moment a specific credential
+    was opened. That's a real gate-placement bug, not a crypto bug: the rejection belonged at the
+    unlock form, not one click downstream of it.
+
+    - **Fix**: `VaultUnlockPanel.tsx`'s non-setup submit path now derives the key and
+      test-decrypts an existing credential (`credentials[0]`, now fetched by
+      `CredentialsModal.tsx` as soon as the modal opens rather than only after "unlock," since the
+      row itself — still-encrypted `secretCiphertext`/`secretIv` plus the already-plaintext
+      `title`/`url` — is already RLS-scoped to workspace members regardless of vault state) *before*
+      ever calling into `VaultKeyContext`. Only on success does it call a new
+      `VaultKeyContext.setKey()` (added alongside `unlock()` specifically so a key that's already
+      been derived-and-verified doesn't pay for a second, redundant 310,000-iteration PBKDF2 just to
+      get stored). A failed verification shows "Wrong passphrase — please try again." right on the unlock form and
+      never stores a key at all — `CredentialsModal` simply never leaves the unlock screen.
+    - **One honestly-documented residual limitation, not fixed because it can't be**: a vault with
+      *zero* credentials yet has nothing anywhere to verify a passphrase against (the server never
+      sees the passphrase, by design — there's no separate stored verifier). First unlock on an
+      empty vault still has to proceed on trust, same as initial setup. Verified this doesn't error
+      or hang (manual + ad-hoc script check), just genuinely can't distinguish right from wrong yet.
+
+    Verified via a rewritten `e2e/credentials.spec.ts` wrong-passphrase case (now asserts rejection
+    *at the unlock form* — "Wrong passphrase — please try again.", credential list never reached — then confirms
+    the correct passphrase still works immediately after on the same form) plus the full suite
+    (10 specs) and `pnpm lint`/`check-types`, all green.
+
+23. **Closed the empty-vault gap from step 22 with a dedicated passphrase verifier.** ✅ *done*.
+    Step 22 fixed wrong-passphrase rejection for any vault that already has a credential to
+    test-decrypt against, but explicitly documented one residual gap: a brand-new vault with zero
+    credentials had nothing anywhere to verify a passphrase against, so it still proceeded on
+    trust. User-reported after finding it live. Closed properly rather than just re-documented:
+
+    - **Schema**: `supabase/migrations/20260816074505_vault_verifier.sql` adds
+      `workspaces.vault_verifier` / `vault_verifier_iv` (both nullable text, no RLS/grant changes —
+      already covered by the existing row-level `workspaces_select_member`/`workspaces_update_owner`
+      policies, same as `vault_salt`). Applied locally via `supabase migration up` (not `db reset`
+      — no need to wipe local data for an additive column change) and regenerated
+      `packages/types/src/database.ts`.
+    - **A verifier is a small, meaningless-content ciphertext** (`vaultCrypto.ts`'s
+      `encryptVerifier`/`verifyVaultKey` — encrypts a fixed marker string; only whether the decrypt
+      succeeds matters, never the plaintext) — the same AES-GCM auth-tag mechanism as
+      `decryptSecret`, just decoupled from needing a real credential to exist.
+    - **New vaults**: `VaultUnlockPanel.tsx`'s setup path now derives the key, encrypts a verifier,
+      and saves salt+verifier together in one `useSetVaultSalt` call (its mutation signature grew
+      the two new required fields) — verified from the very first unlock, never trust-only.
+    - **Legacy vaults** (created before this shipped) fall back to the step-22 credential-test
+      mechanism when `vault_verifier` is null, and *self-heal*: a successful unlock via that
+      fallback fires a best-effort, fire-and-forget `useSetVaultVerifier` (new hook) to backfill the
+      verifier, so every unlock after the first uses the fast/universal verifier check instead. This
+      backfill can silently no-op for a non-owner member (`workspaces_update_owner` is owner-only,
+      same as the salt itself) — harmless, it just retries on the owner's next unlock.
+    - **The one truly unavoidable case**: a legacy vault with *zero* credentials AND no verifier yet
+      still has nothing to check on its very first post-upgrade unlock — but that single unlock now
+      immediately backfills the verifier too, so it's never trust-only a second time. Confirmed via
+      an ad-hoc script directly manipulating Postgres (`docker exec ... psql`, since the local
+      `service_role` lacks a `workspaces` SELECT grant PostgREST would need — a local-only gap, not
+      touched, since the app itself never uses the service role) to simulate a pre-migration vault
+      in both the with-credential and zero-credential states, confirming rejection, correct-unlock,
+      and backfill in each.
+
+    Verified via a new e2e case ("wrong passphrase is rejected even on a brand-new vault with zero
+    credentials" — the exact scenario that used to be an open gap) plus the full suite (11 specs)
+    and `pnpm lint`/`check-types`, all green.
+
 **Deferred, not started:** revisiting `PageEditor.tsx`'s image-compression settings against real
 Storage usage — see **Next Up** above.

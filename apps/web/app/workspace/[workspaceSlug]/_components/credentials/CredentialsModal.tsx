@@ -23,7 +23,11 @@ export function CredentialsModal({
 }) {
   const { data: workspace } = useWorkspace(workspaceId);
   const vaultKey = useVaultKey(workspaceId);
-  const { data: credentials } = useCredentials(vaultKey.isUnlocked ? workspaceId : undefined);
+  // Fetched as soon as the modal opens, independent of vault-lock state: RLS already scopes these
+  // rows to workspace members, and secretCiphertext/secretIv stay encrypted regardless — this just
+  // makes a credential available for VaultUnlockPanel to test-decrypt the passphrase against
+  // *before* granting access, rather than only after.
+  const { data: credentials } = useCredentials(open ? workspaceId : undefined);
   const [selectedId, setSelectedId] = useState<string | null | "new">(null);
 
   // Reset per-open state (selection) and guarantee the key is gone whenever the modal isn't
@@ -44,11 +48,16 @@ export function CredentialsModal({
 
   const selectedCredential =
     selectedId && selectedId !== "new"
-      ? (credentials ?? []).find((c) => c.id === selectedId) ?? null
+      ? ((credentials ?? []).find((c) => c.id === selectedId) ?? null)
       : null;
 
   return (
-    <Modal open={open} onClose={handleClose} widthClassName="max-w-3xl" heightClassName="h-[600px]">
+    <Modal
+      open={open}
+      onClose={handleClose}
+      widthClassName="max-w-3xl"
+      heightClassName="h-[600px]"
+    >
       <div className="flex shrink-0 items-center justify-between border-b border-paper-200 px-4 py-2">
         <span className="text-sm font-medium text-ink-800">Credentials</span>
         <button
@@ -66,9 +75,17 @@ export function CredentialsModal({
           as that child doesn't set its own conflicting height. */}
       <div className="flex min-h-0 flex-1">
         {!workspace ? (
-          <p className="flex flex-1 items-center justify-center text-sm text-ink-400">Loading…</p>
+          <p className="flex flex-1 items-center justify-center text-sm text-ink-400">
+            Loading…
+          </p>
         ) : !vaultKey.isUnlocked || !vaultKey.key ? (
-          <VaultUnlockPanel workspaceId={workspaceId} vaultSalt={workspace.vaultSalt} />
+          <VaultUnlockPanel
+            workspaceId={workspaceId}
+            vaultSalt={workspace.vaultSalt}
+            vaultVerifier={workspace.vaultVerifier}
+            vaultVerifierIv={workspace.vaultVerifierIv}
+            credentials={credentials}
+          />
         ) : (
           <>
             <CredentialList

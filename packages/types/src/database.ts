@@ -194,6 +194,8 @@ export type Database = {
           name: string
           owner_id: string
           vault_salt: string | null
+          vault_verifier: string | null
+          vault_verifier_iv: string | null
         }
         Insert: {
           created_at?: string
@@ -201,6 +203,8 @@ export type Database = {
           name: string
           owner_id: string
           vault_salt?: string | null
+          vault_verifier?: string | null
+          vault_verifier_iv?: string | null
         }
         Update: {
           created_at?: string
@@ -208,6 +212,8 @@ export type Database = {
           name?: string
           owner_id?: string
           vault_salt?: string | null
+          vault_verifier?: string | null
+          vault_verifier_iv?: string | null
         }
         Relationships: []
       }

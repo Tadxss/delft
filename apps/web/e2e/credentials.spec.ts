@@ -28,7 +28,9 @@ test("set up a vault, add a credential, and confirm it re-prompts every time the
   await page.click('button:has-text("Save")');
 
   // Should land back in view mode showing the plaintext title and masked password.
-  await expect(page.getByRole("heading", { name: "Example Site" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Example Site" }),
+  ).toBeVisible();
   await expect(page.getByText("alice")).toBeVisible();
 
   // Reveal the password.
@@ -38,7 +40,9 @@ test("set up a vault, add a credential, and confirm it re-prompts every time the
 
   // Close the modal — this must lock the vault (discard the in-memory key), not just hide the UI.
   await page.click('button[aria-label="Close"]');
-  await expect(page.getByText("Set up this workspace's vault")).not.toBeVisible();
+  await expect(
+    page.getByText("Set up this workspace's vault"),
+  ).not.toBeVisible();
 
   // Reopen — since it always re-prompts on open (no "unlock once per session" behavior), this must
   // show the unlock form again immediately, with no memory of the just-created vault key.
@@ -51,11 +55,15 @@ test("set up a vault, add a credential, and confirm it re-prompts every time the
   // The credential list is title/url plaintext (no decryption needed to render it)...
   await page.click('button:has-text("Example Site")');
   // ...but opening it decrypts secret_ciphertext with the freshly re-derived key.
-  await expect(page.getByRole("heading", { name: "Example Site" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Example Site" }),
+  ).toBeVisible();
   await expect(page.getByText("alice")).toBeVisible();
 });
 
-test("wrong vault passphrase surfaces a decrypt error instead of garbage data", async ({ page }) => {
+test("wrong vault passphrase is rejected at the unlock form, not after reaching the credential list", async ({
+  page,
+}) => {
   await signIn(page, uniqueEmail("credentials-wrong-pass"));
 
   await page.fill("#workspace-name", "Personal");
@@ -72,13 +80,67 @@ test("wrong vault passphrase surfaces a decrypt error instead of garbage data", 
   await page.fill("#username", "alice");
   await page.fill("#password", "s3cret-p4ss");
   await page.click('button:has-text("Save")');
-  await expect(page.getByRole("heading", { name: "Example Site" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Example Site" }),
+  ).toBeVisible();
 
   await page.click('button[aria-label="Close"]');
   await page.click('button:has-text("Credentials")');
   await page.fill("#passphrase", "a-completely-different-passphrase");
   await page.click('button:has-text("Unlock")');
-  await page.click('button:has-text("Example Site")');
 
-  await expect(page.getByText("Couldn't decrypt")).toBeVisible();
+  // Rejected at the unlock form itself — never reaches the credential list, since the wrong
+  // passphrase is now verified (by test-decrypting an existing credential) before the vault is
+  // ever marked unlocked, not just discovered later when opening a specific entry.
+  await expect(
+    page.getByText("Wrong passphrase — please try again."),
+  ).toBeVisible();
+  await expect(page.locator("#passphrase")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Example Site" }),
+  ).not.toBeVisible();
+
+  // The correct passphrase still works right after a failed attempt.
+  await page.fill("#passphrase", "the-real-passphrase");
+  await page.click('button:has-text("Unlock")');
+  await page.click('button:has-text("Example Site")');
+  await expect(
+    page.getByRole("heading", { name: "Example Site" }),
+  ).toBeVisible();
+  await expect(page.getByText("alice")).toBeVisible();
+});
+
+test("wrong passphrase is rejected even on a brand-new vault with zero credentials", async ({
+  page,
+}) => {
+  // Regression test: a vault created with no credentials in it used to have nothing to verify a
+  // passphrase against, so any passphrase (right or wrong) got in. Setup now also saves an
+  // encrypted verifier (independent of any credential), so this must be rejected immediately too.
+  await signIn(page, uniqueEmail("credentials-empty-vault"));
+
+  await page.fill("#workspace-name", "Personal");
+  await page.click('button:has-text("Create")');
+  await page.waitForURL(/\/workspace\/[^/]+--[^/]+$/, { timeout: 15000 });
+
+  await page.click('button:has-text("Credentials")');
+  await page.fill("#passphrase", "the-real-passphrase");
+  await page.fill("#confirm", "the-real-passphrase");
+  await page.click('button:has-text("Create vault")');
+  await expect(page.getByText("Select a credential")).toBeVisible();
+
+  // Close without ever adding a credential, then try to unlock with the wrong passphrase.
+  await page.click('button[aria-label="Close"]');
+  await page.click('button:has-text("Credentials")');
+  await page.fill("#passphrase", "a-completely-different-passphrase");
+  await page.click('button:has-text("Unlock")');
+
+  await expect(
+    page.getByText("Wrong passphrase — please try again."),
+  ).toBeVisible();
+  await expect(page.getByText("Select a credential")).not.toBeVisible();
+
+  // The correct passphrase still works.
+  await page.fill("#passphrase", "the-real-passphrase");
+  await page.click('button:has-text("Unlock")');
+  await expect(page.getByText("Select a credential")).toBeVisible();
 });
