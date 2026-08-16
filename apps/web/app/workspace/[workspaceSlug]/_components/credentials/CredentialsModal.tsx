@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { X } from "lucide-react";
 import {
   useCredentialFolders,
   useCredentials,
@@ -99,7 +100,7 @@ export function CredentialsModal({
           aria-label="Close"
           className="rounded px-2 py-1 text-sm text-ink-500 hover:bg-paper-100 hover:text-ink-800"
         >
-          ×
+          <X size={16} />
         </button>
       </div>
 
