@@ -58,12 +58,18 @@ Storage's free tier caps at 1GB.
   (standalone items, not a tree like `pages`). `scene` is Excalidraw's own `{elements, appState}`
   shape; the `files` argument from Excalidraw's `onChange` (embedded image binaries) is never
   persisted. See Build Order step 17.
+- `profiles (id, first_name, middle_name, last_name, occupation, bio, avatar_url, created_at,
+  updated_at)` — the first **non-workspace-scoped** table; `id` is both PK and FK to `auth.users`,
+  one row per user. Auto-created blank on signup via an `AFTER INSERT` trigger on `auth.users`
+  (not a `public` table); a pre-existing account (created before this shipped) self-heals its
+  first row via the client's `upsert`, not a backfill script. See Build Order step 28.
 
-RLS: every table requires membership (`workspace_members`) except one deliberate hole —
-`pages_select_published_anon`, readable by `anon`, scoped strictly to `is_published = true`.
-`credentials`, `credential_folders`, and `canvases` have no anon policy or grant at all — unlike
-`pages`, none of them has a public share surface. See `supabase/migrations/*_rls.sql` for the full
-policy set and its inline reasoning.
+RLS: every workspace-scoped table requires membership (`workspace_members`) except one deliberate
+hole — `pages_select_published_anon`, readable by `anon`, scoped strictly to `is_published =
+true`. `credentials`, `credential_folders`, and `canvases` have no anon policy or grant at all —
+unlike `pages`, none of them has a public share surface. `profiles` isn't workspace-scoped at all;
+its policies key directly on `id = auth.uid()`, same template as `workspaces_update_owner`. See
+`supabase/migrations/*_rls.sql` for the full policy set and its inline reasoning.
 
 ## Build Order
 
@@ -432,6 +438,19 @@ policy set and its inline reasoning.
     Live at `https://delft.vercel.app`, verified via direct `curl` (status code and real page
     content, e.g. "Careful records. Quiet craft"), not just a successful build log.
 
+    **Recurring gotcha, confirmed again in step 25's deploy**: `delft.vercel.app` is a manually
+    claimed alias (`*.vercel.app` subdomains can't be registered via `vercel domains add`, only
+    `vercel alias set`), so it does **not** auto-follow new Production deployments the way
+    `delft-tadxss-projects.vercel.app` does — after every deploy it must be explicitly re-pointed
+    (`vercel alias set <new-deployment-url> delft.vercel.app`) or it silently keeps serving
+    whatever it was last aliased to, which reads exactly like "the deploy didn't work" when it
+    actually did. Every deploy must also check `supabase migration list` (no `--local`) for any
+    `local` migration with a blank `remote` — a missing migration on hosted doesn't error, writes
+    to the missing table/column just no-op, which reads like a broken feature rather than a
+    database-sync gap. Confirmed as a real recurrence during step 25's deploy: 3 migrations
+    (`vault_verifier`, `credential_folders`, `credential_folders_rls`) were pending on hosted and
+    had to be pushed, and the short alias was pinned to a 23-hour-old deployment.
+
 19. **Workspace deletion, and Credentials moved from a page to a modal.** ✅ *done*. Two gaps
     reported after using the deployed app for real.
 
@@ -681,6 +700,147 @@ policy set and its inline reasoning.
     disturbed — this is what caught the cache-race bug above), the full suite (14 specs), `pnpm
     lint`/`check-types`, direct `psql` trigger testing, and a live screenshot confirming the tree's
     indentation/icons visually match `Sidebar.tsx`'s.
+
+25. **Sidebar/header redesign: Notion-style hover affordances, `lucide-react` icons, and an
+    icon-only header.** ✅ *done*, merged to `master` and deployed. The sidebar read flat compared
+    to Notion (the page tree's chevron was permanently visible whenever a page had children, and
+    every icon in the app — theme toggle, collapse, tree chevrons — was a plain Unicode glyph), and
+    the header was busier than it needed to be (a text "Account" link, the raw email, and a
+    separate "Sign out" button all sitting next to the theme toggle).
+
+    - **`lucide-react` added** as the app's first real icon dependency, replacing every Unicode
+      glyph (▾ ▸ + « » × ☀ ☾) across `Sidebar.tsx`, `PageTreeNode.tsx`, `SidebarShell.tsx`,
+      `ThemeToggle.tsx`, and the modal close buttons.
+    - **Page tree hover affordances**: the expand/collapse chevron switched from
+      `hasChildren ? "" : "invisible"` (always visible when a page has children) to an
+      opacity-based `group-hover:opacity-100` reveal on the row — chosen over toggling
+      `hidden`/`flex` specifically because opacity never affects layout, so hovering can't shift
+      the title's start position. Also added `group-focus-within:opacity-100` (and the same on the
+      existing hover-only "+" button) so keyboard users tabbing through the tree aren't left unable
+      to reach a control that's invisible until hover — a real regression risk once the chevron
+      became hover-gated too, not just a nice-to-have.
+    - **Header collapsed to icon-only**: `TopBar` (`apps/web/app/workspace/layout.tsx`) now shows
+      just a theme toggle and a gear icon opening a new `AccountModal`
+      (`apps/web/app/_components/AccountModal.tsx`) — email display, a "Password" settings box
+      (ported the old standalone `/account` page's set-password form, which is now deleted), and
+      Sign out. The Credentials button also moved from the sidebar into the header as a key icon —
+      this required lifting `CredentialsModal`'s state up from `[workspaceSlug]/layout.tsx` into
+      the *parent* `workspace/layout.tsx`, even though the credentials button should only show
+      inside an actual workspace (not on the bare `/workspace` switcher). Solved via
+      `useParams<{ workspaceSlug?: string }>()` — confirmed Next.js's `useParams()` returns the
+      dynamic segments of the full matched URL regardless of which layout in the tree calls it, so
+      `TopBar` reads `workspaceSlug` correctly and gates the icon/modal render on it being defined.
+    - **`AccountModal` iterated twice on the same day**: shipped first as the password form shown
+      directly in the modal body, then reworked into a list-of-settings-boxes + drill-down pattern
+      (a "Password" box that navigates into its own sub-view with a back chevron in the header) —
+      the flat version didn't scale to a second setting being added later, which is exactly what
+      happened next (see the "Update profile" entry once that ships).
+    - **Sidebar collapse control promoted to its own row**, separate from "Pages" (previously
+      shared a row with the "Pages" label and its "+" button), hover-reveal like the tree icons
+      (same `opacity-0 group-hover:opacity-100 group-focus-within:opacity-100` treatment, on a
+      `group` added to the sidebar's root `<nav>`). Icon is `ChevronsLeft` when expanded; the
+      collapsed rail's expand icon is `Menu` (hamburger) — both by explicit user choice, not a
+      default from the lucide swap above.
+
+    Verified via `pnpm check-types`/`lint`, the full e2e suite (selectors updated in
+    `credentials.spec.ts`/`credential-folders.spec.ts`/`password-sign-in.spec.ts` since the
+    Credentials/Account buttons are icon-only now — `button:has-text(...)` no longer matches, so
+    those switched to `getByRole("button", { name })`, which also matches on `aria-label` and
+    keeps working going forward), and Playwright screenshots in both light and dark mode.
+
+26. **Sidebar page-tree "⋯" menu wired up: Rename and Delete.** ✅ *done*, not yet merged to
+    `master`. Step 25 added the hover-reveal "⋯" button as a deliberate stub
+    (`console.log`-only, with a `TODO`) — the user noticed it did nothing and confirmed it should
+    become a real menu. Wired up with the two actions the codebase already had hooks for, rather
+    than inventing new ones: **Rename** (`useUpdatePage`, turns the row into an inline `<input>`,
+    same focus/select-on-open pattern `CredentialFolderTreeNode.tsx` already established for
+    folder rename — a `renameInputRef` focused via `useEffect`, not the `autoFocus` prop, which
+    trips `jsx-a11y/no-autofocus`) and **Delete** (`useDeletePage`, reusing `PageEditor.tsx`'s
+    exact confirm copy — "Delete this page and all of its sub-pages?" — and its
+    redirect-to-workspace-root-if-currently-viewing-the-deleted-page behavior). No dropdown
+    primitive exists anywhere in this codebase, so the menu is a small self-contained one built
+    directly in `PageTreeNode.tsx`: a `relative`-positioned panel, closed on outside-click
+    (`mousedown` listener) or `Escape`, mirroring `Modal.tsx`'s existing lightweight
+    plain-`useEffect` style rather than pulling in a menu library.
+
+    Verified via a Playwright spec exercising open/close (including click-outside), rename with
+    Enter (saves) and Escape (reverts without saving), and delete with the confirm dialog accepted,
+    plus the full 14-spec e2e suite, `pnpm check-types`/`lint`.
+
+27. **Page editor toolbar cleanup: removed the redundant Delete button, added Undo/Redo.** ✅
+    *done*, not yet merged to `master`. Two small, related changes to `PageEditor.tsx`'s toolbar:
+
+    - Removed its own "Delete" button — redundant now that the sidebar's "⋯" menu (step 26) has
+      the same action.
+    - Added visible Undo/Redo buttons for discoverability. **Real finding**: `editor.can(cb)` —
+      documented in BlockNote's own source comments as `if (editor.can(editor.undo)) { ... }` — is
+      *not* actually public API on the installed `@blocknote/core@0.54.0`'s `BlockNoteEditor`
+      class; only `undo()`/`redo()` are (confirmed against the package's own `.d.ts`, and its
+      compiled source: `undo() { return this._stateManager.undo(); }` — `can()` only exists on
+      that internal, untyped `_stateManager`). The correct fix was reading undo/redo depth
+      directly off the underlying ProseMirror state via `@tiptap/pm/history`'s
+      `undoDepth`/`redoDepth` (confirmed a straight re-export of `prosemirror-history` — `export *
+      from 'prosemirror-history'` — so guaranteed to be the same module instance the editor
+      already uses internally, avoiding a dual-package-instance mismatch that importing the bare
+      `prosemirror-history` package separately could have risked), applied to
+      `editor._tiptapEditor.state` (a public readonly property on `BlockNoteEditor`). Required
+      adding `@tiptap/pm` as an explicit `apps/web` dependency, since pnpm's strict `node_modules`
+      mode doesn't let a package import something only a dependency-of-a-dependency declares, even
+      when it's already resolved in the store. Confirmed via the compiled source that `Mod-z` was
+      already bound by default, so the keyboard shortcut worked before this change too — this only
+      adds the missing visible/discoverable buttons, not the underlying capability.
+
+    Verified via a Playwright spec confirming the Delete button is gone, both buttons start
+    disabled on a fresh page, Undo enables after typing and Redo enables after undoing, and the
+    reverted/reapplied content survives a reload (same autosave path, unchanged) — plus the full
+    e2e suite, `pnpm check-types`/`lint`.
+
+28. **"Update profile" box in the Account modal: name, occupation, bio, avatar.** ✅ *done*, not
+    yet merged to `master`. Added a second box (alongside "Password") to `AccountModal.tsx`'s
+    list-of-settings + drill-down pattern established in step 25 — proof that pattern scales the
+    way it was meant to. New fields: first/middle(optional)/last name, an occupation dropdown
+    (curated general-purpose list + "Other"), a bio, and a profile picture.
+
+    - **New `profiles` table** — the first non-workspace-scoped table in this schema (see Data
+      model above). `occupation` is stored as plain `text`, not an enum: the curated dropdown
+      constrains the UI, but selecting "Other" (or loading a value that isn't in the current list)
+      reveals a free-text input whose value saves directly into that same column — no second
+      `occupation_other` column, and no schema change needed if the curated list changes later.
+    - **RLS** mirrors `workspaces_update_owner`'s direct `id = auth.uid()` template rather than a
+      membership join, since a profile has exactly one owner and no sharing concept. No delete
+      policy — nothing deletes a profile row directly; `auth.users` cascade handles account
+      removal.
+    - **Auto-created on signup** via an `AFTER INSERT SECURITY DEFINER` trigger on `auth.users`
+      (`handle_new_user_profile`), mirroring `handle_new_workspace`'s existing shape — reviewed by
+      `rls-reviewer` before applying, which flagged that an unhandled insert failure inside the
+      trigger would roll back the entire signup (a pre-existing gap in this same pattern, also
+      present in the sibling `votero` repo, not a new one); addressed cheaply with
+      `on conflict (id) do nothing` rather than a broader exception handler, since the only
+      realistic re-fire risk is a double-insert race, not arbitrary failure. Pre-existing accounts
+      (created before this migration) get no row from the trigger — the client's save path uses
+      `upsert`, not `update`, so a pre-existing user's first save self-heals with no backfill
+      script needed.
+    - **New `avatars` Storage bucket**, public read like `page-images`, writes scoped to
+      `(storage.foldername(name))[1] = auth.uid()::text` (the one deviation from `page-images`'
+      workspace-membership scoping — this is user-scoped instead). Path is a **fixed filename per
+      user** (`{userId}/avatar.webp`, not a random uuid), uploaded with `upsert: true` — every
+      re-upload overwrites the same object in place rather than accumulating orphaned old avatar
+      files with no cleanup mechanism, a real consideration against Storage's free-tier 1GB cap.
+      Confirmed via direct `psql` against `storage.objects`: re-uploading twice for the same user
+      still leaves exactly one row. **Real gotcha caught before it shipped**: a fixed path means
+      the public URL never changes across re-uploads, so without a cache-buster the browser/CDN
+      would keep serving the stale image after a change — `useUploadAvatar` appends `?v={timestamp}`
+      to the returned URL to force a fresh fetch every time it changes.
+    - Avatar upload reuses `PageEditor.tsx`'s existing compress-then-upload pattern
+      (`browser-image-compression` → Storage), with a smaller `maxWidthOrHeight: 512` (vs. 1920 for
+      page images) since an avatar never needs to be that large.
+
+    Verified via `e2e/profile.spec.ts` (name/occupation/bio save and persist across a modal
+    close+reopen, the "Other" occupation flow round-trips its custom value, avatar upload succeeds
+    and a second upload overwrites the same object rather than duplicating — confirmed both via the
+    UI and directly via `psql`), the full 15-spec e2e suite, `pnpm check-types`/`lint` (repo-wide,
+    all 3 packages), and an `rls-reviewer` pass on all three new migrations before ever applying
+    them locally.
 
 **Deferred, not started:** revisiting `PageEditor.tsx`'s image-compression settings against real
 Storage usage — see **Next Up** above.

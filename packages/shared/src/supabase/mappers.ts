@@ -4,6 +4,7 @@ import type {
   Credential,
   CredentialFolder,
   Page,
+  Profile,
   Workspace,
   WorkspaceMember,
 } from "@delft/types";
@@ -16,6 +17,7 @@ type CredentialRow = Database["public"]["Tables"]["credentials"]["Row"];
 type CredentialFolderRow =
   Database["public"]["Tables"]["credential_folders"]["Row"];
 type CanvasRow = Database["public"]["Tables"]["canvases"]["Row"];
+type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 
 // The Supabase client is typed snake_case (matching the Postgres columns directly, see
 // packages/types/src/database.ts); every hook maps rows through here into the hand-written
@@ -90,6 +92,20 @@ export function mapCanvasRow(row: CanvasRow): Canvas {
     workspaceId: row.workspace_id,
     title: row.title,
     scene: row.scene,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function mapProfileRow(row: ProfileRow): Profile {
+  return {
+    id: row.id,
+    firstName: row.first_name,
+    middleName: row.middle_name,
+    lastName: row.last_name,
+    occupation: row.occupation,
+    bio: row.bio,
+    avatarUrl: row.avatar_url,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

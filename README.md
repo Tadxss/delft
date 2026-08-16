@@ -14,12 +14,14 @@ place. Built on Next.js + Supabase + Vercel free tiers, isolated per-workspace v
 
 Package manager is **pnpm** — install from the repo root with `pnpm install`.
 
-**Status**: workspace + page schema, RLS, the Pages feature (recursive page tree, BlockNote editor
-with autosave, image upload with client-side compression, publish/share to a public read-only
-`/share/[slug]` route), and a Notion-style dark/light UI (collapsible sidebar,
-`/workspace/{slug}--{id}` URLs) are built. Credentials Manager and the Excalidraw-style Canvas are
-separate, later phases — not built yet. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)'s "Next
-Up" section for the concrete plan on each.
+**Status**: every originally-planned feature has shipped — Pages (recursive page tree, BlockNote
+editor with autosave, image upload with client-side compression, publish/share to a public
+read-only `/share/[slug]` route), auth (password + Google), a Credentials Manager (encrypted
+vault, nested folders), an Excalidraw-style Canvas, a user profile (name/occupation/bio/avatar),
+and a Notion-style dark/light UI (hover-affordance sidebar, icon-only header,
+`/workspace/{slug}--{id}` URLs). Live at `https://delft.vercel.app`, auto-deploying on push to
+`master`. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)'s numbered Build Order for how each
+shipped, and its "Next Up" section for current focus.
 
 Everything here runs on free tiers by design — Supabase Storage in particular caps out at 1GB, so
 image uploads are compressed/resized client-side (1920px max, WebP, EXIF stripped) before they ever

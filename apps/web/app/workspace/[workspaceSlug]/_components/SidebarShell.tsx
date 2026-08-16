@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PanelLeftOpen } from "lucide-react";
+import { Menu } from "lucide-react";
 import { Sidebar } from "./Sidebar";
 
 const STORAGE_KEY = "delft-sidebar-collapsed";
@@ -31,7 +31,7 @@ export function SidebarShell() {
           aria-label="Expand sidebar"
           className="rounded px-1.5 py-0.5 text-ink-500 hover:bg-paper-100 hover:text-ink-800"
         >
-          <PanelLeftOpen size={14} />
+          <Menu size={14} />
         </button>
       </div>
     );

@@ -10,10 +10,11 @@ pnpm dev --filter=web
 Magic-link email is still the only way to *create* an account. Locally, "sending an email" lands
 in Mailpit, not a real inbox — open `http://127.0.0.1:54324` and click the link there. The e2e
 suite does this same lookup programmatically via Mailpit's REST API (`e2e/helpers.ts`). Once
-signed in, `/account` lets a user set a password for future sign-ins, and the login page also
-offers "Continue with Google" (opens as a popup — see `docs/ARCHITECTURE.md` Build Order step 15)
-— Google sign-in needs real OAuth credentials configured (step 14) and isn't covered by the
-automated suite.
+signed in, the header's gear icon opens the Account modal, where a user can set a password for
+future sign-ins and update their profile (name/occupation/bio/avatar — see Build Order step 28),
+and the login page also offers "Continue with Google" (opens as a popup — see
+`docs/ARCHITECTURE.md` Build Order step 15) — Google sign-in needs real OAuth credentials
+configured (step 14) and isn't covered by the automated suite.
 
 ## Automated suite
 
@@ -33,6 +34,7 @@ practice this is rare since every spec uses a freshly generated unique email per
 | `credential-folders.spec.ts` | Create a nested folder (collapsed by default, matching the sidebar's tree), put a credential inside it via the folder's hover "New credential" icon (auto-expands it), confirm collapsing the folder hides the credential and expanding shows it again; move a credential between folders via the edit form's select and a folder via the move dialog (confirming the dialog excludes the folder itself); delete a folder containing a sub-folder and a credential and confirm the credential survives at root while the sub-folder doesn't. |
 | `canvas.spec.ts` | Create a canvas → draw a real rectangle (keyboard shortcut + mouse drag) → confirm autosave actually persisted element data (verified via a direct REST call, since Excalidraw's `<canvas>` has no addressable per-shape DOM to assert against in the UI) → title survives a reload → delete. |
 | `workspace-delete.spec.ts` | Delete a workspace that has a page in it from the `/workspace` switcher → confirms it disappears from the list and its old URL resolves to "no pages" (RLS-level gone, not just hidden from the UI). |
+| `profile.spec.ts` | Account modal's "Update profile" box: name/occupation/bio save and persist across a modal close+reopen; the "Other" occupation option reveals a free-text field whose value is what's actually saved; avatar upload succeeds and a second upload overwrites the same Storage object in place (same path, not a duplicate) rather than accumulating files. |
 
 Not covered by the automated suite (manual-only): Google OAuth (needs real credentials, see
 scenario 6 below), visual/design polish, and the browser's native print-to-PDF output from a
