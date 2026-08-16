@@ -23,9 +23,10 @@ on push to `master`). See Build Order below for how each shipped.
 **Current focus: working through [docs/BETA_READINESS.md](BETA_READINESS.md)** before calling this
 BETA — a full audit found real gaps (silent autosave failures, no mobile layout, `Modal.tsx`
 missing dialog semantics, Storage orphaning on delete, and more, ranked by severity in that doc).
-Both High severity items 1 (silent autosave failures) and 3 (zero responsive/mobile layout) are
-fixed as of Build Order steps 30/31; item 2 (read-hook errors) and everything Medium/Low severity
-is still open as of step 31.
+High severity items 1 (silent autosave failures) and 3 (zero responsive/mobile layout) are fixed as
+of Build Order steps 30/31; Medium severity item 5 (no Safari/WebKit test coverage) is fixed as of
+step 32, with a real-device-testing gap still open (see that step). Item 2 (read-hook errors) and
+the rest of Medium/Low severity is still open as of step 32.
 
 The one recurring (not one-time) item to keep revisiting alongside that: the image-compression
 settings in `PageEditor.tsx` against real Storage usage as real data accumulates — Supabase
@@ -955,6 +956,59 @@ the full policy set and its inline reasoning.
     gap): walked through sign-in → create workspace → open the sidebar drawer → create a page → set
     up a vault → create, save, and navigate back from a credential on the emulated mobile viewport,
     screenshotting each step. Plus `pnpm check-types`/`lint` (repo-wide).
+
+32. **Fixed BETA_READINESS.md item 5: added a WebKit e2e project, and two real bugs it found.**
+    ✅ *done*. `playwright.config.ts` only ever configured `chromium` — no way to catch real
+    Safari/WebKit-engine quirks in three dependencies with known iOS Safari history
+    (`browser-image-compression`, `@excalidraw/excalidraw`, `@blocknote/mantine`). Added a
+    `webkit` project (`devices["Desktop Safari"]`) and installed the browser binary
+    (`playwright install webkit`, also added to the CI `e2e` job's install step).
+
+    Running the full 16-spec suite against it cold surfaced two genuine, reproducible bugs — not
+    environment flakiness, confirmed by isolating each down to a raw script and, for the second
+    one, a direct `psql`/REST check bypassing the UI and test runner entirely:
+
+    - **Real bug found and fixed: `e2e/helpers.ts`'s `signIn()` used `page.fill()` immediately
+      after `page.goto("/")`.** `fill()` sets the DOM value and returns without waiting for React
+      to attach its event handlers. On WebKit specifically, `goto()`'s `load` event reliably
+      resolves *before* hydration finishes (confirmed: an identical instant `fill()` immediately
+      after `goto()` left the identifier input empty 3/3 times in an isolated repro script,
+      chromium's timing apparently doesn't expose the same window) — the fill lands, then gets
+      silently wiped when the controlled `<input value={identifierInput}>` hydrates against its
+      still-empty initial state. Fixed by switching to `click()` + `pressSequentially(email, {
+      delay: 20 })`, which both closes the race (each keystroke lands well after hydration
+      completes, confirmed 3/3 in the same repro) and is closer to how a real user actually types
+      than an instantaneous fill.
+    - **Real bug found and fixed: `AccountModal.tsx`'s `ProfileForm` could silently drop the first
+      field a user typed.** Its seeding `useEffect` (`setFirstName(profile?.firstName ?? "")` etc.)
+      ran every time the `profile` query's reference changed, including the query's own
+      loading→resolved transition — so a user who started typing before that first resolution
+      landed had their input overwritten back to the (still-empty, since it hadn't loaded yet)
+      fetched value, and "Save profile" then persisted that overwritten value. Confirmed via
+      direct `psql` against the local Postgres container: a test run that filled `firstName` first
+      (immediately after the form mounted) then `middleName`/`lastName`/etc. right after produced
+      a saved row with `middle_name`/`last_name` correct but `first_name` empty — only the very
+      first field touched, right after mount, lost its value. A `seededRef` guard (fire the seed
+      effect at most once) narrows the window but doesn't close it — the fields already exist
+      (empty) the instant the form mounts, so a fast-enough first keystroke can still land before
+      that one-time seed. Properly fixed by gating the form's fields out of the DOM entirely until
+      `profile` has resolved (`if (profile === undefined) return <p>Loading…</p>`) — the seeding
+      effect and the `seededRef` guard both stay, now as defense against a *later* background
+      refetch stomping on in-progress edits, but the initial race is closed by construction: a
+      keystroke can't land in a field that doesn't exist yet.
+
+    **Known gap, not closed by this pass**: this is still emulated-viewport/mouse-driven WebKit,
+    not a real Safari/iOS device — the doc's original "manually test on a real device/simulator"
+    ask remains open, no such device was available here. A `devices["iPhone 13"]` mobile-viewport
+    project was tried too, but 11 of 16 specs fail immediately since they assume the desktop
+    sidebar is always visible (`[aria-label="New page"]` etc.) — below `md` it's off-canvas inside
+    a drawer (step 31). Adapting the suite to open the drawer first on narrow viewports is real,
+    separate work, not done here — left out of `playwright.config.ts` rather than landing a
+    project that's 69% red by default.
+
+    Verified via the full 16-spec suite on both `chromium` and `webkit` (32/32 green), the two
+    fixed specs repeated 3x standalone against `webkit` with no flakes, and `pnpm
+    check-types`/`lint` (repo-wide).
 
 **Deferred, not started:** revisiting `PageEditor.tsx`'s image-compression settings against real
 Storage usage — see **Next Up** above.

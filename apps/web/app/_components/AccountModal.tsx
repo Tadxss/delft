@@ -186,10 +186,17 @@ function ProfileForm({ userId }: { userId: string | undefined }) {
   const [bio, setBio] = useState("");
   const [saved, setSaved] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Guards the seeding effect below to fire exactly once — defends against a *later* background
+  // refetch (e.g. refocusing the tab) re-seeding over in-progress edits. This alone isn't enough
+  // to prevent the *first* seed racing the user's first keystroke though — see the loading gate
+  // below the effect, which is what actually closes that window.
+  const seededRef = useRef(false);
 
   // Seed local form state once the profile query resolves — a missing row (pre-existing account,
   // trigger never fired) resolves to `null`, same as a row with every field empty.
   useEffect(() => {
+    if (seededRef.current || profile === undefined) return;
+    seededRef.current = true;
     setAvatarUrl(profile?.avatarUrl ?? null);
     setUsername(profile?.username ?? "");
     setFirstName(profile?.firstName ?? "");
@@ -238,6 +245,17 @@ function ProfileForm({ userId }: { userId: string | undefined }) {
       },
       { onSuccess: () => setSaved(true) },
     );
+  }
+
+  // Real bug found (BETA_READINESS.md item 5's WebKit e2e pass): the seeding effect above only
+  // guards against re-seeding on a *later* profile change — it doesn't stop the very first seed
+  // from racing a user who starts typing before that first `profile` resolution lands, since the
+  // fields already exist (empty) the instant this form mounts. Gating the fields out of the DOM
+  // entirely until `profile` has resolved closes that race by construction: there's no window
+  // where a keystroke could land in a field the seeding effect hasn't populated yet, because the
+  // field doesn't exist yet either.
+  if (profile === undefined) {
+    return <p className="p-4 text-sm text-ink-400">Loading…</p>;
   }
 
   return (

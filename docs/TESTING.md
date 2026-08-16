@@ -24,6 +24,18 @@ debugging of a single spec). Requires the local Supabase stack running and a fre
 database — see "Resetting between runs" below if specs start colliding with leftover data (in
 practice this is rare since every spec uses a freshly generated unique email per run).
 
+Runs against two `playwright.config.ts` projects — `chromium` (`devices["Desktop Chrome"]`) and
+`webkit` (`devices["Desktop Safari"]`) — every spec on both, sequentially (`fullyParallel: false`).
+The `webkit` project exists specifically to catch real Safari/WebKit-engine quirks in three
+dependencies with known iOS Safari history: `browser-image-compression` (WebP encode support),
+`@excalidraw/excalidraw` (touch/pointer-event handling), and `@blocknote/mantine`
+(contentEditable/ProseMirror behavior) — see `docs/ARCHITECTURE.md` Build Order step 32. Run a
+single project with `npx playwright test --project=webkit` (or `--project=chromium`) from
+`apps/web`. No mobile-viewport project (`devices["iPhone 13"]`) yet — every spec assumes the
+desktop sidebar is always visible, but it's off-canvas behind a drawer below `md` (Build Order step
+31); adapting the suite to open the drawer first is separate, not-yet-done work (see
+BETA_READINESS.md item 5).
+
 | `e2e/*.spec.ts` | Covers |
 |---|---|
 | `sign-in.spec.ts` | Magic-link sign-in end-to-end (send → Mailpit → verify URL → landed signed in, URL fragment stripped); signed-out visitors get redirected off authenticated routes. |

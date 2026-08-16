@@ -58,27 +58,6 @@ the one place in the app most worth getting right.
 open on close. Keep it minimal/dependency-free per the file's existing "no dialog library" choice —
 this doesn't require pulling in Radix or similar, just filling in the specific gaps listed.
 
-### 5. No Safari/WebKit/mobile test coverage at all
-`playwright.config.ts` only configures `{ name: "chromium", use: devices["Desktop Chrome"] }` —
-confirmed, not speculative. No Firefox, no WebKit, no mobile emulation profile. Combined with known
-iOS Safari quirks in three dependencies actually in use:
-- `browser-image-compression` (`PageEditor.tsx`) — WebP encode support only reliable from iOS 14+,
-  canvas memory limits on older iOS.
-- `@excalidraw/excalidraw` (`CanvasEditor.tsx`) — historical touch/pointer-event conflicts
-  (pinch-zoom vs. page scroll) on iOS Safari.
-- `@blocknote/mantine` (`PageEditor.tsx`) — contentEditable/ProseMirror editors have a history of
-  iOS-specific virtual-keyboard and cursor-placement bugs.
-
-None of this is verified either automatically or (as far as this audit could determine) manually.
-
-**Files**: `apps/web/playwright.config.ts`.
-
-**Suggested next step**: at minimum, manually test the Pages editor, Canvas, and the Credentials
-modal on a real iOS Safari device/simulator before calling this BETA. Longer-term, add a WebKit
-Playwright project (`devices["Desktop Safari"]` and/or `devices["iPhone 13"]`) — now that the
-mobile-layout item below (Fixed) is in place, the `devices["iPhone 13"]` mobile-viewport variant of
-this is no longer blocked on layout, only on this item still being unstarted.
-
 ## Low severity
 
 - **No `<label>` on the page/canvas title input** — relies solely on `placeholder="Untitled"`.
@@ -175,7 +154,29 @@ unreachable on touch with no mouse or keyboard focus to trigger them — now alw
 
 **Known remaining gap, not fully closed by this pass**: no real device/touch-emulation testing was
 done (this was verified via Playwright's `devices["iPhone 13"]` viewport emulation over a
-mouse-driven Chromium instance, not actual touch input) — that overlaps with item 5 below, which is
-still open. `CredentialFolderTreeNode`'s rename `<input>` and a few other hover-adjacent affordances
-weren't separately re-audited beyond the `group-hover`/`opacity-0` grep sweep above; worth a second
-pass if real-device testing (item 5) surfaces anything.
+mouse-driven Chromium instance, not actual touch input) — see item 5's own real-device gap below.
+`CredentialFolderTreeNode`'s rename `<input>` and a few other hover-adjacent affordances weren't
+separately re-audited beyond the `group-hover`/`opacity-0` grep sweep above; worth a second pass if
+real-device testing (item 5) surfaces anything.
+
+### 5. No Safari/WebKit test coverage — partially fixed, see [docs/ARCHITECTURE.md](ARCHITECTURE.md) Build Order step 32
+`playwright.config.ts` only configured `{ name: "chromium", use: devices["Desktop Chrome"] }` — no
+Firefox, no WebKit, no mobile emulation profile. Combined with known iOS Safari quirks in three
+dependencies actually in use (`browser-image-compression`'s WebP encode support, Excalidraw's
+touch/pointer-event handling, BlockNote/ProseMirror's contentEditable behavior), none of this was
+verified automatically or manually.
+
+Fixed: added a `webkit` project (`devices["Desktop Safari"]`) to `playwright.config.ts` — running
+the full suite against it cold surfaced and led to fixing two real, reproducible bugs (a WebKit-only
+hydration race in the shared `signIn()` test helper, and a genuine product bug in
+`AccountModal.tsx`'s `ProfileForm` where the first field a user typed could get silently dropped —
+see Build Order step 32 for the full detail on both). All 16 specs now pass on both `chromium` and
+`webkit`, repeated to confirm no flakiness.
+
+**Not closed by this pass**: the doc's original "manually test on a real iOS Safari device/
+simulator" ask is still open — no real device was available to do this with, so `webkit`'s coverage
+is still emulated/mouse-driven, not real Safari or real touch input. A `devices["iPhone 13"]`
+mobile-viewport project was tried too, but 11 of 16 specs fail immediately since they assume the
+desktop sidebar is always visible — below `md` it's off-canvas inside item 3's drawer. Adapting the
+suite to open the drawer first on narrow viewports is real, separate work; left out of
+`playwright.config.ts` for now rather than landing a project that's mostly red by default.
