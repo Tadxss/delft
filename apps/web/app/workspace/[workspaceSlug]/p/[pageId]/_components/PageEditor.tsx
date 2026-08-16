@@ -179,6 +179,13 @@ export function PageEditor({ page }: { page: Page }) {
         </div>
       </div>
 
+      {updatePage.isError && (
+        <p className="text-xs text-red-700">
+          Couldn&apos;t save your last change
+          {updatePage.error?.message ? `: ${updatePage.error.message}` : ""}
+        </p>
+      )}
+
       {shareUrl && (
         <div className="flex items-center gap-2 rounded-md bg-paper-100 px-3 py-2 text-xs text-ink-600">
           <span>Live at</span>

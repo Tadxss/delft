@@ -23,7 +23,8 @@ on push to `master`). See Build Order below for how each shipped.
 **Current focus: working through [docs/BETA_READINESS.md](BETA_READINESS.md)** before calling this
 BETA — a full audit found real gaps (silent autosave failures, no mobile layout, `Modal.tsx`
 missing dialog semantics, Storage orphaning on delete, and more, ranked by severity in that doc).
-Nothing in it has been fixed yet as of Build Order step 20.
+The first (highest-severity) item — silent autosave failures — is fixed as of Build Order step 30;
+everything else in that doc is still open as of step 30.
 
 The one recurring (not one-time) item to keep revisiting alongside that: the image-compression
 settings in `PageEditor.tsx` against real Storage usage as real data accumulates — Supabase
@@ -894,6 +895,27 @@ the full policy set and its inline reasoning.
     error, and a network-level check confirming plain email sign-in never fires the lookup RPC at
     all. Full 16-spec e2e suite, `pnpm check-types`/`lint` (repo-wide), and the `rls-reviewer` pass
     above.
+
+30. **Fixed BETA_READINESS.md item 1: silent autosave failures in Pages and Canvas.** ✅ *done*.
+    `PageEditor.tsx`'s and `CanvasEditor.tsx`'s debounced `scheduleSave` called
+    `updatePage.mutate(...)`/`updateCanvas.mutate(...)` with no `onError` and never read
+    `.isError`/`.error`, so a failed autosave (expired session, RLS rejection, network drop) was
+    silent — the user kept editing believing it had saved. `useUpdatePage`/`useUpdateCanvas`
+    already exposed `.isError`/`.error` as standard `useMutation` return values, so this was a
+    UI-only fix: both editors now render a small inline `text-red-700` message ("Couldn't save
+    your last change: …") near the title while the mutation is in its error state, mirroring
+    `CredentialDetail.tsx`'s existing `saveError` display pattern. No retry button/toast, and no
+    change to the debounce/mutation structure — confirmed `apps/web/app/providers.tsx`'s
+    `QueryClient` only sets `defaultOptions.queries.retry`, not `mutations.retry` (TanStack
+    Query's own mutation default is `retry: 0`), so a failed autosave doesn't silently retry on
+    its own and needed exactly this kind of visible signal. The error clears automatically on the
+    next successful save, since a new `mutate()` call resets `isError`.
+
+    Verified against a real local Supabase session (not just types/lint): signed in via magic
+    link, created a workspace, created a page and a canvas, used Playwright's request
+    interception to force the `PATCH /rest/v1/pages` and `PATCH /rest/v1/canvases` requests to
+    fail, and confirmed the inline error rendered correctly in both editors. Plus
+    `pnpm check-types`/`lint` (repo-wide).
 
 **Deferred, not started:** revisiting `PageEditor.tsx`'s image-compression settings against real
 Storage usage — see **Next Up** above.

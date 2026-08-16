@@ -113,6 +113,13 @@ export function CanvasEditor({ canvas }: { canvas: Canvas }) {
         </button>
       </div>
 
+      {updateCanvas.isError && (
+        <p className="shrink-0 px-6 text-xs text-red-700">
+          Couldn&apos;t save your last change
+          {updateCanvas.error?.message ? `: ${updateCanvas.error.message}` : ""}
+        </p>
+      )}
+
       <div className="min-h-0 flex-1">
         <Excalidraw
           initialData={toInitialData(canvas.scene)}
