@@ -177,6 +177,7 @@ function ProfileForm({ userId }: { userId: string | undefined }) {
   const uploadAvatar = useUploadAvatar();
 
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [username, setUsername] = useState("");
   const [firstName, setFirstName] = useState("");
   const [middleName, setMiddleName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -190,6 +191,7 @@ function ProfileForm({ userId }: { userId: string | undefined }) {
   // trigger never fired) resolves to `null`, same as a row with every field empty.
   useEffect(() => {
     setAvatarUrl(profile?.avatarUrl ?? null);
+    setUsername(profile?.username ?? "");
     setFirstName(profile?.firstName ?? "");
     setMiddleName(profile?.middleName ?? "");
     setLastName(profile?.lastName ?? "");
@@ -227,6 +229,7 @@ function ProfileForm({ userId }: { userId: string | undefined }) {
     upsertProfile.mutate(
       {
         id: userId,
+        username: username.trim() || null,
         firstName: firstName.trim() || null,
         middleName: middleName.trim() || null,
         lastName: lastName.trim() || null,
@@ -271,6 +274,21 @@ function ProfileForm({ userId }: { userId: string | undefined }) {
       </div>
 
       <form onSubmit={handleSubmit} className="mt-2 flex flex-col gap-2">
+        <label htmlFor="username" className="text-xs font-medium uppercase tracking-wide text-ink-500">
+          Username (optional)
+        </label>
+        <input
+          id="username"
+          value={username}
+          onChange={(e) => setUsername(e.target.value.toLowerCase())}
+          placeholder="e.g. ada_lovelace"
+          className="rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
+        />
+        <p className="-mt-1 text-xs text-ink-400">
+          Lowercase letters, numbers, and underscores only, 3–20 characters. Lets you sign in with
+          this instead of your email.
+        </p>
+
         <label htmlFor="firstName" className="text-xs font-medium uppercase tracking-wide text-ink-500">
           First name
         </label>
@@ -345,7 +363,13 @@ function ProfileForm({ userId }: { userId: string | undefined }) {
         >
           {upsertProfile.isPending ? "Saving…" : "Save profile"}
         </button>
-        {upsertProfile.isError && <p className="text-xs text-red-700">{upsertProfile.error.message}</p>}
+        {upsertProfile.isError && (
+          <p className="text-xs text-red-700">
+            {(upsertProfile.error as { code?: string })?.code === "23505"
+              ? "That username is already taken."
+              : upsertProfile.error.message}
+          </p>
+        )}
         {saved && <p className="text-xs text-emerald-700">Profile saved.</p>}
       </form>
     </div>

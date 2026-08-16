@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import {
   useAuthUser,
+  useEmailForUsername,
   useSignInWithGoogle,
   useSignInWithMagicLink,
   useSignInWithPassword,
@@ -49,8 +50,14 @@ export default function LoginPage() {
   const signIn = useSignInWithMagicLink();
   const signInWithPassword = useSignInWithPassword();
   const signInWithGoogle = useSignInWithGoogle();
+  const emailForUsername = useEmailForUsername();
+  // `identifierInput` is exactly what the user typed (what "Change" restores); `email` is the
+  // resolved address actually used for auth calls — the same value when the user typed an email
+  // directly, but the looked-up address when they typed a username instead.
+  const [identifierInput, setIdentifierInput] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [usernameNotFound, setUsernameNotFound] = useState(false);
   const [step, setStep] = useState<Step>("email");
   const [awaitingGooglePopup, setAwaitingGooglePopup] = useState(false);
   const popupPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -86,14 +93,29 @@ export default function LoginPage() {
     }, 500);
   }
 
-  function handleEmailSubmit(e: React.FormEvent) {
+  async function handleEmailSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!email) return;
+    if (!identifierInput) return;
+    setUsernameNotFound(false);
+
+    if (identifierInput.includes("@")) {
+      setEmail(identifierInput);
+      setStep("password");
+      return;
+    }
+
+    const resolved = await emailForUsername.mutateAsync(identifierInput);
+    if (!resolved) {
+      setUsernameNotFound(true);
+      return;
+    }
+    setEmail(resolved);
     setStep("password");
   }
 
   function handleChangeEmail() {
     setPassword("");
+    setUsernameNotFound(false);
     signInWithPassword.reset();
     setStep("email");
   }
@@ -177,26 +199,32 @@ export default function LoginPage() {
             </div>
 
             <form onSubmit={handleEmailSubmit} className="flex flex-col gap-3">
-              <label htmlFor="email" className="text-xs font-medium uppercase tracking-wide text-ink-500">
-                Email
+              <label htmlFor="identifier" className="text-xs font-medium uppercase tracking-wide text-ink-500">
+                Email or username
               </label>
               <input
-                id="email"
-                type="email"
+                id="identifier"
+                type="text"
                 required
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="username"
+                value={identifierInput}
+                onChange={(e) => {
+                  setIdentifierInput(e.target.value);
+                  setUsernameNotFound(false);
+                }}
                 placeholder="you@example.com"
                 className="rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
               />
               <button
                 type="submit"
-                disabled={!email}
+                disabled={!identifierInput || emailForUsername.isPending}
                 className="rounded-md bg-ink-800 px-3 py-2 text-sm font-medium text-paper-50 transition-colors hover:bg-ink-700 disabled:opacity-60"
               >
-                Continue
+                {emailForUsername.isPending ? "Checking…" : "Continue"}
               </button>
+              {usernameNotFound && (
+                <p className="text-xs text-red-700">No account found with that username.</p>
+              )}
             </form>
           </>
         )}

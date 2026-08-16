@@ -11,8 +11,9 @@ Magic-link email is still the only way to *create* an account. Locally, "sending
 in Mailpit, not a real inbox — open `http://127.0.0.1:54324` and click the link there. The e2e
 suite does this same lookup programmatically via Mailpit's REST API (`e2e/helpers.ts`). Once
 signed in, the header's gear icon opens the Account modal, where a user can set a password for
-future sign-ins and update their profile (name/occupation/bio/avatar — see Build Order step 28),
-and the login page also offers "Continue with Google" (opens as a popup — see
+future sign-ins and update their profile (name/occupation/bio/avatar/username — see Build Order
+steps 28-29; a set username can be typed on the sign-in page instead of the email), and the login
+page also offers "Continue with Google" (opens as a popup — see
 `docs/ARCHITECTURE.md` Build Order step 15) — Google sign-in needs real OAuth credentials
 configured (step 14) and isn't covered by the automated suite.
 
@@ -26,7 +27,8 @@ practice this is rare since every spec uses a freshly generated unique email per
 | `e2e/*.spec.ts` | Covers |
 |---|---|
 | `sign-in.spec.ts` | Magic-link sign-in end-to-end (send → Mailpit → verify URL → landed signed in, URL fragment stripped); signed-out visitors get redirected off authenticated routes. |
-| `password-sign-in.spec.ts` | Set a password from `/account`, sign out, sign back in with email+password (no magic-link email round-trip). |
+| `password-sign-in.spec.ts` | Set a password from the Account modal, sign out, sign back in with email+password (no magic-link email round-trip). |
+| `username-sign-in.spec.ts` | Set a username from the Account modal's profile box, sign out, sign back in typing the *username* instead of the email — confirms it resolves to the right account and signs in; a made-up username is rejected right at the identifier step, never reaching a password prompt. |
 | `workspace-pages.spec.ts` | Create workspace → create page → edit title + BlockNote content → autosave persists across a reload → nested sub-page creation and tree display. |
 | `publish-share.spec.ts` | Publish toggle → `/share/[slug]` renders content read-only (zero `[contenteditable]` elements) to a fully separate signed-out browser context → unpublish takes the share URL back down to a 404. |
 | `workspace-isolation.spec.ts` | A second real user can neither see user A's workspace in their own switcher, nor read anything by navigating directly to user A's workspace URL — RLS-level isolation, not just UI filtering. |

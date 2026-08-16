@@ -67,6 +67,7 @@ export interface CredentialFolder {
 // with a trailing "Other" option that saves a free-text value directly into this same field.
 export interface Profile {
   id: string;
+  username: string | null;
   firstName: string | null;
   middleName: string | null;
   lastName: string | null;
