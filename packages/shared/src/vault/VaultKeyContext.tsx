@@ -13,7 +13,12 @@ import { deriveVaultKey } from "../lib/vaultCrypto";
 interface VaultKeyContextValue {
   isUnlocked: (workspaceId: string) => boolean;
   getKey: (workspaceId: string) => CryptoKey | null;
-  unlock: (workspaceId: string, passphrase: string, saltB64: string) => Promise<void>;
+  unlock: (
+    workspaceId: string,
+    passphrase: string,
+    saltB64: string,
+  ) => Promise<void>;
+  setKey: (workspaceId: string, key: CryptoKey) => void;
   lock: (workspaceId: string) => void;
 }
 
@@ -39,8 +44,20 @@ export function VaultKeyProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const unlock = useCallback(async (workspaceId: string, passphrase: string, saltB64: string) => {
-    const key = await deriveVaultKey(passphrase, saltB64);
+  const unlock = useCallback(
+    async (workspaceId: string, passphrase: string, saltB64: string) => {
+      const key = await deriveVaultKey(passphrase, saltB64);
+      keysRef.current.set(workspaceId, key);
+      setUnlockedIds((prev) => new Set(prev).add(workspaceId));
+    },
+    [],
+  );
+
+  // Stores a key the caller already derived (and, in the non-setup unlock flow, already verified
+  // by test-decrypting an existing credential) — the store-and-mark-unlocked half of `unlock()`,
+  // split out so a caller that already has a `CryptoKey` doesn't pay for a second, redundant
+  // 310,000-iteration PBKDF2 derivation just to get it into this Map.
+  const setKey = useCallback((workspaceId: string, key: CryptoKey) => {
     keysRef.current.set(workspaceId, key);
     setUnlockedIds((prev) => new Set(prev).add(workspaceId));
   }, []);
@@ -55,7 +72,9 @@ export function VaultKeyProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <VaultKeyContext.Provider value={{ isUnlocked, getKey, unlock, lock }}>
+    <VaultKeyContext.Provider
+      value={{ isUnlocked, getKey, unlock, setKey, lock }}
+    >
       {children}
     </VaultKeyContext.Provider>
   );
@@ -63,7 +82,8 @@ export function VaultKeyProvider({ children }: { children: ReactNode }) {
 
 export function useVaultKey(workspaceId: string | undefined) {
   const ctx = useContext(VaultKeyContext);
-  if (!ctx) throw new Error("useVaultKey must be used within a VaultKeyProvider");
+  if (!ctx)
+    throw new Error("useVaultKey must be used within a VaultKeyProvider");
 
   return {
     isUnlocked: workspaceId ? ctx.isUnlocked(workspaceId) : false,
@@ -71,6 +91,10 @@ export function useVaultKey(workspaceId: string | undefined) {
     unlock: (passphrase: string, saltB64: string) => {
       if (!workspaceId) throw new Error("No workspace id");
       return ctx.unlock(workspaceId, passphrase, saltB64);
+    },
+    setKey: (key: CryptoKey) => {
+      if (!workspaceId) throw new Error("No workspace id");
+      ctx.setKey(workspaceId, key);
     },
     lock: () => {
       if (workspaceId) ctx.lock(workspaceId);

@@ -1,8 +1,15 @@
 import type { Database } from "@delft/types";
-import type { Canvas, Credential, Page, Workspace, WorkspaceMember } from "@delft/types";
+import type {
+  Canvas,
+  Credential,
+  Page,
+  Workspace,
+  WorkspaceMember,
+} from "@delft/types";
 
 type WorkspaceRow = Database["public"]["Tables"]["workspaces"]["Row"];
-type WorkspaceMemberRow = Database["public"]["Tables"]["workspace_members"]["Row"];
+type WorkspaceMemberRow =
+  Database["public"]["Tables"]["workspace_members"]["Row"];
 type PageRow = Database["public"]["Tables"]["pages"]["Row"];
 type CredentialRow = Database["public"]["Tables"]["credentials"]["Row"];
 type CanvasRow = Database["public"]["Tables"]["canvases"]["Row"];
@@ -17,11 +24,15 @@ export function mapWorkspaceRow(row: WorkspaceRow): Workspace {
     ownerId: row.owner_id,
     name: row.name,
     vaultSalt: row.vault_salt,
+    vaultVerifier: row.vault_verifier,
+    vaultVerifierIv: row.vault_verifier_iv,
     createdAt: row.created_at,
   };
 }
 
-export function mapWorkspaceMemberRow(row: WorkspaceMemberRow): WorkspaceMember {
+export function mapWorkspaceMemberRow(
+  row: WorkspaceMemberRow,
+): WorkspaceMember {
   return {
     workspaceId: row.workspace_id,
     userId: row.user_id,

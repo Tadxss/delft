@@ -32,7 +32,10 @@ export function generateSalt(): string {
 
 // Non-extractable: the raw key bytes can never leave the CryptoKey handle, even via a bug that
 // tries to serialize it (e.g. accidentally logging it, or a future localStorage caching mistake).
-export async function deriveVaultKey(passphrase: string, saltB64: string): Promise<CryptoKey> {
+export async function deriveVaultKey(
+  passphrase: string,
+  saltB64: string,
+): Promise<CryptoKey> {
   const baseKey = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(passphrase),
@@ -60,7 +63,11 @@ export async function encryptSecret(
 ): Promise<{ ciphertext: string; iv: string }> {
   const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES));
   const plaintext = new TextEncoder().encode(JSON.stringify(secret));
-  const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, plaintext);
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    key,
+    plaintext,
+  );
   return { ciphertext: toBase64(ciphertext), iv: toBase64(iv) };
 }
 
@@ -78,6 +85,39 @@ export async function decryptSecret(
     fromBase64(ciphertextB64) as BufferSource,
   );
   return JSON.parse(new TextDecoder().decode(plaintext)) as CredentialSecret;
+}
+
+// A fixed marker, not a secret — its plaintext content never matters, only whether decrypting it
+// with a given key succeeds. Lets a passphrase be verified (workspaces.vault_verifier/_iv) even
+// when the vault has zero credentials yet to test-decrypt against instead.
+const VERIFIER_PLAINTEXT = "delft-vault-verifier";
+
+export async function encryptVerifier(
+  key: CryptoKey,
+): Promise<{ ciphertext: string; iv: string }> {
+  const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES));
+  const plaintext = new TextEncoder().encode(VERIFIER_PLAINTEXT);
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    key,
+    plaintext,
+  );
+  return { ciphertext: toBase64(ciphertext), iv: toBase64(iv) };
+}
+
+// Throws (same AES-GCM auth-tag failure as decryptSecret) if `key` doesn't match the key the
+// verifier was encrypted with. The decrypted plaintext itself is discarded on success — a
+// successful decrypt is sufficient proof the passphrase is correct.
+export async function verifyVaultKey(
+  key: CryptoKey,
+  ciphertextB64: string,
+  ivB64: string,
+): Promise<void> {
+  await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: fromBase64(ivB64) as BufferSource },
+    key,
+    fromBase64(ciphertextB64) as BufferSource,
+  );
 }
 
 export interface GeneratePasswordOptions {
@@ -103,5 +143,7 @@ export function generatePassword(options: GeneratePasswordOptions): string {
   if (!alphabet) throw new Error("Select at least one character set.");
 
   const randomValues = crypto.getRandomValues(new Uint32Array(options.length));
-  return Array.from(randomValues, (value) => alphabet.charAt(value % alphabet.length)).join("");
+  return Array.from(randomValues, (value) =>
+    alphabet.charAt(value % alphabet.length),
+  ).join("");
 }

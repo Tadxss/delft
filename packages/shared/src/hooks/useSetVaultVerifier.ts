@@ -3,36 +3,25 @@ import type { Workspace } from "@delft/types";
 import { useSupabaseClient } from "../supabase/context";
 import { mapWorkspaceRow } from "../supabase/mappers";
 
-// Called exactly once per workspace, the first time its vault passphrase is set up (see
-// vaultCrypto.ts's generateSalt()) — saves the salt and an encrypted verifier (see
-// vaultCrypto.ts's encryptVerifier()) together, so every vault can have its passphrase verified
-// from the moment it's created, not just once it has its first credential. RLS-gated by
-// workspaces_update_owner — only the workspace owner can set this, same as any other
-// workspace-level update.
-export function useSetVaultSalt() {
+// Backfills workspaces.vault_verifier/_iv for a vault that predates that column — called
+// opportunistically after a legacy vault is unlocked correctly (verified by test-decrypting an
+// existing credential instead), so every unlock from then on can use the faster, always-available
+// verifier check instead. Best-effort by design: RLS-gated by workspaces_update_owner like
+// useSetVaultSalt, so a non-owner member who correctly unlocks a shared vault can't write this —
+// that's fine, it just means the backfill happens next time the owner unlocks instead.
+export function useSetVaultVerifier() {
   const supabase = useSupabaseClient();
   const queryClient = useQueryClient();
 
   return useMutation<
     Workspace,
     Error,
-    {
-      workspaceId: string;
-      saltB64: string;
-      verifierCiphertext: string;
-      verifierIv: string;
-    }
+    { workspaceId: string; verifierCiphertext: string; verifierIv: string }
   >({
-    mutationFn: async ({
-      workspaceId,
-      saltB64,
-      verifierCiphertext,
-      verifierIv,
-    }) => {
+    mutationFn: async ({ workspaceId, verifierCiphertext, verifierIv }) => {
       const { data, error } = await supabase
         .from("workspaces")
         .update({
-          vault_salt: saltB64,
           vault_verifier: verifierCiphertext,
           vault_verifier_iv: verifierIv,
         })
