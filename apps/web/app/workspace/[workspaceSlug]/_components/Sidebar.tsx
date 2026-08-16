@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { PanelLeftClose, Plus } from "lucide-react";
+import { ChevronsLeft, Plus } from "lucide-react";
 import type { Page } from "@delft/types";
 import { useCreateCanvas, useCreatePage, useCanvases, usePages, parseWorkspaceSlug } from "@delft/shared";
 import { PageTreeNode } from "./PageTreeNode";
@@ -63,7 +63,17 @@ export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
   }
 
   return (
-    <nav className="flex w-64 shrink-0 flex-col gap-2 border-r border-paper-200 bg-paper-50 p-3">
+    <nav className="group flex w-64 shrink-0 flex-col gap-2 border-r border-paper-200 bg-paper-50 p-3">
+      <div className="flex items-center justify-end px-1">
+        <button
+          type="button"
+          onClick={onCollapse}
+          aria-label="Collapse sidebar"
+          className="rounded px-1.5 py-0.5 text-ink-500 opacity-0 hover:bg-paper-100 hover:text-ink-800 group-hover:opacity-100 group-focus-within:opacity-100"
+        >
+          <ChevronsLeft size={14} />
+        </button>
+      </div>
       <div className="flex items-center justify-between px-1">
         <span className="text-xs font-medium uppercase tracking-wide text-ink-500">Pages</span>
         <div className="flex items-center gap-0.5">
@@ -74,14 +84,6 @@ export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
             className="rounded px-1.5 py-0.5 text-ink-500 hover:bg-paper-100 hover:text-ink-800"
           >
             <Plus size={14} />
-          </button>
-          <button
-            type="button"
-            onClick={onCollapse}
-            aria-label="Collapse sidebar"
-            className="rounded px-1.5 py-0.5 text-ink-500 hover:bg-paper-100 hover:text-ink-800"
-          >
-            <PanelLeftClose size={14} />
           </button>
         </div>
       </div>
