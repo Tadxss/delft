@@ -23,8 +23,9 @@ on push to `master`). See Build Order below for how each shipped.
 **Current focus: working through [docs/BETA_READINESS.md](BETA_READINESS.md)** before calling this
 BETA — a full audit found real gaps (silent autosave failures, no mobile layout, `Modal.tsx`
 missing dialog semantics, Storage orphaning on delete, and more, ranked by severity in that doc).
-The first (highest-severity) item — silent autosave failures — is fixed as of Build Order step 30;
-everything else in that doc is still open as of step 30.
+Both High severity items 1 (silent autosave failures) and 3 (zero responsive/mobile layout) are
+fixed as of Build Order steps 30/31; item 2 (read-hook errors) and everything Medium/Low severity
+is still open as of step 31.
 
 The one recurring (not one-time) item to keep revisiting alongside that: the image-compression
 settings in `PageEditor.tsx` against real Storage usage as real data accumulates — Supabase
@@ -916,6 +917,44 @@ the full policy set and its inline reasoning.
     interception to force the `PATCH /rest/v1/pages` and `PATCH /rest/v1/canvases` requests to
     fail, and confirmed the inline error rendered correctly in both editors. Plus
     `pnpm check-types`/`lint` (repo-wide).
+
+31. **Fixed BETA_READINESS.md item 3: zero responsive/mobile layout.** ✅ *done*. No `sm:`/`md:`/
+    `lg:`/`xl:`/`2xl:` breakpoints existed anywhere in `apps/web/app`, and no `@media` queries in
+    `globals.css` — `Sidebar.tsx`'s hardcoded `w-64`, `PageEditor.tsx`'s fixed `px-8`/`pt-28`, and
+    `CredentialsModal.tsx`'s side-by-side two-pane layout made the app effectively unusable at a
+    ~375px phone width.
+
+    - **Sidebar**: below `md`, `SidebarShell.tsx`'s desktop collapsed-rail/expanded-sidebar split
+      is entirely `hidden`, replaced by an off-canvas drawer — a fixed `[aria-label="Open sidebar"]`
+      toggle button, a `bg-black/50` backdrop, and the same `Sidebar` component sliding in from the
+      left (its own `onCollapse` prop repurposed as "close the drawer" in this context). The drawer
+      closes automatically on navigation via a `usePathname()` effect, rather than needing every
+      nav link threaded with an explicit close callback. `mobileOpen` is deliberately *not*
+      persisted to `localStorage` like the desktop `collapsed` flag — it's transient overlay state,
+      not a layout preference.
+    - **Editors**: `PageEditor.tsx`/`CanvasEditor.tsx` swapped their fixed padding for
+      viewport-relative values (e.g. `px-4 pt-24 sm:px-8 sm:pt-28`) — the extra top padding is
+      sized specifically to clear the fixed sidebar-toggle button, not arbitrary.
+    - **`CredentialsModal`**: below `md`, switched to single-pane master/detail (list, or detail
+      with a "← Back" row) rather than literal vertical stacking — the modal's fixed
+      `h-[720px]`/`max-h-[85vh]` height meant stacking both panes would force double-scrolling
+      inside a bounded box, worse than showing one pane at a time. `CredentialList.tsx`'s own root
+      became `w-full md:w-72` to actually fill that single pane rather than staying pinned at 288px.
+    - **Real bug found and fixed, outside the original audit's scope**: while implementing the
+      above, found that several row-level actions across the app — `Sidebar`'s collapse button,
+      `PageTreeNode`'s "add sub-page"/"⋯" menu buttons, `CredentialFolderTreeNode`'s folder action
+      icons, and the workspace list's per-row Delete button — were `opacity-0`/`hidden` until
+      `:hover`/`:focus-within`, with no touch equivalent for either state. On a touch device these
+      were permanently unreachable, not just visually different — e.g. no way to rename or delete
+      a page from the tree at all. Fixed the same way everywhere: `opacity-100`/`flex` as the base
+      state, hover-reveal (`opacity-0`/`hidden` + `group-hover:`/`group-focus-within:`) pushed
+      behind an `md:` prefix so it only kicks in once a real pointer device is likely present.
+
+    Verified against a real local Supabase session using Playwright's `devices["iPhone 13"]`
+    viewport emulation (not real touch input — see BETA_READINESS.md item 5's still-open real-device
+    gap): walked through sign-in → create workspace → open the sidebar drawer → create a page → set
+    up a vault → create, save, and navigate back from a credential on the emulated mobile viewport,
+    screenshotting each step. Plus `pnpm check-types`/`lint` (repo-wide).
 
 **Deferred, not started:** revisiting `PageEditor.tsx`'s image-compression settings against real
 Storage usage — see **Next Up** above.

@@ -40,31 +40,6 @@ etc.) — this gap is specifically on the read side.
 or just inline `{isError && <p className="text-red-700">...}` matching the mutation-error styling
 already used elsewhere) added to each of these six call sites.
 
-### 3. Zero responsive/mobile layout
-Confirmed via grep: 0 uses of `sm:`/`md:`/`lg:`/`xl:`/`2xl:` anywhere in `apps/web/app`, no
-`@media` queries in `globals.css`. Concrete breakage:
-- `Sidebar.tsx` has a hardcoded `w-64` (256px) with no viewport-based collapse — only a manual
-  desktop toggle persisted via `localStorage` (`SidebarShell.tsx`), not a breakpoint-driven
-  drawer/overlay pattern.
-- `PageEditor.tsx` has fixed `px-8`/`pt-28` regardless of viewport.
-- `CredentialsModal.tsx`'s list+detail two-pane layout (`flex min-h-0 flex-1` with `CredentialList`
-  + a detail pane side by side) has no stacking fallback for narrow widths.
-
-On a ~375px phone viewport the app is effectively unusable (sidebar alone consumes ~68% of the
-screen), not just visually cramped.
-
-**Files**: `apps/web/app/workspace/[workspaceSlug]/_components/{Sidebar,SidebarShell}.tsx`,
-`.../p/[pageId]/_components/PageEditor.tsx`, `.../_components/credentials/CredentialsModal.tsx`,
-`apps/web/app/globals.css`.
-
-**Suggested next step**: decide the actual target (is mobile support in scope for this BETA, or is
-"desktop-only for now" an acceptable documented constraint like the zero-cost one in
-`CLAUDE.md`?). If in scope: sidebar becomes an off-canvas drawer below a breakpoint, editors drop
-fixed horizontal padding in favor of viewport-relative spacing, `CredentialsModal`'s two-pane
-layout stacks vertically below a breakpoint. Playwright already supports device-emulation projects
-(`devices["iPhone 13"]`) — see item 5 below — so a mobile viewport check could be added to the e2e
-suite once this is fixed, not before.
-
 ## Medium severity
 
 ### 4. `Modal.tsx` has no dialog semantics
@@ -100,8 +75,9 @@ None of this is verified either automatically or (as far as this audit could det
 
 **Suggested next step**: at minimum, manually test the Pages editor, Canvas, and the Credentials
 modal on a real iOS Safari device/simulator before calling this BETA. Longer-term, add a WebKit
-Playwright project (`devices["Desktop Safari"]` and/or `devices["iPhone 13"]`) — note this is
-naturally blocked on item 3 (no responsive layout) for the mobile-viewport variant specifically.
+Playwright project (`devices["Desktop Safari"]` and/or `devices["iPhone 13"]`) — now that the
+mobile-layout item below (Fixed) is in place, the `devices["iPhone 13"]` mobile-viewport variant of
+this is no longer blocked on layout, only on this item still being unstarted.
 
 ## Low severity
 
@@ -176,3 +152,30 @@ persistent inline message near the title ("Couldn't save your last change: …")
 `CredentialDetail.tsx`'s existing `saveError` display pattern. Verified against a real local
 Supabase session by forcing the underlying `PATCH` requests to fail and confirming the message
 rendered in both editors, plus `pnpm check-types`/`lint`.
+
+### 3. Zero responsive/mobile layout — fixed, see [docs/ARCHITECTURE.md](ARCHITECTURE.md) Build Order step 31
+Confirmed via grep: 0 uses of `sm:`/`md:`/`lg:`/`xl:`/`2xl:` anywhere in `apps/web/app`, no
+`@media` queries in `globals.css`. `Sidebar.tsx` had a hardcoded `w-64` with no viewport-based
+collapse, `PageEditor.tsx` had fixed `px-8`/`pt-28` regardless of viewport, and
+`CredentialsModal.tsx`'s list+detail two-pane layout had no stacking fallback for narrow widths —
+on a ~375px phone viewport the app was effectively unusable.
+
+Fixed: `Sidebar`/`SidebarShell` gained a `md:`-gated off-canvas drawer (fixed toggle button,
+backdrop, sliding panel, auto-closes on navigation via `usePathname`) replacing the fixed sidebar
+below that breakpoint; `PageEditor`/`CanvasEditor` got viewport-relative padding
+(`px-4 sm:px-8`-style); `CredentialsModal`/`CredentialList` switched to a single-pane
+master/detail view below `md` (list or detail-with-Back, not both at once) instead of literal
+side-by-side stacking, since the modal's fixed height made simultaneous vertical stacking
+unworkable. Along the way, found and fixed a related but distinct gap the original audit pass
+didn't cover: several row-level actions across the app (Sidebar's collapse button, page-tree
+"add sub-page"/"⋯ menu" buttons, credential-folder-tree action icons, the workspace list's Delete
+button) were `opacity-0`/`hidden` until `:hover`/`:focus-within`, making them permanently
+unreachable on touch with no mouse or keyboard focus to trigger them — now always visible below
+`md`, hover-reveal preserved at `md:` and up.
+
+**Known remaining gap, not fully closed by this pass**: no real device/touch-emulation testing was
+done (this was verified via Playwright's `devices["iPhone 13"]` viewport emulation over a
+mouse-driven Chromium instance, not actual touch input) — that overlaps with item 5 below, which is
+still open. `CredentialFolderTreeNode`'s rename `<input>` and a few other hover-adjacent affordances
+weren't separately re-audited beyond the `group-hover`/`opacity-0` grep sweep above; worth a second
+pass if real-device testing (item 5) surfaces anything.

@@ -97,7 +97,7 @@ export function CanvasEditor({ canvas }: { canvas: Canvas }) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex shrink-0 items-center justify-between gap-4 px-6 pb-2 pt-6">
+      <div className="flex shrink-0 items-center justify-between gap-4 px-4 pb-2 pt-16 sm:px-6 sm:pt-6">
         <input
           value={title}
           onChange={(e) => handleTitleChange(e.target.value)}
@@ -114,7 +114,7 @@ export function CanvasEditor({ canvas }: { canvas: Canvas }) {
       </div>
 
       {updateCanvas.isError && (
-        <p className="shrink-0 px-6 text-xs text-red-700">
+        <p className="shrink-0 px-4 text-xs text-red-700 sm:px-6">
           Couldn&apos;t save your last change
           {updateCanvas.error?.message ? `: ${updateCanvas.error.message}` : ""}
         </p>

@@ -109,7 +109,7 @@ export function PageTreeNode({
           aria-label={isExpanded ? "Collapse" : "Expand"}
           className={`flex h-4 w-4 shrink-0 items-center justify-center text-ink-400 ${
             hasChildren
-              ? "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+              ? "opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100"
               : "invisible"
           }`}
         >
@@ -144,7 +144,7 @@ export function PageTreeNode({
           type="button"
           onClick={() => onCreateChild(page.id)}
           aria-label="Add sub-page"
-          className="hidden h-4 w-4 shrink-0 items-center justify-center text-ink-400 hover:text-ink-700 group-hover:flex group-focus-within:flex"
+          className="flex h-4 w-4 shrink-0 items-center justify-center text-ink-400 hover:text-ink-700 md:hidden md:group-hover:flex md:group-focus-within:flex"
         >
           <Plus size={14} />
         </button>
@@ -154,7 +154,7 @@ export function PageTreeNode({
             onClick={() => setMenuOpen((prev) => !prev)}
             aria-label="Page actions"
             aria-haspopup="menu"
-            className="hidden h-4 w-4 shrink-0 items-center justify-center text-ink-400 hover:text-ink-700 group-hover:flex group-focus-within:flex"
+            className="flex h-4 w-4 shrink-0 items-center justify-center text-ink-400 hover:text-ink-700 md:hidden md:group-hover:flex md:group-focus-within:flex"
           >
             <MoreHorizontal size={14} />
           </button>
