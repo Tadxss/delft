@@ -7,6 +7,7 @@ type ProfilesUpsert = Database["public"]["Tables"]["profiles"]["Insert"];
 
 export interface UpsertProfileInput {
   id: string;
+  username?: string | null;
   firstName?: string | null;
   middleName?: string | null;
   lastName?: string | null;
@@ -23,8 +24,9 @@ export function useUpsertProfile() {
   const queryClient = useQueryClient();
 
   return useMutation<Profile, Error, UpsertProfileInput>({
-    mutationFn: async ({ id, firstName, middleName, lastName, occupation, bio, avatarUrl }) => {
+    mutationFn: async ({ id, username, firstName, middleName, lastName, occupation, bio, avatarUrl }) => {
       const patch: ProfilesUpsert = { id };
+      if (username !== undefined) patch.username = username;
       if (firstName !== undefined) patch.first_name = firstName;
       if (middleName !== undefined) patch.middle_name = middleName;
       if (lastName !== undefined) patch.last_name = lastName;

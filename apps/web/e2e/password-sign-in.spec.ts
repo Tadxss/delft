@@ -16,7 +16,7 @@ test("a user can set a password from the Account modal and sign in with it after
   await page.click('button:has-text("Sign out")');
   await expect(page).toHaveURL("http://127.0.0.1:3000/");
 
-  await page.fill('input[type="email"]', email);
+  await page.fill("#identifier", email);
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   await page.fill("#password", "correct-horse-battery");
   await page.getByRole("button", { name: "Continue", exact: true }).click();

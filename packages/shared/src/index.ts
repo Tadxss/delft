@@ -41,3 +41,4 @@ export * from "./hooks/useDeleteCanvas";
 export * from "./hooks/useProfile";
 export * from "./hooks/useUpsertProfile";
 export * from "./hooks/useUploadAvatar";
+export * from "./hooks/useEmailForUsername";

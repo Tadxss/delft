@@ -58,18 +58,24 @@ Storage's free tier caps at 1GB.
   (standalone items, not a tree like `pages`). `scene` is Excalidraw's own `{elements, appState}`
   shape; the `files` argument from Excalidraw's `onChange` (embedded image binaries) is never
   persisted. See Build Order step 17.
-- `profiles (id, first_name, middle_name, last_name, occupation, bio, avatar_url, created_at,
-  updated_at)` — the first **non-workspace-scoped** table; `id` is both PK and FK to `auth.users`,
-  one row per user. Auto-created blank on signup via an `AFTER INSERT` trigger on `auth.users`
-  (not a `public` table); a pre-existing account (created before this shipped) self-heals its
-  first row via the client's `upsert`, not a backfill script. See Build Order step 28.
+- `profiles (id, username, first_name, middle_name, last_name, occupation, bio, avatar_url,
+  created_at, updated_at)` — the first **non-workspace-scoped** table; `id` is both PK and FK to
+  `auth.users`, one row per user. Auto-created blank on signup via an `AFTER INSERT` trigger on
+  `auth.users` (not a `public` table); a pre-existing account (created before this shipped)
+  self-heals its first row via the client's `upsert`, not a backfill script. `username` is
+  nullable/unique/lowercase-only (CHECK-enforced), letting sign-in accept a username instead of an
+  email — resolved via `get_email_for_username`, an `anon`-callable function (see below). See
+  Build Order steps 28-29.
 
-RLS: every workspace-scoped table requires membership (`workspace_members`) except one deliberate
-hole — `pages_select_published_anon`, readable by `anon`, scoped strictly to `is_published =
-true`. `credentials`, `credential_folders`, and `canvases` have no anon policy or grant at all —
-unlike `pages`, none of them has a public share surface. `profiles` isn't workspace-scoped at all;
-its policies key directly on `id = auth.uid()`, same template as `workspaces_update_owner`. See
-`supabase/migrations/*_rls.sql` for the full policy set and its inline reasoning.
+RLS/grants: every workspace-scoped table requires membership (`workspace_members`) except one
+deliberate hole — `pages_select_published_anon`, readable by `anon`, scoped strictly to
+`is_published = true`. `credentials`, `credential_folders`, and `canvases` have no anon policy or
+grant at all — `profiles`' RLS itself is also `authenticated`-only (`id = auth.uid()`, no anon
+policy), but the standalone `get_email_for_username` function is explicitly `grant execute ... to
+anon` — the one place in this schema an `anon` client can reach into `profiles`/`auth.users` data
+at all, deliberately narrowed to a bare email-or-null return with no other fields ever exposed.
+See Build Order step 29 for the reasoning and tradeoff. See `supabase/migrations/*_rls.sql` for
+the full policy set and its inline reasoning.
 
 ## Build Order
 
@@ -841,6 +847,53 @@ its policies key directly on `id = auth.uid()`, same template as `workspaces_upd
     UI and directly via `psql`), the full 15-spec e2e suite, `pnpm check-types`/`lint` (repo-wide,
     all 3 packages), and an `rls-reviewer` pass on all three new migrations before ever applying
     them locally.
+
+29. **Username field + login-by-username.** ✅ *done*, not yet merged to `master`. Added an
+    optional `username` to the "Update profile" box (step 28), and let the sign-in page's single
+    identifier field accept either an email or a username.
+
+    - **The forcing constraint**: Supabase's `signInWithPassword` only ever accepts `{ email,
+      password }` or `{ phone, password }` — confirmed against `@supabase/auth-js`'s own types,
+      never a username. A username has to be resolved to an email client-side, before the user is
+      authenticated. Since this app's auth is deliberately 100% client-side (`AuthGate.tsx` — no
+      `@supabase/ssr`, no server auth routes), that resolution has to be a database function
+      callable by a signed-out (`anon`) client. **Confirmed with the user before building**: this
+      is the first `anon`-callable RPC in this repo, and it's an accepted tradeoff that anyone who
+      knows/guesses a username can resolve it to the account's email through this function. Kept
+      as narrow as possible — `get_email_for_username(username) returns text`, a bare email-or-null,
+      never a row/record, never distinguishing "no such username" from any other non-match.
+    - **Schema**: `supabase/migrations/20260817000000_profile_username.sql` (nullable `username`
+      column, `check (username is null or username ~ '^[a-z0-9_]{3,20}$')`, plain `unique`
+      constraint — stored already-lowercased app-side so case-insensitive matching needs no
+      `citext`/functional index) + `20260817000010_username_lookup_rpc.sql` (the `security
+      definer` lookup function). Reviewed by `rls-reviewer` before applying — no blocking issues;
+      confirmed the join can never fan out (unique constraint from migration 1 is in place before
+      the RPC in migration 2 can rely on it), confirmed the `revoke all from public` + `grant ...
+      to anon, authenticated` sequence is actually load-bearing here (unlike the existing trigger
+      functions, which return `trigger` and are never directly callable regardless of grants, this
+      one returns `text` and would otherwise be silently callable by `PUBLIC` by Postgres's
+      default), and confirmed the CHECK constraint — not just the app's pre-lowercasing — is what
+      actually prevents a non-lowercase username from ever being stored, regardless of what client
+      code does.
+    - **Sign-in page** (`apps/web/app/page.tsx`): the single identifier field became "Email or
+      username" (`type="text"`, not `type="email"` — a username isn't email-shaped, so HTML5
+      validation would block it), split into two pieces of state — `identifierInput` (exactly what
+      was typed, what "Change" restores) and `email` (the resolved address auth calls actually
+      use). Contains `"@"` → treated as an email directly, no RPC round-trip (keeps the common
+      case exactly as fast as before). Otherwise resolved via the new `useEmailForUsername` hook;
+      a `null` result shows "No account found with that username." and does *not* advance to the
+      password step, since the magic-link fallback there also needs a real email to send to.
+    - **`e2e/helpers.ts`'s shared `signIn` and `password-sign-in.spec.ts` both broke** from the
+      `input[type="email"]` → `#identifier` change — every spec funnels through the shared helper,
+      so this was caught immediately by the full suite rather than shipping unnoticed.
+
+    Verified via a new `e2e/username-sign-in.spec.ts` (set a username, confirm an unknown username
+    is rejected without reaching a password prompt, sign in successfully via the resolved
+    username), plus ad-hoc checks (not made permanent): a second account attempting to claim an
+    already-taken username sees "That username is already taken." rather than a raw Postgres
+    error, and a network-level check confirming plain email sign-in never fires the lookup RPC at
+    all. Full 16-spec e2e suite, `pnpm check-types`/`lint` (repo-wide), and the `rls-reviewer` pass
+    above.
 
 **Deferred, not started:** revisiting `PageEditor.tsx`'s image-compression settings against real
 Storage usage — see **Next Up** above.

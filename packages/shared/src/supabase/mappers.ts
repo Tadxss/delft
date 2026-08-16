@@ -100,6 +100,7 @@ export function mapCanvasRow(row: CanvasRow): Canvas {
 export function mapProfileRow(row: ProfileRow): Profile {
   return {
     id: row.id,
+    username: row.username,
     firstName: row.first_name,
     middleName: row.middle_name,
     lastName: row.last_name,
