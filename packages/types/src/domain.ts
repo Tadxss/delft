@@ -34,6 +34,7 @@ export interface Page {
 export interface Credential {
   id: string;
   workspaceId: string;
+  folderId: string | null;
   title: string;
   url: string | null;
   secretCiphertext: string;
@@ -46,6 +47,19 @@ export interface CredentialSecret {
   username: string;
   password: string;
   notes: string;
+}
+
+// A folder is a pure container — name only, no secret payload of its own. Nests arbitrarily deep
+// via parentFolderId, mirroring Page's parentId tree, but with deliberately different delete
+// semantics (see supabase/migrations/20260816090000_credential_folders.sql): deleting a folder
+// never destroys the credentials inside it, only cascades away empty sub-folder shells.
+export interface CredentialFolder {
+  id: string;
+  workspaceId: string;
+  parentFolderId: string | null;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // `scene` is Excalidraw's own { elements, appState } shape (its onChange callback's first two

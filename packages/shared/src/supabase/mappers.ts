@@ -2,6 +2,7 @@ import type { Database } from "@delft/types";
 import type {
   Canvas,
   Credential,
+  CredentialFolder,
   Page,
   Workspace,
   WorkspaceMember,
@@ -12,6 +13,8 @@ type WorkspaceMemberRow =
   Database["public"]["Tables"]["workspace_members"]["Row"];
 type PageRow = Database["public"]["Tables"]["pages"]["Row"];
 type CredentialRow = Database["public"]["Tables"]["credentials"]["Row"];
+type CredentialFolderRow =
+  Database["public"]["Tables"]["credential_folders"]["Row"];
 type CanvasRow = Database["public"]["Tables"]["canvases"]["Row"];
 
 // The Supabase client is typed snake_case (matching the Postgres columns directly, see
@@ -58,10 +61,24 @@ export function mapCredentialRow(row: CredentialRow): Credential {
   return {
     id: row.id,
     workspaceId: row.workspace_id,
+    folderId: row.folder_id,
     title: row.title,
     url: row.url,
     secretCiphertext: row.secret_ciphertext,
     secretIv: row.secret_iv,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function mapCredentialFolderRow(
+  row: CredentialFolderRow,
+): CredentialFolder {
+  return {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    parentFolderId: row.parent_folder_id,
+    name: row.name,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

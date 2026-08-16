@@ -5,6 +5,7 @@ import { mapCredentialRow } from "../supabase/mappers";
 
 export interface CreateCredentialInput {
   workspaceId: string;
+  folderId?: string | null;
   title: string;
   url: string | null;
   secretCiphertext: string;
@@ -18,11 +19,19 @@ export function useCreateCredential() {
   const queryClient = useQueryClient();
 
   return useMutation<Credential, Error, CreateCredentialInput>({
-    mutationFn: async ({ workspaceId, title, url, secretCiphertext, secretIv }) => {
+    mutationFn: async ({
+      workspaceId,
+      folderId = null,
+      title,
+      url,
+      secretCiphertext,
+      secretIv,
+    }) => {
       const { data, error } = await supabase
         .from("credentials")
         .insert({
           workspace_id: workspaceId,
+          folder_id: folderId,
           title,
           url,
           secret_ciphertext: secretCiphertext,
@@ -34,7 +43,17 @@ export function useCreateCredential() {
       return mapCredentialRow(data);
     },
     onSuccess: (credential) => {
-      queryClient.invalidateQueries({ queryKey: ["credentials", credential.workspaceId] });
+      // Merge synchronously (not just invalidate) so a caller that immediately selects the new
+      // credential's id (e.g. CredentialDetail's onSaved) doesn't race a background refetch —
+      // without this, a consumer checking "does this id exist in the credentials list yet" can
+      // transiently see it missing and incorrectly treat it as deleted.
+      queryClient.setQueryData<Credential[]>(
+        ["credentials", credential.workspaceId],
+        (old) => (old ? [...old, credential] : [credential]),
+      );
+      queryClient.invalidateQueries({
+        queryKey: ["credentials", credential.workspaceId],
+      });
     },
   });
 }
