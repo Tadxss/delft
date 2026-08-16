@@ -4,7 +4,10 @@ Snapshot from a full audit pass (two research passes: security/data-integrity/RL
 accessibility/mobile/error-state coverage) after Build Order step 20 in
 [docs/ARCHITECTURE.md](ARCHITECTURE.md). Written so a session with zero conversation context can
 pick any item below and start fixing it directly — nothing here has been fixed yet, this is
-findings only.
+findings only. Reverified against current code as of Build Order step 29: steps 21–29 (Shiki code
+blocks, vault verifier, nested credential folders, sidebar/header redesign, page-tree menu, editor
+Undo/Redo, profile/avatar upload, username login) shipped in the meantime but none overlap with the
+areas below — every finding still holds as originally written.
 
 Live app: `https://delft.vercel.app`. Read [docs/ARCHITECTURE.md](ARCHITECTURE.md) and
 [docs/TESTING.md](TESTING.md) first for the existing architecture/test conventions — every fix
@@ -20,29 +23,6 @@ covers it, rather than deleting it — same "accumulate, don't delete" conventio
 `ARCHITECTURE.md`.
 
 ## High severity
-
-### 1. Silent autosave failures (Pages + Canvas)
-`PageEditor.tsx`'s and `CanvasEditor.tsx`'s `scheduleSave` call `updatePage.mutate(...)` /
-`updateCanvas.mutate(...)` with no `onError` callback, and neither component ever reads
-`.isError`/`.error` off the mutation object. If a session expires mid-edit, or any request fails
-(network drop, RLS rejection), the user keeps typing believing it's autosaving — there is no
-toast, no inline message, no retry affordance. Edits past the last successful save are silently
-lost. This is the single most user-impacting gap found, since autosave is the core interaction
-model for both editors.
-
-`CredentialDetail.tsx` already does this correctly (`saveError` is read and rendered) — but
-credentials use an explicit Save button, not background autosave, so mirror that pattern's
-*display* approach (inline error text near the save-affected UI) while keeping autosave's
-debounced-mutation structure intact.
-
-**Files**: `apps/web/app/workspace/[workspaceSlug]/p/[pageId]/_components/PageEditor.tsx`,
-`apps/web/app/workspace/[workspaceSlug]/canvas/[canvasId]/_components/CanvasEditor.tsx`,
-`packages/shared/src/hooks/useUpdatePage.ts`, `packages/shared/src/hooks/useUpdateCanvas.ts`.
-
-**Suggested next step**: surface `updatePage.isError`/`updateCanvas.isError` in each editor (a
-small persistent "Couldn't save — retrying" or "Couldn't save your last change" indicator near the
-title, not just console-invisible internal query state). Consider whether TanStack Query's retry
-behavior is already enabled by default for these mutations before adding manual retry UI.
 
 ### 2. Every read-hook consumer swallows errors
 `useWorkspaces`, `usePages`, `useCredentials`, `useCanvases`, `usePage`, `useCanvas` are
@@ -160,7 +140,10 @@ cascade on their own.
   `credentials`, `canvases`) for every operation the app's UI actually performs. The previously-
   found `workspaces` DELETE gap (Build Order step 19) is fixed. `workspace_members` having no
   client write path at all is intentional — v1 is single-user-per-workspace by design (see
-  `docs/ARCHITECTURE.md`'s Data model section) — not a gap unless multi-user sharing ships.
+  `docs/ARCHITECTURE.md`'s Data model section) — not a gap unless multi-user sharing ships. The
+  `profiles` table and its `avatars` Storage bucket (added Build Order step 28, after this audit)
+  are **not covered by this claim** — their RLS/grants haven't been reviewed against the same bar
+  and should be audited before treating them as clean.
 - **Service-role key**: never referenced client-side anywhere in `apps/web` or `packages/shared` —
   only the anon key is used, everywhere, exactly as the fully-client-side/RLS-based architecture
   intends.
@@ -176,3 +159,20 @@ cascade on their own.
   auth-endpoint rate limits (`[auth.rate_limit]` in `supabase/config.toml`) still apply to
   sign-in/token-refresh regardless. Revisit if the user base ever grows beyond one trusted person,
   or if Google OAuth is ever opened up more broadly.
+
+## Fixed
+
+### 1. Silent autosave failures (Pages + Canvas) — fixed, see [docs/ARCHITECTURE.md](ARCHITECTURE.md) Build Order step 30
+`PageEditor.tsx`'s and `CanvasEditor.tsx`'s `scheduleSave` called `updatePage.mutate(...)` /
+`updateCanvas.mutate(...)` with no `onError` callback, and neither component ever read
+`.isError`/`.error` off the mutation object. If a session expired mid-edit, or any request failed
+(network drop, RLS rejection), the user kept typing believing it was autosaving — there was no
+toast, no inline message, no retry affordance. Edits past the last successful save were silently
+lost. This was the single most user-impacting gap found, since autosave is the core interaction
+model for both editors.
+
+Fixed by surfacing `updatePage.isError`/`updateCanvas.isError` in each editor as a small
+persistent inline message near the title ("Couldn't save your last change: …"), mirroring
+`CredentialDetail.tsx`'s existing `saveError` display pattern. Verified against a real local
+Supabase session by forcing the underlying `PATCH` requests to fail and confirming the message
+rendered in both editors, plus `pnpm check-types`/`lint`.
