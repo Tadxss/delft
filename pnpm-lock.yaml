@@ -58,6 +58,9 @@ importers:
       browser-image-compression:
         specifier: ^2.0.2
         version: 2.0.2
+      lucide-react:
+        specifier: ^1.31.0
+        version: 1.31.0(react@19.2.3)
       next:
         specifier: 16.2.0
         version: 16.2.0(@playwright/test@1.62.1)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(sass@1.51.0)
@@ -2485,6 +2488,11 @@ packages:
 
   lru-cache@10.4.3:
     resolution: {integrity: sha512-JNAzZcXrCt42VGLuYz0zfAzDfAvJWW6AfYlDBQyDV5DClI2m5sAmK+OIO7s59XfsRsWHp02jAJrRadPRGTt6SQ==}
+
+  lucide-react@1.31.0:
+    resolution: {integrity: sha512-G8u2eEtoHUnUa9f8lbvqDhCiORMnYLdUEo06EEG9MQvHQrInKcX3Pa2TH39MM5qyzRcWETxB0+aOwAPI1g1kEg==}
+    peerDependencies:
+      react: 19.2.3
 
   marked@16.4.2:
     resolution: {integrity: sha512-TI3V8YYWvkVf3KJe1dRkpnjs68JUPyEa5vjKrp1XEEJUAOaQc+Qj+L1qWbPd0SJuAdQkFU0h73sXXqwDYxsiDA==}
@@ -6110,6 +6118,10 @@ snapshots:
       js-tokens: 4.0.0
 
   lru-cache@10.4.3: {}
+
+  lucide-react@1.31.0(react@19.2.3):
+    dependencies:
+      react: 19.2.3
 
   marked@16.4.2: {}
 

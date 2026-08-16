@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { ChevronDown, ChevronRight, MoreHorizontal, Plus } from "lucide-react";
 import type { Page } from "@delft/types";
 
 export interface PageTreeNodeProps {
@@ -39,11 +40,13 @@ export function PageTreeNode({
           type="button"
           onClick={() => onToggle(page.id)}
           aria-label={isExpanded ? "Collapse" : "Expand"}
-          className={`flex h-4 w-4 shrink-0 items-center justify-center text-[10px] text-ink-400 ${
-            hasChildren ? "" : "invisible"
+          className={`flex h-4 w-4 shrink-0 items-center justify-center text-ink-400 ${
+            hasChildren
+              ? "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+              : "invisible"
           }`}
         >
-          {isExpanded ? "▾" : "▸"}
+          {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </button>
         <Link
           href={`/workspace/${params.workspaceSlug}/p/${page.id}`}
@@ -55,9 +58,21 @@ export function PageTreeNode({
           type="button"
           onClick={() => onCreateChild(page.id)}
           aria-label="Add sub-page"
-          className="hidden h-4 w-4 shrink-0 items-center justify-center text-ink-400 hover:text-ink-700 group-hover:flex"
+          className="hidden h-4 w-4 shrink-0 items-center justify-center text-ink-400 hover:text-ink-700 group-hover:flex group-focus-within:flex"
         >
-          +
+          <Plus size={14} />
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            // TODO: open a rename/delete/move menu here once those actions exist.
+            console.log("page menu:", page.id);
+          }}
+          aria-label="Page actions"
+          aria-haspopup="menu"
+          className="hidden h-4 w-4 shrink-0 items-center justify-center text-ink-400 hover:text-ink-700 group-hover:flex group-focus-within:flex"
+        >
+          <MoreHorizontal size={14} />
         </button>
       </div>
       {hasChildren && isExpanded && (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { PanelLeftOpen } from "lucide-react";
 import { Sidebar } from "./Sidebar";
 
 const STORAGE_KEY = "delft-sidebar-collapsed";
@@ -9,7 +10,7 @@ const STORAGE_KEY = "delft-sidebar-collapsed";
 // next-themes' pattern (read on mount, avoid rendering the collapsed-vs-expanded choice until
 // then) is overkill for something with no light/dark-style flash-of-wrong-content risk: the
 // sidebar is always visible either way, so there's nothing to briefly render incorrectly.
-export function SidebarShell({ onOpenCredentials }: { onOpenCredentials: () => void }) {
+export function SidebarShell() {
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
@@ -28,13 +29,13 @@ export function SidebarShell({ onOpenCredentials }: { onOpenCredentials: () => v
           type="button"
           onClick={() => setAndPersist(false)}
           aria-label="Expand sidebar"
-          className="rounded px-1.5 py-0.5 text-sm text-ink-500 hover:bg-paper-100 hover:text-ink-800"
+          className="rounded px-1.5 py-0.5 text-ink-500 hover:bg-paper-100 hover:text-ink-800"
         >
-          »
+          <PanelLeftOpen size={14} />
         </button>
       </div>
     );
   }
 
-  return <Sidebar onCollapse={() => setAndPersist(true)} onOpenCredentials={onOpenCredentials} />;
+  return <Sidebar onCollapse={() => setAndPersist(true)} />;
 }

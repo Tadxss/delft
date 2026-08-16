@@ -1,19 +1,18 @@
 import { test, expect } from "@playwright/test";
 import { signIn, uniqueEmail } from "./helpers";
 
-test("a user can set a password from /account and sign in with it afterward", async ({ page }) => {
+test("a user can set a password from the Account modal and sign in with it afterward", async ({ page }) => {
   const email = uniqueEmail("pw");
   await signIn(page, email);
 
-  await page.click('a:has-text("Account")');
-  await expect(page).toHaveURL(/\/account$/);
+  await page.getByRole("button", { name: "Account settings" }).click();
+  await page.getByRole("button", { name: "Password", exact: true }).click();
   await page.fill("#password", "correct-horse-battery");
   await page.fill("#confirm", "correct-horse-battery");
   await page.click('button:has-text("Save password")');
   await expect(page.getByText("Password saved.")).toBeVisible({ timeout: 10000 });
 
-  await page.click('a:has-text("Back")');
-  await expect(page).toHaveURL(/\/workspace$/);
+  await page.getByRole("button", { name: "Back" }).click();
   await page.click('button:has-text("Sign out")');
   await expect(page).toHaveURL("http://127.0.0.1:3000/");
 

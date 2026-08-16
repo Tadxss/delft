@@ -6,7 +6,7 @@ async function setUpVault(page: Page) {
   await page.click('button:has-text("Create")');
   await page.waitForURL(/\/workspace\/[^/]+--[^/]+$/, { timeout: 15000 });
 
-  await page.click('button:has-text("Credentials")');
+  await page.getByRole("button", { name: "Credentials" }).click();
   await page.fill("#passphrase", "the-real-passphrase");
   await page.fill("#confirm", "the-real-passphrase");
   await page.click('button:has-text("Create vault")');
