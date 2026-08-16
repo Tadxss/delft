@@ -15,12 +15,12 @@ package, paid SaaS dependency, or Supabase/Vercel paid-tier feature. Only free/o
 libraries, self-hosted within the Supabase + Vercel free tiers. Flag it explicitly before
 implementing anything that would realistically require a paid service.
 
-**Status**: workspace + page schema, RLS, the Pages feature (recursive page tree, BlockNote editor
-with autosave, image compression, publish/share, restricted to Image-only media blocks for now),
-and a Notion-style dark/light UI (collapsible sidebar, `/workspace/{slug}--{id}` URLs) are built and
-covered by an e2e suite. **Next up: Credentials Manager, then Canvas — see
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)'s "Next Up" section for the concrete plan on each
-(the encryption approach for Credentials is already decided, don't re-derive it).**
+**Status**: every originally-planned feature has shipped — Pages, auth (password + Google),
+Credentials Manager (with nested folders), Excalidraw Canvas, and a Notion-style hover-affordance
+UI (icon-only header, hover-reveal sidebar), all covered by an e2e suite, live at
+`https://delft.vercel.app` (auto-deploys on push to `master`). See
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)'s **Next Up** section for current focus (working
+through `docs/BETA_READINESS.md`) and the numbered Build Order for how each feature shipped.
 
 ## Commands
 
@@ -57,9 +57,12 @@ npx supabase db reset     # reapplies all migrations from scratch (destructive t
 npx supabase gen types typescript --local > packages/types/src/database.ts
 ```
 
-Not yet linked (`supabase link`) to a hosted project — everything so far has only run against the
-local stack. `apps/web/.env.local` (gitignored, copy from `.env.local.example`) points at the
-local stack (`http://127.0.0.1:54321`) by default.
+Linked (`supabase link`) to the hosted `delft` project — new migrations do **not** apply to it
+automatically, they need an explicit `supabase db push` after being applied locally (see
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) Build Order step 18's "recurring gotcha" note; a
+migration silently missing on hosted doesn't error, writes just no-op). `apps/web/.env.local`
+(gitignored, copy from `.env.local.example`) points at the local stack (`http://127.0.0.1:54321`)
+by default — local dev always targets local Supabase, never the hosted project directly.
 
 **Windows/Turbopack dev-origin gotcha**: `apps/web/next.config.js` sets
 `allowedDevOrigins: ["127.0.0.1", "localhost"]`. Without it, Next.js 16 silently blocks dev-resource

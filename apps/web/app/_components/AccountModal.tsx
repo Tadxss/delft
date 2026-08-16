@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, LogOut, X } from "lucide-react";
-import { useAuthUser, useSetPassword, useSignOut } from "@delft/shared";
+import { ChevronLeft, ChevronRight, LogOut, User, X } from "lucide-react";
+import imageCompression from "browser-image-compression";
+import { useAuthUser, useProfile, useSetPassword, useSignOut, useUploadAvatar, useUpsertProfile } from "@delft/shared";
+import { OCCUPATIONS } from "../_lib/occupations";
 import { Modal } from "./Modal";
 
 const MIN_PASSWORD_LENGTH = 8;
 
-type View = "list" | "password";
+type View = "list" | "password" | "profile";
 
 export function AccountModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { user } = useAuthUser();
@@ -70,7 +72,9 @@ export function AccountModal({ open, onClose }: { open: boolean; onClose: () => 
             >
               <ChevronLeft size={16} />
             </button>
-            <span className="text-sm font-medium text-ink-800">Password</span>
+            <span className="text-sm font-medium text-ink-800">
+              {view === "password" ? "Password" : "Update profile"}
+            </span>
           </div>
         )}
         <button
@@ -91,6 +95,15 @@ export function AccountModal({ open, onClose }: { open: boolean; onClose: () => 
 
           <button
             type="button"
+            onClick={() => setView("profile")}
+            className="flex w-full items-center justify-between rounded-md border border-paper-200 bg-paper-100 px-4 py-3 text-left text-sm text-ink-800 hover:bg-paper-200"
+          >
+            Update profile
+            <ChevronRight size={14} className="text-ink-400" />
+          </button>
+
+          <button
+            type="button"
             onClick={() => setView("password")}
             className="flex w-full items-center justify-between rounded-md border border-paper-200 bg-paper-100 px-4 py-3 text-left text-sm text-ink-800 hover:bg-paper-200"
           >
@@ -107,7 +120,7 @@ export function AccountModal({ open, onClose }: { open: boolean; onClose: () => 
             Sign out
           </button>
         </div>
-      ) : (
+      ) : view === "password" ? (
         <div className="flex flex-col gap-2 overflow-y-auto p-4">
           <p className="text-xs text-ink-500">
             Sign in with a password instead of waiting on a magic-link email each time.
@@ -151,7 +164,190 @@ export function AccountModal({ open, onClose }: { open: boolean; onClose: () => 
             {saved && <p className="text-xs text-emerald-700">Password saved.</p>}
           </form>
         </div>
+      ) : (
+        <ProfileForm userId={user?.id} />
       )}
     </Modal>
+  );
+}
+
+function ProfileForm({ userId }: { userId: string | undefined }) {
+  const { data: profile } = useProfile(userId);
+  const upsertProfile = useUpsertProfile();
+  const uploadAvatar = useUploadAvatar();
+
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [firstName, setFirstName] = useState("");
+  const [middleName, setMiddleName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [occupation, setOccupation] = useState("");
+  const [customOccupation, setCustomOccupation] = useState("");
+  const [bio, setBio] = useState("");
+  const [saved, setSaved] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Seed local form state once the profile query resolves — a missing row (pre-existing account,
+  // trigger never fired) resolves to `null`, same as a row with every field empty.
+  useEffect(() => {
+    setAvatarUrl(profile?.avatarUrl ?? null);
+    setFirstName(profile?.firstName ?? "");
+    setMiddleName(profile?.middleName ?? "");
+    setLastName(profile?.lastName ?? "");
+    setBio(profile?.bio ?? "");
+    const stored = profile?.occupation ?? "";
+    if (stored && !(OCCUPATIONS as readonly string[]).includes(stored)) {
+      setOccupation("Other");
+      setCustomOccupation(stored);
+    } else {
+      setOccupation(stored);
+      setCustomOccupation("");
+    }
+  }, [profile]);
+
+  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !userId) return;
+    const compressed = await imageCompression(file, {
+      maxWidthOrHeight: 512,
+      fileType: "image/webp",
+      useWebWorker: true,
+      exifOrientation: 1,
+    });
+    const url = await uploadAvatar.mutateAsync({ userId, file: compressed });
+    setAvatarUrl(url);
+    upsertProfile.mutate({ id: userId, avatarUrl: url });
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!userId) return;
+    setSaved(false);
+    const finalOccupation = occupation === "Other" ? customOccupation.trim() : occupation;
+    upsertProfile.mutate(
+      {
+        id: userId,
+        firstName: firstName.trim() || null,
+        middleName: middleName.trim() || null,
+        lastName: lastName.trim() || null,
+        occupation: finalOccupation || null,
+        bio: bio.trim() || null,
+      },
+      { onSuccess: () => setSaved(true) },
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-2 overflow-y-auto p-4">
+      <div className="flex items-center gap-3">
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border border-paper-200 bg-paper-100">
+          {avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- avatars are small, user-uploaded images with no build-time known dimensions; next/image's optimization isn't worth the config for this
+            <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <User size={22} className="text-ink-400" />
+          )}
+        </div>
+        <div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleAvatarChange}
+            className="hidden"
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploadAvatar.isPending}
+            className="rounded-md border border-paper-200 px-2.5 py-1.5 text-xs text-ink-600 hover:bg-paper-100 disabled:opacity-60"
+          >
+            {uploadAvatar.isPending ? "Uploading…" : "Change photo"}
+          </button>
+          {uploadAvatar.isError && (
+            <p className="mt-1 text-xs text-red-700">{uploadAvatar.error.message}</p>
+          )}
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} className="mt-2 flex flex-col gap-2">
+        <label htmlFor="firstName" className="text-xs font-medium uppercase tracking-wide text-ink-500">
+          First name
+        </label>
+        <input
+          id="firstName"
+          value={firstName}
+          onChange={(e) => setFirstName(e.target.value)}
+          className="rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
+        />
+
+        <label htmlFor="middleName" className="text-xs font-medium uppercase tracking-wide text-ink-500">
+          Middle name (optional)
+        </label>
+        <input
+          id="middleName"
+          value={middleName}
+          onChange={(e) => setMiddleName(e.target.value)}
+          className="rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
+        />
+
+        <label htmlFor="lastName" className="text-xs font-medium uppercase tracking-wide text-ink-500">
+          Last name
+        </label>
+        <input
+          id="lastName"
+          value={lastName}
+          onChange={(e) => setLastName(e.target.value)}
+          className="rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
+        />
+
+        <label htmlFor="occupation" className="text-xs font-medium uppercase tracking-wide text-ink-500">
+          Occupation
+        </label>
+        <select
+          id="occupation"
+          value={occupation}
+          onChange={(e) => setOccupation(e.target.value)}
+          className="rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
+        >
+          <option value="">Select an occupation</option>
+          {OCCUPATIONS.map((o) => (
+            <option key={o} value={o}>
+              {o}
+            </option>
+          ))}
+          <option value="Other">Other</option>
+        </select>
+        {occupation === "Other" && (
+          <input
+            value={customOccupation}
+            onChange={(e) => setCustomOccupation(e.target.value)}
+            placeholder="Enter your occupation"
+            className="rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
+          />
+        )}
+
+        <label htmlFor="bio" className="text-xs font-medium uppercase tracking-wide text-ink-500">
+          Bio
+        </label>
+        <textarea
+          id="bio"
+          value={bio}
+          onChange={(e) => setBio(e.target.value)}
+          rows={3}
+          className="resize-none rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
+        />
+
+        <button
+          type="submit"
+          disabled={upsertProfile.isPending}
+          className="mt-1 rounded-md bg-ink-800 px-3 py-2 text-sm font-medium text-paper-50 transition-colors hover:bg-ink-700 disabled:opacity-60"
+        >
+          {upsertProfile.isPending ? "Saving…" : "Save profile"}
+        </button>
+        {upsertProfile.isError && <p className="text-xs text-red-700">{upsertProfile.error.message}</p>}
+        {saved && <p className="text-xs text-emerald-700">Profile saved.</p>}
+      </form>
+    </div>
   );
 }

@@ -62,6 +62,21 @@ export interface CredentialFolder {
   updatedAt: string;
 }
 
+// One row per user (id doubles as PK and FK to auth.users), not workspace-scoped. `occupation` is
+// plain text, not an enum — the client renders a curated dropdown (apps/web/app/_lib/occupations.ts)
+// with a trailing "Other" option that saves a free-text value directly into this same field.
+export interface Profile {
+  id: string;
+  firstName: string | null;
+  middleName: string | null;
+  lastName: string | null;
+  occupation: string | null;
+  bio: string | null;
+  avatarUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // `scene` is Excalidraw's own { elements, appState } shape (its onChange callback's first two
 // arguments) — deliberately never the third `files` argument, so no image/binary data is ever
 // persisted. Typed `unknown` here since Excalidraw's own types aren't imported into this

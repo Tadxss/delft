@@ -38,3 +38,6 @@ export * from "./hooks/useCanvas";
 export * from "./hooks/useCreateCanvas";
 export * from "./hooks/useUpdateCanvas";
 export * from "./hooks/useDeleteCanvas";
+export * from "./hooks/useProfile";
+export * from "./hooks/useUpsertProfile";
+export * from "./hooks/useUploadAvatar";
