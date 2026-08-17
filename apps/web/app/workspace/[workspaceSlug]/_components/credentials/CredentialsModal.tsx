@@ -121,16 +121,32 @@ export function CredentialsModal({
             credentials={credentials}
           />
         ) : (
+          // Below `md`, only one pane is shown at a time (list, or detail with a "Back" row) —
+          // CredentialList's own root is `w-full md:w-72`, so at full width it would otherwise
+          // collide with the detail pane rather than genuinely replacing it.
           <>
-            <CredentialList
-              workspaceId={workspaceId}
-              credentials={credentials ?? []}
-              folders={folders ?? []}
-              selectedId={selectedId === "new" ? null : selectedId}
-              onSelect={setSelectedId}
-              onNewCredential={handleNewCredential}
-            />
-            <div className="flex-1 overflow-y-auto">
+            <div className={selectedId ? "hidden md:flex" : "flex flex-1 md:flex-none"}>
+              <CredentialList
+                workspaceId={workspaceId}
+                credentials={credentials ?? []}
+                folders={folders ?? []}
+                selectedId={selectedId === "new" ? null : selectedId}
+                onSelect={setSelectedId}
+                onNewCredential={handleNewCredential}
+              />
+            </div>
+            <div
+              className={`min-h-0 flex-1 flex-col overflow-y-auto ${
+                selectedId ? "flex" : "hidden md:flex"
+              }`}
+            >
+              <button
+                type="button"
+                onClick={() => setSelectedId(null)}
+                className="flex shrink-0 items-center gap-1 border-b border-paper-200 px-4 py-2 text-sm text-ink-500 hover:text-ink-800 md:hidden"
+              >
+                ← Back
+              </button>
               {selectedId === "new" ? (
                 <CredentialDetail
                   workspaceId={workspaceId}

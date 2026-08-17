@@ -137,7 +137,7 @@ export function PageEditor({ page }: { page: Page }) {
   }
 
   return (
-    <div className="mx-auto flex h-full max-w-4xl flex-col gap-4 px-8 pb-10 pt-28">
+    <div className="mx-auto flex h-full max-w-4xl flex-col gap-4 px-4 pb-10 pt-24 sm:px-8 sm:pt-28">
       <div className="flex items-start justify-between gap-4">
         <input
           value={title}

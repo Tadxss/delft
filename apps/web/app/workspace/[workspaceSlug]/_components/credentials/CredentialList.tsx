@@ -192,7 +192,7 @@ export function CredentialList({
   const isEmpty = folders.length === 0 && credentials.length === 0;
 
   return (
-    <div className="flex w-72 shrink-0 flex-col border-r border-paper-200">
+    <div className="flex w-full shrink-0 flex-col border-r border-paper-200 md:w-72">
       <div className="flex items-center justify-between gap-2 border-b border-paper-200 p-3">
         <input
           type="search"

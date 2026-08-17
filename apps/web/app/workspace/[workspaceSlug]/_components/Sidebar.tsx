@@ -63,13 +63,13 @@ export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
   }
 
   return (
-    <nav className="group flex w-64 shrink-0 flex-col gap-2 border-r border-paper-200 bg-paper-50 p-3">
+    <nav className="group flex h-full w-64 shrink-0 flex-col gap-2 border-r border-paper-200 bg-paper-50 p-3">
       <div className="flex items-center justify-end px-1">
         <button
           type="button"
           onClick={onCollapse}
           aria-label="Collapse sidebar"
-          className="rounded px-1.5 py-0.5 text-ink-500 opacity-0 hover:bg-paper-100 hover:text-ink-800 group-hover:opacity-100 group-focus-within:opacity-100"
+          className="rounded px-1.5 py-0.5 text-ink-500 opacity-100 hover:bg-paper-100 hover:text-ink-800 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100"
         >
           <ChevronsLeft size={14} />
         </button>

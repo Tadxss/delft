@@ -61,7 +61,7 @@ export default function WorkspaceSwitcherPage() {
                 <button
                   type="button"
                   onClick={(e) => handleDelete(e, workspace.id, workspace.name)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded px-2 py-1 text-xs text-ink-400 opacity-0 hover:bg-paper-200 hover:text-red-700 group-hover:opacity-100"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded px-2 py-1 text-xs text-ink-400 opacity-100 hover:bg-paper-200 hover:text-red-700 md:opacity-0 md:group-hover:opacity-100"
                 >
                   Delete
                 </button>
