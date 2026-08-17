@@ -45,6 +45,9 @@ export async function generateMetadata({
   return {
     title,
     description: `Shared via Delft`,
+    // Belt-and-suspenders with robots.ts's /share/ disallow rule — a well-behaved bot that
+    // ignores robots.txt but still respects on-page directives won't index this anyway.
+    robots: { index: false, follow: false },
     openGraph: { title, description: `Shared via Delft`, type: "article" },
     twitter: { card: "summary", title, description: `Shared via Delft` },
   };

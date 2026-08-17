@@ -1304,3 +1304,33 @@ Storage usage — see **Next Up** above.
       scale, choosing instead to rely on Supabase's existing free Auth/API logs and Vercel's existing
       free deploy/function logs (Dashboard → Logs on each platform) when investigating an incident.
       `apps/web/app/error.tsx`'s existing `console.error` + fallback UI (step 36) was left as-is.
+
+40. **Abuse-protection scoping: no custom API/AI surface exists, so the work narrows to the one
+    public route.** ✅ *done*, scoped down with the user rather than built blind. The request asked
+    for rate limiting on "login attempts, API endpoints, account creation, and AI generation
+    requests" — none of the last three exist in this app (no `app/api/**`, no AI feature anywhere),
+    and login/account-creation rate limiting is already GoTrue's built-in `[auth.rate_limit]` (tuned
+    in step 38). Confirmed with the user that the only real gap is `/share/[slug]`
+    (`apps/web/app/share/[slug]/page.tsx`) — the sole unauthenticated, publicly fetchable route,
+    with zero bot/scraper protection.
+
+    Real distributed rate limiting there needs state shared across requests, which Vercel serverless
+    functions don't have on their own (a naive in-memory counter resets on every cold start/scale-out
+    and wouldn't actually stop a scraper) — the standard fix is an external store like Upstash Redis.
+    Asked the user whether to add that new (free-tier) third-party dependency; they chose
+    **best-effort only, no new service**. Implemented the two zero-dependency mitigations available:
+    - `apps/web/app/robots.ts` (Next's file-based robots.txt convention, same pattern as the
+      existing `icon.tsx`): disallows `/share/` and `/workspace/` for all user agents. Verified via
+      `curl http://127.0.0.1:3000/robots.txt`.
+    - `/share/[slug]`'s `generateMetadata` now also returns `robots: { index: false, follow: false }`
+      — belt-and-suspenders for bots that fetch the page but don't honor `robots.txt`.
+    - Confirmed (not changed — already correct) `usePublishPage.ts`'s `generateSlug()` uses 12 hex
+      chars of `crypto.randomUUID()` (48 bits of randomness), already documented as a deliberate
+      "unguessable enough for personal sharing, not meant to resist targeted brute-forcing"
+      tradeoff — left as-is.
+
+    Both are advisory-only against a determined, non-compliant scraper — real bots ignore
+    `robots.txt` outright — but they stop the well-behaved-crawler case (search engine indexing of
+    personal shared content) at zero cost and zero new infrastructure, which is what was in scope
+    after the user declined the Upstash option. Verified: `pnpm check-types`/`lint` clean, and
+    `publish-share.spec.ts` still passes with the new metadata in place.
