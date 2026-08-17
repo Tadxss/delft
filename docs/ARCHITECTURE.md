@@ -1211,3 +1211,44 @@ the full policy set and its inline reasoning.
 
 **Deferred, not started:** revisiting `PageEditor.tsx`'s image-compression settings against real
 Storage usage — see **Next Up** above.
+
+38. **Auth security audit.** ✅ *done*. Requested review of password hashing, session expiry, email
+    verification, password-reset token expiry, login rate limiting, and frontend secret exposure.
+    Audited every hook in `packages/shared/src/hooks/` plus `AccountModal.tsx` and confirmed auth is
+    100% delegated to Supabase/GoTrue — no custom password hashing, token generation, or session
+    logic exists in app code, and no service-role key or other secret is ever referenced in
+    browser-shipped code (only the public anon key, in `providers.tsx` and `share/[slug]/page.tsx`).
+    So there was no insecure custom logic to refactor; the actual gaps were three under-tuned GoTrue
+    config values in `supabase/config.toml`:
+    - `minimum_password_length`: `6` → `8`
+    - `password_requirements`: `""` (no character-class rule) → `"lower_upper_letters_digits"`
+    - `secure_password_change`: `false` → `true` (password changes now require a recent
+      login/reauth — relevant because `useSetPassword` lets any active session silently add
+      password sign-in with no re-auth check)
+
+    Confirmed everything else already met the bar and was deliberately left unchanged:
+    `jwt_expiry = 3600` with `enable_refresh_token_rotation = true` (session expiry), GoTrue's
+    built-in `[auth.rate_limit]` block (login throttling — no custom app-level throttling exists or
+    is needed on top of it), and `enable_confirmations = false` (email verification) — account
+    *creation* is magic-link-only (no `auth.signUp` call exists anywhere in the repo), so receiving
+    the magic link *is* the verification step, making this correct by design rather than a gap.
+    Password reset likewise has no separate flow or custom token logic — a failed password attempt
+    falls back to the same magic link (step 14), governed by the same `otp_expiry = 3600`.
+
+    Updated `e2e/password-sign-in.spec.ts` and `e2e/username-sign-in.spec.ts`'s fixture password to
+    `Correct-Horse-Battery9` (was `correct-horse-battery`, all-lowercase) so both still satisfy the
+    new complexity rule; `e2e/credentials.spec.ts`'s identical-looking string is an unrelated
+    Credentials-Manager test fixture, not a Supabase auth password, and was left alone. Verified by
+    restarting the local stack (`supabase stop && supabase start`, so `config.toml` was re-read) and
+    running both specs across all three e2e projects (chromium/webkit/mobile-safari) — 6/6 passed.
+
+    **Hosted-side action item, not yet done**: per step 18's `config push` decision, these three
+    values only apply to local dev — the hosted project's Auth settings are Dashboard-only and were
+    not touched here. To match, set them by hand under Dashboard → Authentication → Providers →
+    Email (minimum password length 8, password requirements "Lowercase, uppercase letters and
+    digits") and → Authentication → Policies (require reauthentication before password change).
+
+    **Recommended follow-up, not implemented**: a CAPTCHA (`[auth.captcha]`, hCaptcha or Cloudflare
+    Turnstile, both free) as brute-force protection beyond GoTrue's IP rate limits. Needs the user's
+    own Turnstile/hCaptcha site key (an external account action) plus wiring a widget into the
+    sign-in/sign-up forms — out of scope for a config-only pass.

@@ -7,8 +7,8 @@ test("a user can set a password from the Account modal and sign in with it after
 
   await page.getByRole("button", { name: "Account settings" }).click();
   await page.getByRole("button", { name: "Password", exact: true }).click();
-  await page.fill("#password", "correct-horse-battery");
-  await page.fill("#confirm", "correct-horse-battery");
+  await page.fill("#password", "Correct-Horse-Battery9");
+  await page.fill("#confirm", "Correct-Horse-Battery9");
   await page.click('button:has-text("Save password")');
   await expect(page.getByText("Password saved.")).toBeVisible({ timeout: 10000 });
 
@@ -18,7 +18,7 @@ test("a user can set a password from the Account modal and sign in with it after
 
   await page.fill("#identifier", email);
   await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await page.fill("#password", "correct-horse-battery");
+  await page.fill("#password", "Correct-Horse-Battery9");
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   await expect(page).toHaveURL(/\/workspace$/, { timeout: 15000 });
 });
