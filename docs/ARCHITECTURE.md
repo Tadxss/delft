@@ -23,13 +23,13 @@ on push to `master`). See Build Order below for how each shipped.
 **Current focus: working through [docs/BETA_READINESS.md](BETA_READINESS.md)** before calling this
 BETA — a full audit found real gaps (silent autosave failures, no mobile layout, `Modal.tsx`
 missing dialog semantics, Storage orphaning on delete, and more, ranked by severity in that doc).
-Every High severity item is now fixed: 1 (silent autosave failures) and 3 (zero responsive/mobile
-layout) as of Build Order steps 30/31, 2 (read-hook errors) as of step 34. Medium severity is also
-done: 5 (no Safari/WebKit test coverage, steps 32-33 — its one remaining piece, real iOS Safari
-device/simulator testing, was deliberately moved to BETA_READINESS.md's "Accepted risk" section
-rather than left as open work) and 4 (`Modal.tsx` dialog semantics, step 35). What's left: the Low
-severity batch (title `<label>`, favicon, `app/error.tsx`, OG/viewport metadata), and Storage
-orphaning on delete.
+Every High and Medium severity item is now fixed: 1 (silent autosave failures) and 3 (zero
+responsive/mobile layout) as of Build Order steps 30/31, 2 (read-hook errors) as of step 34, 5 (no
+Safari/WebKit test coverage, steps 32-33 — its one remaining piece, real iOS Safari device/simulator
+testing, was deliberately moved to BETA_READINESS.md's "Accepted risk" section rather than left as
+open work) and 4 (`Modal.tsx` dialog semantics, step 35). The Low severity batch (title `<label>`,
+favicon, `app/error.tsx`, OG/viewport metadata) is fixed too, as of step 36. What's left: only
+Storage orphaning on delete.
 
 The one recurring (not one-time) item to keep revisiting alongside that: the image-compression
 settings in `PageEditor.tsx` against real Storage usage as real data accumulates — Supabase
@@ -1116,6 +1116,53 @@ the full policy set and its inline reasoning.
     trigger. Nested case reverified after the fix: Tab stays within the innermost dialog only, and
     Escape closes just that one. Plus the full 48-test suite (`chromium`/`webkit`/`mobile-safari`)
     green with no regressions, and `pnpm check-types`/`lint` (repo-wide).
+
+36. **Fixed BETA_READINESS.md's Low-severity batch: title `<label>`, favicon, `app/error.tsx`, OG/
+    viewport metadata.** ✅ *done*, closing out every High/Medium/Low item in that doc except
+    Storage orphaning. Four small, independent gaps fixed together in one pass:
+
+    - `PageEditor.tsx`/`CanvasEditor.tsx`'s title inputs relied on `placeholder="Untitled"` alone —
+      each now has an `sr-only` `<label htmlFor>` paired to a new `id` (`page-title`/
+      `canvas-title`) on the input.
+    - No favicon anywhere — `apps/web/app/icon.tsx` generates one at request time via Next's
+      built-in `next/og` `ImageResponse` (Next's file-based icon convention: the file's default
+      export becomes the `/icon` route automatically, no manual `<link rel="icon">` needed). A
+      plain "D" monogram (ink-800 background, paper-50 text) rather than a designed logo, since
+      there isn't one yet — zero-cost, no external asset or service.
+    - No `app/error.tsx` anywhere — added both a root one and one scoped to `app/workspace/`
+      (per the doc's own suggestion, since that's where the state-heavy editors live): Next's
+      file-based error boundary convention, replacing just the segment that threw while parent
+      layouts (the workspace TopBar) stay mounted. Both render a "Something went wrong."
+      message + `reset()`-wired "Try again" button, plus a `console.error` for dev visibility.
+    - No OG/Twitter/viewport metadata — root `layout.tsx` gained `openGraph`/`twitter` fields on
+      the existing `metadata` export and an explicit `viewport` export; `share/[slug]/page.tsx`
+      (the one route meant for external sharing) gained a `generateMetadata` using the shared
+      page's own title, so a share URL sent around actually gets a real link preview instead of
+      the generic site-wide one. That's a second, smaller Supabase query beyond the page
+      component's own fetch — different `.select()` columns mean Next's request memoization
+      won't dedupe the two — accepted as a minor cost rather than engineering a shared cached
+      fetch for one route.
+
+    Verified against a real local Supabase session, not just written and assumed correct: both
+    title labels confirmed via `page.getByLabel("Title")` resolving to the actual input; the
+    favicon confirmed by fetching `/icon` directly (200, `image/png`, visually inspected as the
+    intended monogram — not just assumed from the route existing); both error boundaries confirmed
+    by *forcing a real render-time throw*, not just reading the code. The root one was
+    straightforward (a temporary always-throwing route, no auth involved). The workspace-scoped
+    one needed a different approach: a temporary throwing route at `app/workspace/test-error-
+    trigger/` redirected to the sign-in page instead of showing the error, traced to `AuthGate`
+    racing its own session-reestablishment against a full `page.goto()` reload — a real
+    characteristic of this app's client-side-only auth, but not a bug in `error.tsx` itself, and
+    not representative of how a real user would ever hit this (mid-session, not a cold load to a
+    URL that happens to throw). Switched to triggering the throw via a temporary click-driven state
+    change on an already-authenticated, already-mounted page instead, which sidesteps the
+    reload race entirely — confirmed the boundary renders and "Try again" successfully resets back
+    to real content. All temporary test files/routes/edits removed afterward, confirmed via a clean
+    `git diff` before committing.
+
+    Plus `pnpm build` (confirms the `/icon` route and both `generateMetadata`/`viewport` exports
+    actually compile, not just type-check), `pnpm check-types`/`lint`, and the full 48-test e2e
+    suite (`chromium`/`webkit`/`mobile-safari`) green with no regressions.
 
 **Deferred, not started:** revisiting `PageEditor.tsx`'s image-compression settings against real
 Storage usage — see **Next Up** above.

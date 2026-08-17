@@ -22,21 +22,6 @@ entry to a new "Fixed" section at the bottom with a one-line pointer to the Buil
 covers it, rather than deleting it — same "accumulate, don't delete" convention as
 `ARCHITECTURE.md`.
 
-## Low severity
-
-- **No `<label>` on the page/canvas title input** — relies solely on `placeholder="Untitled"`.
-  Every other form input in the app has a proper `<label htmlFor>` pair; this one doesn't.
-  Files: `PageEditor.tsx`, `CanvasEditor.tsx`.
-- **No favicon at all** — `apps/web` has no `public/` directory and no `app/favicon.ico`/`icon.*`.
-  Browser tab shows a generic/blank icon.
-- **No `app/error.tsx` anywhere** — an unexpected render-time throw shows Next's bare default
-  error screen instead of a recoverable, branded fallback. A root `app/error.tsx` (and possibly one
-  scoped to `app/workspace/`, given that's where all the state-heavy editors live) would cover
-  this.
-- **No `openGraph`/`twitter`/explicit `viewport` metadata**; `/share/[slug]` pages (the one route
-  meant for external sharing) have no per-page metadata (title/description per shared page) despite
-  that being exactly where it'd matter most (link previews when a share URL is sent to someone).
-
 ## Storage orphaning (real gap, ungraded above — assess severity when picked up)
 
 Deleting a page or workspace only cascades **Postgres rows** (`on delete cascade` on the FK) —
@@ -68,7 +53,8 @@ cascade on their own.
   intends.
 - **TODO/FIXME/HACK**: zero matches anywhere in the repo.
 - **Form labels**: login, account, credential, and workspace-name inputs all have proper
-  `<label htmlFor>` pairs (the one exception — page/canvas title — is listed under Low severity).
+  `<label htmlFor>` pairs. The one exception at the time of the original audit — page/canvas
+  title — is fixed too now, see "Fixed" below.
 
 ## Accepted risk — not a BETA blocker
 
@@ -208,3 +194,36 @@ escape the panel; Escape closes and returns focus to the original trigger button
 (Credentials → Move-folder) confirmed separately: Tab stays within the innermost dialog, and Escape
 closes only that one, leaving the outer modal open. Plus the full 48-test suite
 (`chromium`/`webkit`/`mobile-safari`) green with no regressions, and `pnpm check-types`/`lint`.
+
+### Low severity batch (label, favicon, error.tsx, metadata) — fixed, see [docs/ARCHITECTURE.md](ARCHITECTURE.md) Build Order step 36
+Four small independent gaps, closed together: no `<label>` on the page/canvas title input
+(`PageEditor.tsx`/`CanvasEditor.tsx`, relied solely on `placeholder="Untitled"`); no favicon at all
+(`apps/web` had no `public/` directory or `app/favicon.ico`/`icon.*`); no `app/error.tsx` anywhere
+(an unexpected render-time throw showed Next's bare default error screen); no `openGraph`/`twitter`/
+explicit `viewport` metadata, `/share/[slug]` pages had no per-page metadata despite being the one
+route meant for external sharing (link previews).
+
+Fixed: `PageEditor.tsx`/`CanvasEditor.tsx` each got an `sr-only` `<label htmlFor>` paired with the
+title input's new `id`; `apps/web/app/icon.tsx` generates a favicon at request time via Next's
+built-in `next/og` `ImageResponse` (a plain "D" monogram in the app's ink-800/paper-50 palette —
+zero-cost, no external asset or service, matching the file-based icon convention Next.js already
+supports); `app/error.tsx` (root) and `app/workspace/error.tsx` (scoped, so the TopBar stays mounted
+around it, per the doc's own suggestion — that's where the state-heavy editors live) both render a
+"Something went wrong."/message/"Try again" fallback; root `layout.tsx` gained `openGraph`/`twitter`
+fields and an explicit `viewport` export, and `share/[slug]/page.tsx` gained a `generateMetadata`
+using the shared page's own title (a second, smaller query beyond the page component's own fetch,
+since the different `.select()` columns mean Next's request memoization won't dedupe them — accepted
+as a minor cost for correctness over rigging up a shared cached fetch for one route).
+
+Verified against a real local Supabase session, not just written and assumed correct: both title
+labels confirmed via `page.getByLabel("Title")` resolving to the actual input in both editors; the
+favicon confirmed by fetching `/icon` directly (200, `image/png`, visually a "D" monogram); both
+error boundaries confirmed by *forcing a real render-time throw* (a temporary always-throwing route
+for the root one; a temporary click-triggered `throw` in an already-authenticated page for the
+workspace-scoped one, since navigating directly to a fresh throwing route raced `AuthGate`'s
+session-reestablishment on full reload and isn't representative of how a real user would ever hit
+this — the failure is mid-session, not on a cold load) — both showed the fallback UI, and "Try
+again" successfully reset the workspace-scoped one back to real content. All temporary test
+files/routes removed afterward, confirmed via a clean `git diff`. Plus `pnpm build` (confirms the
+`/icon` route and both metadata exports compile), `pnpm check-types`/`lint`, and the full 48-test
+e2e suite (`chromium`/`webkit`/`mobile-safari`) green with no regressions.

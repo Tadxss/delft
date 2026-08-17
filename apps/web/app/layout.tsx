@@ -1,11 +1,28 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { ThemeProvider } from "next-themes";
 import "./globals.css";
 import { Providers } from "./providers";
 
+const DESCRIPTION = "A private, personal records and notes workspace.";
+
 export const metadata: Metadata = {
   title: "Delft",
-  description: "A private, personal records and notes workspace.",
+  description: DESCRIPTION,
+  openGraph: {
+    title: "Delft",
+    description: DESCRIPTION,
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "Delft",
+    description: DESCRIPTION,
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({
