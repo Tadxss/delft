@@ -12,6 +12,26 @@ const nextConfig = {
   // like the sign-in form's onSubmit never attach, so clicking "Send magic link" falls through to
   // a native HTML form submit instead of calling the React handler).
   allowedDevOrigins: ["127.0.0.1", "localhost"],
+  // Security headers, applied to every route. `frame-ancestors 'none'`/X-Frame-Options: DENY is
+  // safe here — nothing in the app ever renders inside an iframe (Google sign-in is a popup, not
+  // an embed; confirmed no <iframe> usage anywhere in apps/web). HSTS is meaningful even though
+  // Vercel already forces HTTPS at the edge: it tells the browser to *never* attempt plain HTTP
+  // for this origin again (closing the window for a downgrade/strip attack on the very first
+  // request), which Vercel's redirect-after-the-fact alone doesn't cover.
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

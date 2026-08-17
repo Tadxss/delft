@@ -1252,3 +1252,55 @@ Storage usage — see **Next Up** above.
     Turnstile, both free) as brute-force protection beyond GoTrue's IP rate limits. Needs the user's
     own Turnstile/hCaptcha site key (an external account action) plus wiring a widget into the
     sign-in/sign-up forms — out of scope for a config-only pass.
+
+39. **IDOR audit of every RLS policy, then a deployment-security pass (HTTPS headers, secrets,
+    direct DB access, logging).** ✅ *done*, two separate requests handled back to back.
+
+    **IDOR audit**: since there are no custom `app/api/**` routes at all — the browser talks
+    straight to PostgREST/GoTrue/Storage with the anon key — the entire IDOR trust boundary here is
+    RLS, not application code. Re-read every policy across all 17 migrations (`rls-reviewer` agent
+    pass, then independently re-verified `20260812140010_rls.sql` and
+    `20260812181920_credentials_rls.sql` by hand rather than trusting the agent's report at face
+    value) — found **zero IDOR vulnerabilities**. Every table (`workspaces`, `workspace_members`,
+    `pages`, `credentials`, `credential_folders`, `canvases`, `profiles`) has RLS enabled with all
+    four operations correctly scoped to `auth.uid()` via direct ownership or a `workspace_members`
+    membership subquery; the two deliberate anon-reachable exceptions
+    (`pages_select_published_anon`, `get_email_for_username`) are both narrowly scoped to exactly
+    what they need. Storage bucket policies (`page-images`, `avatars`) correctly key writes off the
+    caller's own workspace-membership or user-id path prefix. No code changes were needed — this
+    was a verification pass, not a fix.
+
+    **Deployment security pass**:
+    - **HTTPS**: Vercel already TLS-terminates and redirects HTTP→HTTPS at the edge for
+      `*.vercel.app` by default (nothing to configure), but the repo had zero security-headers
+      config. Added an `async headers()` block to `apps/web/next.config.js` applying
+      `Strict-Transport-Security` (HSTS, 2yr + `includeSubDomains` + `preload` — meaningfully
+      different from Vercel's redirect: it stops the browser from ever attempting plain HTTP again,
+      closing the downgrade-on-first-request gap that a redirect-after-the-fact doesn't cover),
+      `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` (safe — confirmed zero `<iframe>`
+      usage anywhere in `apps/web`; Google sign-in is a popup, not an embed), `Referrer-Policy:
+      strict-origin-when-cross-origin`, and a `Permissions-Policy` denying camera/mic/geolocation
+      (unused by the app). Verified live: `curl -D -` against the dev server showed all five headers
+      present, then the full `chromium` e2e suite (16/16, including sign-in flows) still passed with
+      headers active, confirming nothing broke. A full CSP was considered and deliberately **not**
+      added in this pass — Turbopack/BlockNote/Excalidraw/Supabase asset origins would need careful
+      allowlisting and live verification to avoid silently breaking something in production, which
+      is a separate, riskier piece of work.
+    - **Secrets**: re-confirmed the findings already on record from step 38 — `.gitignore` excludes
+      all `.env*` variants except the committed `.env.local.example`/`.env.example` placeholder
+      templates (verified via `git log --all --diff-filter=A -- '*.env*'`: only the two placeholder
+      files were ever added, never a real `.env.local`), only `NEXT_PUBLIC_*` vars are defined for
+      the client, and every non-placeholder `env(...)` reference in `supabase/config.toml` resolves
+      to a real environment variable rather than a hardcoded value. No changes needed.
+    - **Direct DB access**: confirmed no code anywhere in the repo connects directly to Postgres
+      (`pg`/`node-postgres`/`DATABASE_URL`/raw connection strings) — all access is via the Supabase
+      client over HTTPS (PostgREST). Restricting the hosted project's direct Postgres port from the
+      public internet (Dashboard → Settings → Database → Network Restrictions, if available on the
+      free tier) and confirming "Enforce SSL on incoming connections" is on are both Dashboard-only
+      settings this session can't perform or verify — flagged as a manual action item for the user,
+      not attempted.
+    - **Logging**: asked the user directly rather than assuming — declined adding a third-party
+      error tracker (e.g. Sentry free tier) to avoid a new external dependency at personal-project
+      scale, choosing instead to rely on Supabase's existing free Auth/API logs and Vercel's existing
+      free deploy/function logs (Dashboard → Logs on each platform) when investigating an incident.
+      `apps/web/app/error.tsx`'s existing `console.error` + fallback UI (step 36) was left as-is.
