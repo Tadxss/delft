@@ -1211,3 +1211,96 @@ the full policy set and its inline reasoning.
 
 **Deferred, not started:** revisiting `PageEditor.tsx`'s image-compression settings against real
 Storage usage — see **Next Up** above.
+
+38. **Auth security audit.** ✅ *done*. Requested review of password hashing, session expiry, email
+    verification, password-reset token expiry, login rate limiting, and frontend secret exposure.
+    Audited every hook in `packages/shared/src/hooks/` plus `AccountModal.tsx` and confirmed auth is
+    100% delegated to Supabase/GoTrue — no custom password hashing, token generation, or session
+    logic exists in app code, and no service-role key or other secret is ever referenced in
+    browser-shipped code (only the public anon key, in `providers.tsx` and `share/[slug]/page.tsx`).
+    So there was no insecure custom logic to refactor; the actual gaps were three under-tuned GoTrue
+    config values in `supabase/config.toml`:
+    - `minimum_password_length`: `6` → `8`
+    - `password_requirements`: `""` (no character-class rule) → `"lower_upper_letters_digits"`
+    - `secure_password_change`: `false` → `true` (password changes now require a recent
+      login/reauth — relevant because `useSetPassword` lets any active session silently add
+      password sign-in with no re-auth check)
+
+    Confirmed everything else already met the bar and was deliberately left unchanged:
+    `jwt_expiry = 3600` with `enable_refresh_token_rotation = true` (session expiry), GoTrue's
+    built-in `[auth.rate_limit]` block (login throttling — no custom app-level throttling exists or
+    is needed on top of it), and `enable_confirmations = false` (email verification) — account
+    *creation* is magic-link-only (no `auth.signUp` call exists anywhere in the repo), so receiving
+    the magic link *is* the verification step, making this correct by design rather than a gap.
+    Password reset likewise has no separate flow or custom token logic — a failed password attempt
+    falls back to the same magic link (step 14), governed by the same `otp_expiry = 3600`.
+
+    Updated `e2e/password-sign-in.spec.ts` and `e2e/username-sign-in.spec.ts`'s fixture password to
+    `Correct-Horse-Battery9` (was `correct-horse-battery`, all-lowercase) so both still satisfy the
+    new complexity rule; `e2e/credentials.spec.ts`'s identical-looking string is an unrelated
+    Credentials-Manager test fixture, not a Supabase auth password, and was left alone. Verified by
+    restarting the local stack (`supabase stop && supabase start`, so `config.toml` was re-read) and
+    running both specs across all three e2e projects (chromium/webkit/mobile-safari) — 6/6 passed.
+
+    **Hosted-side action item, not yet done**: per step 18's `config push` decision, these three
+    values only apply to local dev — the hosted project's Auth settings are Dashboard-only and were
+    not touched here. To match, set them by hand under Dashboard → Authentication → Providers →
+    Email (minimum password length 8, password requirements "Lowercase, uppercase letters and
+    digits") and → Authentication → Policies (require reauthentication before password change).
+
+    **Recommended follow-up, not implemented**: a CAPTCHA (`[auth.captcha]`, hCaptcha or Cloudflare
+    Turnstile, both free) as brute-force protection beyond GoTrue's IP rate limits. Needs the user's
+    own Turnstile/hCaptcha site key (an external account action) plus wiring a widget into the
+    sign-in/sign-up forms — out of scope for a config-only pass.
+
+39. **IDOR audit of every RLS policy, then a deployment-security pass (HTTPS headers, secrets,
+    direct DB access, logging).** ✅ *done*, two separate requests handled back to back.
+
+    **IDOR audit**: since there are no custom `app/api/**` routes at all — the browser talks
+    straight to PostgREST/GoTrue/Storage with the anon key — the entire IDOR trust boundary here is
+    RLS, not application code. Re-read every policy across all 17 migrations (`rls-reviewer` agent
+    pass, then independently re-verified `20260812140010_rls.sql` and
+    `20260812181920_credentials_rls.sql` by hand rather than trusting the agent's report at face
+    value) — found **zero IDOR vulnerabilities**. Every table (`workspaces`, `workspace_members`,
+    `pages`, `credentials`, `credential_folders`, `canvases`, `profiles`) has RLS enabled with all
+    four operations correctly scoped to `auth.uid()` via direct ownership or a `workspace_members`
+    membership subquery; the two deliberate anon-reachable exceptions
+    (`pages_select_published_anon`, `get_email_for_username`) are both narrowly scoped to exactly
+    what they need. Storage bucket policies (`page-images`, `avatars`) correctly key writes off the
+    caller's own workspace-membership or user-id path prefix. No code changes were needed — this
+    was a verification pass, not a fix.
+
+    **Deployment security pass**:
+    - **HTTPS**: Vercel already TLS-terminates and redirects HTTP→HTTPS at the edge for
+      `*.vercel.app` by default (nothing to configure), but the repo had zero security-headers
+      config. Added an `async headers()` block to `apps/web/next.config.js` applying
+      `Strict-Transport-Security` (HSTS, 2yr + `includeSubDomains` + `preload` — meaningfully
+      different from Vercel's redirect: it stops the browser from ever attempting plain HTTP again,
+      closing the downgrade-on-first-request gap that a redirect-after-the-fact doesn't cover),
+      `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` (safe — confirmed zero `<iframe>`
+      usage anywhere in `apps/web`; Google sign-in is a popup, not an embed), `Referrer-Policy:
+      strict-origin-when-cross-origin`, and a `Permissions-Policy` denying camera/mic/geolocation
+      (unused by the app). Verified live: `curl -D -` against the dev server showed all five headers
+      present, then the full `chromium` e2e suite (16/16, including sign-in flows) still passed with
+      headers active, confirming nothing broke. A full CSP was considered and deliberately **not**
+      added in this pass — Turbopack/BlockNote/Excalidraw/Supabase asset origins would need careful
+      allowlisting and live verification to avoid silently breaking something in production, which
+      is a separate, riskier piece of work.
+    - **Secrets**: re-confirmed the findings already on record from step 38 — `.gitignore` excludes
+      all `.env*` variants except the committed `.env.local.example`/`.env.example` placeholder
+      templates (verified via `git log --all --diff-filter=A -- '*.env*'`: only the two placeholder
+      files were ever added, never a real `.env.local`), only `NEXT_PUBLIC_*` vars are defined for
+      the client, and every non-placeholder `env(...)` reference in `supabase/config.toml` resolves
+      to a real environment variable rather than a hardcoded value. No changes needed.
+    - **Direct DB access**: confirmed no code anywhere in the repo connects directly to Postgres
+      (`pg`/`node-postgres`/`DATABASE_URL`/raw connection strings) — all access is via the Supabase
+      client over HTTPS (PostgREST). Restricting the hosted project's direct Postgres port from the
+      public internet (Dashboard → Settings → Database → Network Restrictions, if available on the
+      free tier) and confirming "Enforce SSL on incoming connections" is on are both Dashboard-only
+      settings this session can't perform or verify — flagged as a manual action item for the user,
+      not attempted.
+    - **Logging**: asked the user directly rather than assuming — declined adding a third-party
+      error tracker (e.g. Sentry free tier) to avoid a new external dependency at personal-project
+      scale, choosing instead to rely on Supabase's existing free Auth/API logs and Vercel's existing
+      free deploy/function logs (Dashboard → Logs on each platform) when investigating an incident.
+      `apps/web/app/error.tsx`'s existing `console.error` + fallback UI (step 36) was left as-is.

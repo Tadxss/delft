@@ -22,8 +22,8 @@ test("set a username, sign in with it, and confirm an unknown username is reject
   // Set a password too, so we can actually sign in with it.
   await page.getByRole("button", { name: "Back" }).click();
   await page.getByRole("button", { name: "Password", exact: true }).click();
-  await page.fill("#password", "correct-horse-battery");
-  await page.fill("#confirm", "correct-horse-battery");
+  await page.fill("#password", "Correct-Horse-Battery9");
+  await page.fill("#confirm", "Correct-Horse-Battery9");
   await page.click('button:has-text("Save password")');
   await expect(page.getByText("Password saved.")).toBeVisible({ timeout: 10000 });
 
@@ -44,7 +44,7 @@ test("set a username, sign in with it, and confirm an unknown username is reject
   await page.fill("#identifier", username);
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   await expect(page.getByText(email)).toBeVisible({ timeout: 10000 });
-  await page.fill("#password", "correct-horse-battery");
+  await page.fill("#password", "Correct-Horse-Battery9");
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   await expect(page).toHaveURL(/\/workspace$/, { timeout: 15000 });
 });
