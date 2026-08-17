@@ -203,6 +203,7 @@ export function CredentialFolderTreeNode({
       {isRenaming ? (
         <input
           ref={renameInputRef}
+          maxLength={200}
           value={renameValue}
           onChange={(e) => onRenameChange(e.target.value)}
           onBlur={onCommitRename}

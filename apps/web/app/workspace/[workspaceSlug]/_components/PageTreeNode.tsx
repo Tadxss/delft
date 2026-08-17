@@ -118,6 +118,7 @@ export function PageTreeNode({
         {renaming ? (
           <input
             ref={renameInputRef}
+            maxLength={500}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             onBlur={commitRename}

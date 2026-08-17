@@ -88,6 +88,7 @@ export default function WorkspaceSwitcherPage() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. Personal"
+            maxLength={200}
             className="flex-1 rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
           />
           <button

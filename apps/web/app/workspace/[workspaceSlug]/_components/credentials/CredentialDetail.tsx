@@ -229,6 +229,7 @@ export function CredentialDetail({
         <input
           id="title"
           required
+          maxLength={200}
           value={form.title}
           onChange={(e) =>
             setForm((prev) => ({ ...prev, title: e.target.value }))
@@ -267,6 +268,7 @@ export function CredentialDetail({
         <input
           id="url"
           type="url"
+          maxLength={2000}
           value={form.url}
           onChange={(e) =>
             setForm((prev) => ({ ...prev, url: e.target.value }))

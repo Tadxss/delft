@@ -312,6 +312,7 @@ function ProfileForm({ userId }: { userId: string | undefined }) {
         </label>
         <input
           id="firstName"
+          maxLength={100}
           value={firstName}
           onChange={(e) => setFirstName(e.target.value)}
           className="rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
@@ -322,6 +323,7 @@ function ProfileForm({ userId }: { userId: string | undefined }) {
         </label>
         <input
           id="middleName"
+          maxLength={100}
           value={middleName}
           onChange={(e) => setMiddleName(e.target.value)}
           className="rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
@@ -332,6 +334,7 @@ function ProfileForm({ userId }: { userId: string | undefined }) {
         </label>
         <input
           id="lastName"
+          maxLength={100}
           value={lastName}
           onChange={(e) => setLastName(e.target.value)}
           className="rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
@@ -357,6 +360,7 @@ function ProfileForm({ userId }: { userId: string | undefined }) {
         {occupation === "Other" && (
           <input
             value={customOccupation}
+            maxLength={200}
             onChange={(e) => setCustomOccupation(e.target.value)}
             placeholder="Enter your occupation"
             className="rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
@@ -368,6 +372,7 @@ function ProfileForm({ userId }: { userId: string | undefined }) {
         </label>
         <textarea
           id="bio"
+          maxLength={2000}
           value={bio}
           onChange={(e) => setBio(e.target.value)}
           rows={3}
