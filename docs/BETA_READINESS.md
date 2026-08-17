@@ -22,24 +22,6 @@ entry to a new "Fixed" section at the bottom with a one-line pointer to the Buil
 covers it, rather than deleting it — same "accumulate, don't delete" convention as
 `ARCHITECTURE.md`.
 
-## Medium severity
-
-### 4. `Modal.tsx` has no dialog semantics
-No `role="dialog"`/`aria-modal`, no focus trap, no focus-in-on-open or focus-return-on-close (the
-component's own comment already says "no focus trap"). The only ARIA present is
-`role="presentation"` on the backdrop/panel — semantically the *wrong* role for a dialog container
-(it strips semantics rather than adding them). Tab can currently move focus out of the modal into
-the page behind it. This affects `CredentialsModal` specifically, which holds sensitive data and is
-the one place in the app most worth getting right.
-
-**Files**: `apps/web/app/_components/Modal.tsx`.
-
-**Suggested next step**: add `role="dialog"` + `aria-modal="true"` to the panel, a focus trap
-(`inert` on siblings, or a small manual trap on Tab/Shift+Tab), move focus into the panel on open
-(e.g. to the first focusable element or a close button), and return focus to whatever triggered the
-open on close. Keep it minimal/dependency-free per the file's existing "no dialog library" choice —
-this doesn't require pulling in Radix or similar, just filling in the specific gaps listed.
-
 ## Low severity
 
 - **No `<label>` on the page/canvas title input** — relies solely on `placeholder="Untitled"`.
@@ -196,3 +178,33 @@ failure can take **15-20 seconds** to settle into `isError` (well past `provider
 `retry: 1`), likely React StrictMode's dev-only double-invoke compounding retry attempts — a
 verification script using a short wait (1-4s, matching item 1's mutation-error timing) will falsely
 read as broken. Plus `pnpm check-types`/`lint` (repo-wide).
+
+### 4. `Modal.tsx` has no dialog semantics — fixed, see [docs/ARCHITECTURE.md](ARCHITECTURE.md) Build Order step 35
+No `role="dialog"`/`aria-modal`, no focus trap, no focus-in-on-open or focus-return-on-close — both
+the backdrop and panel used `role="presentation"` (the panel's was semantically wrong: it strips
+dialog semantics rather than adding them). Tab could move focus out of the modal into the page
+behind it. Affected `CredentialsModal` specifically, which holds sensitive data.
+
+Fixed, confined entirely to `Modal.tsx` (no consumer changed): the panel now gets `role="dialog"` +
+`aria-modal="true"`; a manual Tab/Shift+Tab handler traps focus within the panel's own focusable
+elements (`inert`-ing siblings was considered and rejected — it gets genuinely awkward for the
+nested-modal case, since `MoveCredentialFolderModal` opens from inside `CredentialsModal` and both
+portal to `document.body`); and a `useEffect` moves focus into the panel on open (first focusable
+element, falling back to the panel itself) and back to whatever triggered it on close.
+
+**Real bug found and fixed during verification**: the first implementation guarded the Tab-wrap
+logic against the nested-modal case (only act if `document.activeElement` is inside *this*
+instance's own panel) but left the Escape branch unguarded — every open `Modal` instance adds its
+own `window`-level `keydown` listener, so pressing Escape once fired *both* the inner and outer
+modal's `onClose` simultaneously, closing both instead of just the topmost one. Caught by an actual
+nested-modal test (open Credentials → open the Move-folder dialog → Escape → assert exactly one
+`[role="dialog"]` remains), not just eyeballing the diff. Fixed by moving the same
+panel-contains-focus guard above the Escape/Tab branch instead of only the Tab one.
+
+Verified against a real local Supabase session: dialog role/`aria-modal` present on open; focus
+lands inside the panel immediately (on the Close button, the first focusable element) without an
+explicit call, confirmed via `document.activeElement`; 15 forward Tabs and 5 Shift+Tabs never
+escape the panel; Escape closes and returns focus to the original trigger button. Nested case
+(Credentials → Move-folder) confirmed separately: Tab stays within the innermost dialog, and Escape
+closes only that one, leaving the outer modal open. Plus the full 48-test suite
+(`chromium`/`webkit`/`mobile-safari`) green with no regressions, and `pnpm check-types`/`lint`.

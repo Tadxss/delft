@@ -24,12 +24,12 @@ on push to `master`). See Build Order below for how each shipped.
 BETA — a full audit found real gaps (silent autosave failures, no mobile layout, `Modal.tsx`
 missing dialog semantics, Storage orphaning on delete, and more, ranked by severity in that doc).
 Every High severity item is now fixed: 1 (silent autosave failures) and 3 (zero responsive/mobile
-layout) as of Build Order steps 30/31, 2 (read-hook errors) as of step 34. Medium severity item 5
-(no Safari/WebKit test coverage) is fixed as of steps 32-33 — its one remaining piece, real iOS
-Safari device/simulator testing, was deliberately moved to BETA_READINESS.md's "Accepted risk"
-section rather than left as open work (no device available here, and the alternatives were declined
-for now). What's left: Medium severity item 4 (`Modal.tsx` dialog semantics), the Low severity batch
-(title `<label>`, favicon, `app/error.tsx`, OG/viewport metadata), and Storage orphaning on delete.
+layout) as of Build Order steps 30/31, 2 (read-hook errors) as of step 34. Medium severity is also
+done: 5 (no Safari/WebKit test coverage, steps 32-33 — its one remaining piece, real iOS Safari
+device/simulator testing, was deliberately moved to BETA_READINESS.md's "Accepted risk" section
+rather than left as open work) and 4 (`Modal.tsx` dialog semantics, step 35). What's left: the Low
+severity batch (title `<label>`, favicon, `app/error.tsx`, OG/viewport metadata), and Storage
+orphaning on delete.
 
 The one recurring (not one-time) item to keep revisiting alongside that: the image-compression
 settings in `PageEditor.tsx` against real Storage usage as real data accumulates — Supabase
@@ -1078,6 +1078,44 @@ the full policy set and its inline reasoning.
     same short-wait technique worked there but not here. Re-verified with `page.waitForSelector`
     (no fixed timeout) instead of a blind wait, and all six sites confirmed rendering correctly.
     Plus `pnpm check-types`/`lint` (repo-wide).
+
+35. **Fixed BETA_READINESS.md item 4: `Modal.tsx` has no dialog semantics.** ✅ *done*, closing out
+    Medium severity. Neither the backdrop nor the panel had real dialog semantics (both
+    `role="presentation"`, the panel's wrong for a dialog container), no focus trap, no
+    focus-in-on-open/focus-return-on-close — Tab could escape the modal into the page behind it.
+    All three consumers (`AccountModal.tsx`, `CredentialsModal.tsx`,
+    `MoveCredentialFolderModal.tsx`) share one `Modal.tsx` primitive, so the fix is confined to
+    that one file.
+
+    - Panel gets `role="dialog"` + `aria-modal="true"` (backdrop keeps `role="presentation"` — it's
+      a decorative click-to-close overlay, not part of the dialog).
+    - Focus trap is a manual Tab/Shift+Tab handler on the existing `keydown` listener, not
+      `inert`-ing siblings — considered and rejected, since `document.body`'s children include
+      *every* open modal's own portal (`MoveCredentialFolderModal` opens from inside
+      `CredentialsModal`), and `inert`-ing "everything except this one" would need to specifically
+      exclude every other currently-open portal too.
+    - A `useEffect` keyed on `open` moves focus to the panel's first focusable element (or the
+      panel itself, `tabIndex={-1}`, as a fallback) on open, and back to whatever
+      `document.activeElement` was beforehand on close.
+    - **Real bug found and fixed during verification, not just eyeballing the diff**: the first
+      pass guarded the Tab-wrap logic against the nested-modal case (`panel.contains
+      (document.activeElement)` before acting) but left Escape unguarded. Every open `Modal`
+      instance registers its own `window`-level `keydown` listener — native listeners have no
+      concept of nesting, so *all* open instances' listeners fire on every keydown regardless of
+      which modal actually has focus. One Escape press was closing both the inner
+      `MoveCredentialFolderModal` and the outer `CredentialsModal` at once. Caught by an actual
+      nested-modal Playwright script (open Credentials → create a folder → open its Move dialog →
+      Escape → assert exactly one `[role="dialog"]` remains, not zero) — a check the first "looks
+      right" implementation would have failed. Fixed by moving the focus-containment guard above
+      the Escape/Tab branch entirely, so only the instance that actually owns focus reacts to
+      either key.
+
+    Verified against a real local Supabase session: `role="dialog"`/`aria-modal="true"` present on
+    open; focus lands inside the panel immediately (on the Close button) without an explicit call;
+    15 forward Tabs and 5 Shift+Tabs never escape the panel; Escape closes and returns focus to the
+    trigger. Nested case reverified after the fix: Tab stays within the innermost dialog only, and
+    Escape closes just that one. Plus the full 48-test suite (`chromium`/`webkit`/`mobile-safari`)
+    green with no regressions, and `pnpm check-types`/`lint` (repo-wide).
 
 **Deferred, not started:** revisiting `PageEditor.tsx`'s image-compression settings against real
 Storage usage — see **Next Up** above.
