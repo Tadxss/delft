@@ -13,7 +13,7 @@ import {
 export default function WorkspaceSwitcherPage() {
   const router = useRouter();
   const { user } = useAuthUser();
-  const { data: workspaces, isLoading } = useWorkspaces(user?.id);
+  const { data: workspaces, isLoading, isError, error } = useWorkspaces(user?.id);
   const createWorkspace = useCreateWorkspace(user?.id);
   const deleteWorkspace = useDeleteWorkspace(user?.id);
   const [name, setName] = useState("");
@@ -46,6 +46,8 @@ export default function WorkspaceSwitcherPage() {
 
       {isLoading ? (
         <p className="text-sm text-ink-500">Loading…</p>
+      ) : isError ? (
+        <p className="text-sm text-red-700">Couldn&apos;t load workspaces: {error.message}</p>
       ) : workspaces && workspaces.length > 0 ? (
         <ul className="flex flex-col gap-2">
           {workspaces.map((workspace) => (

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@delft/types";
@@ -17,6 +18,36 @@ function createAnonClient() {
   return createClient<Database>(url, anonKey, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
+}
+
+// The one route meant for external sharing — link previews (Slack, iMessage, etc.) read these
+// tags when a share URL gets sent around, so it's worth the extra query beyond the page component's
+// own fetch (different `.select()` columns, so Next's request memoization won't dedupe them).
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const supabase = createAnonClient();
+  if (!supabase) return {};
+
+  const { data: page } = await supabase
+    .from("pages")
+    .select("title")
+    .eq("published_slug", slug)
+    .eq("is_published", true)
+    .maybeSingle();
+
+  if (!page) return {};
+
+  const title = page.title || "Untitled";
+  return {
+    title,
+    description: `Shared via Delft`,
+    openGraph: { title, description: `Shared via Delft`, type: "article" },
+    twitter: { card: "summary", title, description: `Shared via Delft` },
+  };
 }
 
 export default async function SharedPagePage({

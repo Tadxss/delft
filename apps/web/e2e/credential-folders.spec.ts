@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { signIn, uniqueEmail } from "./helpers";
+import { backToList, signIn, uniqueEmail } from "./helpers";
 
 async function setUpVault(page: Page) {
   await page.fill("#workspace-name", "Personal");
@@ -60,6 +60,9 @@ test("nested folders are collapsed by default and expand/collapse controls what'
     username: "alice",
     password: "s3cret-p4ss",
   });
+  // Below `md`, creating (and thus selecting) a credential switches CredentialsModal to the
+  // single-pane detail view — return to the list before asserting on a list-pane element.
+  await backToList(page);
   await expect(
     page.getByRole("button", { name: "Chase", exact: true }),
   ).toBeVisible();
@@ -94,6 +97,7 @@ test("move a credential between folders via the edit form, and a folder via the 
   await page.click('button:has-text("Edit")');
   await page.selectOption("#folder", { label: "Root" });
   await page.click('button:has-text("Save")');
+  await backToList(page);
   // Now a root-level credential — visible immediately, no expand needed.
   await expect(
     page.getByRole("button", { name: "Chase", exact: true }),
@@ -142,6 +146,7 @@ test("deleting a folder never destroys the credentials inside it, only empty sub
     username: "bob",
     password: "leaf-pass",
   });
+  await backToList(page);
 
   // Delete "Parent" (which contains "Child" which contains "Leaf") from its own hover action.
   page.once("dialog", (dialog) => dialog.accept());

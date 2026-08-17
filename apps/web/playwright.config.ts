@@ -18,7 +18,14 @@ export default defineConfig({
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  // webkit catches the real Safari/WebKit-engine quirks BETA_READINESS.md item 5 flagged as
+  // unverified (browser-image-compression WebP encode support, Excalidraw touch/pointer-event
+  // handling, BlockNote/ProseMirror contentEditable behavior) — chromium alone can't surface those.
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    { name: "webkit", use: { ...devices["Desktop Safari"] } },
+    { name: "mobile-safari", use: { ...devices["iPhone 13"] } },
+  ],
   webServer: {
     command: "pnpm dev",
     url: "http://127.0.0.1:3000",

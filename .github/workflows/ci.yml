@@ -41,7 +41,7 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter web exec playwright install --with-deps chromium
+      - run: pnpm --filter web exec playwright install --with-deps chromium webkit
       - uses: supabase/setup-cli@v1
         with:
           version: latest

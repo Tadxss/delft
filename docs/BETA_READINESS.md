@@ -9,6 +9,10 @@ blocks, vault verifier, nested credential folders, sidebar/header redesign, page
 Undo/Redo, profile/avatar upload, username login) shipped in the meantime but none overlap with the
 areas below — every finding still holds as originally written.
 
+**Status as of Build Order step 37: every finding below is either fixed or explicitly accepted as
+non-blocking risk** — see "Fixed" and "Accepted risk" below. Kept as a historical record (not
+deleted) per this doc's own "accumulate, don't delete" convention.
+
 Live app: `https://delft.vercel.app`. Read [docs/ARCHITECTURE.md](ARCHITECTURE.md) and
 [docs/TESTING.md](TESTING.md) first for the existing architecture/test conventions — every fix
 below should follow those same patterns (RLS policy naming, `useX`/`useUpdateX` hook shape,
@@ -21,94 +25,6 @@ repo's existing verification bar — see recent Build Order entries for the stan
 entry to a new "Fixed" section at the bottom with a one-line pointer to the Build Order step that
 covers it, rather than deleting it — same "accumulate, don't delete" convention as
 `ARCHITECTURE.md`.
-
-## High severity
-
-### 2. Every read-hook consumer swallows errors
-`useWorkspaces`, `usePages`, `useCredentials`, `useCanvases`, `usePage`, `useCanvas` are
-destructured as `{ data, isLoading }` only, everywhere they're consumed — `.isError`/`.error` is
-never read anywhere in `apps/web`. A failed fetch (RLS error, network drop) is indistinguishable in
-the UI from "genuinely empty" (e.g. "No pages yet.") or "not found." Mutations (writes) generally
-*do* surface errors correctly already (`useCreateWorkspace`, `useCreateCredential`, the auth hooks,
-etc.) — this gap is specifically on the read side.
-
-**Files**: every consumer of the six hooks above — `apps/web/app/workspace/page.tsx`,
-`.../_components/Sidebar.tsx`, `.../credentials/CredentialsModal.tsx`, `.../p/[pageId]/page.tsx`,
-`.../canvas/[canvasId]/page.tsx`.
-
-**Suggested next step**: a consistent small pattern (e.g. a shared `<QueryError error={...} />`
-or just inline `{isError && <p className="text-red-700">...}` matching the mutation-error styling
-already used elsewhere) added to each of these six call sites.
-
-## Medium severity
-
-### 4. `Modal.tsx` has no dialog semantics
-No `role="dialog"`/`aria-modal`, no focus trap, no focus-in-on-open or focus-return-on-close (the
-component's own comment already says "no focus trap"). The only ARIA present is
-`role="presentation"` on the backdrop/panel — semantically the *wrong* role for a dialog container
-(it strips semantics rather than adding them). Tab can currently move focus out of the modal into
-the page behind it. This affects `CredentialsModal` specifically, which holds sensitive data and is
-the one place in the app most worth getting right.
-
-**Files**: `apps/web/app/_components/Modal.tsx`.
-
-**Suggested next step**: add `role="dialog"` + `aria-modal="true"` to the panel, a focus trap
-(`inert` on siblings, or a small manual trap on Tab/Shift+Tab), move focus into the panel on open
-(e.g. to the first focusable element or a close button), and return focus to whatever triggered the
-open on close. Keep it minimal/dependency-free per the file's existing "no dialog library" choice —
-this doesn't require pulling in Radix or similar, just filling in the specific gaps listed.
-
-### 5. No Safari/WebKit/mobile test coverage at all
-`playwright.config.ts` only configures `{ name: "chromium", use: devices["Desktop Chrome"] }` —
-confirmed, not speculative. No Firefox, no WebKit, no mobile emulation profile. Combined with known
-iOS Safari quirks in three dependencies actually in use:
-- `browser-image-compression` (`PageEditor.tsx`) — WebP encode support only reliable from iOS 14+,
-  canvas memory limits on older iOS.
-- `@excalidraw/excalidraw` (`CanvasEditor.tsx`) — historical touch/pointer-event conflicts
-  (pinch-zoom vs. page scroll) on iOS Safari.
-- `@blocknote/mantine` (`PageEditor.tsx`) — contentEditable/ProseMirror editors have a history of
-  iOS-specific virtual-keyboard and cursor-placement bugs.
-
-None of this is verified either automatically or (as far as this audit could determine) manually.
-
-**Files**: `apps/web/playwright.config.ts`.
-
-**Suggested next step**: at minimum, manually test the Pages editor, Canvas, and the Credentials
-modal on a real iOS Safari device/simulator before calling this BETA. Longer-term, add a WebKit
-Playwright project (`devices["Desktop Safari"]` and/or `devices["iPhone 13"]`) — now that the
-mobile-layout item below (Fixed) is in place, the `devices["iPhone 13"]` mobile-viewport variant of
-this is no longer blocked on layout, only on this item still being unstarted.
-
-## Low severity
-
-- **No `<label>` on the page/canvas title input** — relies solely on `placeholder="Untitled"`.
-  Every other form input in the app has a proper `<label htmlFor>` pair; this one doesn't.
-  Files: `PageEditor.tsx`, `CanvasEditor.tsx`.
-- **No favicon at all** — `apps/web` has no `public/` directory and no `app/favicon.ico`/`icon.*`.
-  Browser tab shows a generic/blank icon.
-- **No `app/error.tsx` anywhere** — an unexpected render-time throw shows Next's bare default
-  error screen instead of a recoverable, branded fallback. A root `app/error.tsx` (and possibly one
-  scoped to `app/workspace/`, given that's where all the state-heavy editors live) would cover
-  this.
-- **No `openGraph`/`twitter`/explicit `viewport` metadata**; `/share/[slug]` pages (the one route
-  meant for external sharing) have no per-page metadata (title/description per shared page) despite
-  that being exactly where it'd matter most (link previews when a share URL is sent to someone).
-
-## Storage orphaning (real gap, ungraded above — assess severity when picked up)
-
-Deleting a page or workspace only cascades **Postgres rows** (`on delete cascade` on the FK) —
-`useDeletePage`/`useDeleteWorkspace` never call `supabase.storage.from("page-images").remove(...)`.
-Any image uploaded via the BlockNote editor becomes permanently orphaned in Storage once its page
-or workspace is deleted. Not catastrophic short-term, but a slow leak against the 1GB free tier
-that never self-heals.
-
-**Files**: `packages/shared/src/hooks/useDeletePage.ts`, `packages/shared/src/hooks/useDeleteWorkspace.ts`.
-
-**Suggested next step**: list objects under the `{workspaceId}/{pageId}/` (or `{workspaceId}/` for
-a whole-workspace delete) prefix and `remove()` them as part of the delete mutation, before or
-after the row delete. Note a workspace delete needs to enumerate every page under it first (or use
-a wildcard-prefix list call) since Storage objects aren't foreign-keyed to Postgres and won't
-cascade on their own.
 
 ## Confirmed clean — no action needed
 
@@ -125,7 +41,8 @@ cascade on their own.
   intends.
 - **TODO/FIXME/HACK**: zero matches anywhere in the repo.
 - **Form labels**: login, account, credential, and workspace-name inputs all have proper
-  `<label htmlFor>` pairs (the one exception — page/canvas title — is listed under Low severity).
+  `<label htmlFor>` pairs. The one exception at the time of the original audit — page/canvas
+  title — is fixed too now, see "Fixed" below.
 
 ## Accepted risk — not a BETA blocker
 
@@ -135,6 +52,14 @@ cascade on their own.
   auth-endpoint rate limits (`[auth.rate_limit]` in `supabase/config.toml`) still apply to
   sign-in/token-refresh regardless. Revisit if the user base ever grows beyond one trusted person,
   or if Google OAuth is ever opened up more broadly.
+- **No real iOS Safari device/simulator testing** (item 5's one remaining piece). `webkit`/
+  `mobile-safari` Playwright projects (Build Order steps 32-33) cover the WebKit *engine*, but not
+  real Safari on real hardware/touch input — no such device was available to set that up.
+  Deliberately left open rather than adding a paid device-lab service (BrowserStack etc., which
+  would also mean routing a credentials app's traffic through a third party) or a real-Safari CI
+  toolchain (macOS runner + `safaridriver`/Appium — a genuinely separate setup from the rest of the
+  e2e suite). The cheapest real coverage here is manual: open `https://delft.vercel.app` on an
+  iPhone/iPad you own and walk through Pages/Canvas/Credentials once in a while.
 
 ## Fixed
 
@@ -175,7 +100,153 @@ unreachable on touch with no mouse or keyboard focus to trigger them — now alw
 
 **Known remaining gap, not fully closed by this pass**: no real device/touch-emulation testing was
 done (this was verified via Playwright's `devices["iPhone 13"]` viewport emulation over a
-mouse-driven Chromium instance, not actual touch input) — that overlaps with item 5 below, which is
-still open. `CredentialFolderTreeNode`'s rename `<input>` and a few other hover-adjacent affordances
-weren't separately re-audited beyond the `group-hover`/`opacity-0` grep sweep above; worth a second
-pass if real-device testing (item 5) surfaces anything.
+mouse-driven Chromium instance, not actual touch input) — see item 5's own real-device gap below.
+`CredentialFolderTreeNode`'s rename `<input>` and a few other hover-adjacent affordances weren't
+separately re-audited beyond the `group-hover`/`opacity-0` grep sweep above; worth a second pass if
+real-device testing (item 5) surfaces anything.
+
+### 5. No Safari/WebKit test coverage — fixed except real-device testing, see [docs/ARCHITECTURE.md](ARCHITECTURE.md) Build Order steps 32-33
+`playwright.config.ts` only configured `{ name: "chromium", use: devices["Desktop Chrome"] }` — no
+Firefox, no WebKit, no mobile emulation profile. Combined with known iOS Safari quirks in three
+dependencies actually in use (`browser-image-compression`'s WebP encode support, Excalidraw's
+touch/pointer-event handling, BlockNote/ProseMirror's contentEditable behavior), none of this was
+verified automatically or manually.
+
+Fixed: added `webkit` (`devices["Desktop Safari"]`) and `mobile-safari` (`devices["iPhone 13"]`)
+projects to `playwright.config.ts`. Running the full suite against them cold surfaced and led to
+fixing three real, reproducible bugs — a WebKit-only hydration race in the shared `signIn()` test
+helper, a genuine product bug in `AccountModal.tsx`'s `ProfileForm` where the first field a user
+typed could get silently dropped, and (mobile-viewport specifically) `canvas.spec.ts`'s
+shape-drawing step using desktop-sized pixel offsets that landed off-screen on a narrow viewport —
+see Build Order steps 32-33 for the full detail on each. Getting `mobile-safari` green also required
+new `e2e/helpers.ts` exports (`openSidebar`, `backToList`, `onlyVisible`) so specs can reach content
+that's gated behind the mobile drawer/single-pane credentials view (item 3) rather than always
+visible, since the existing suite was written before that UX existed. All 16 specs now pass on all
+three projects, repeated twice back-to-back to confirm no flakiness.
+
+**Not closed by this pass**: the doc's original "manually test on a real iOS Safari device/
+simulator" ask — moved to "Accepted risk" below rather than left as open work, since no real device
+was available here and the alternatives (a paid device lab, or a separate real-Safari CI toolchain)
+were deliberately declined for now.
+
+### 2. Every read-hook consumer swallows errors — fixed, see [docs/ARCHITECTURE.md](ARCHITECTURE.md) Build Order step 34
+`useWorkspaces`, `usePages`, `useCredentials`, `useCanvases`, `usePage`, `useCanvas` were
+destructured as `{ data, isLoading }` only, everywhere they were consumed — `.isError`/`.error` was
+never read anywhere in `apps/web`. A failed fetch (RLS error, network drop) was indistinguishable in
+the UI from "genuinely empty" (e.g. "No pages yet.") or "not found." Mutations (writes) already
+surfaced errors correctly elsewhere (`useCreateWorkspace`, `useCreateCredential`, the auth hooks) —
+this gap was specifically on the read side.
+
+Fixed by adding `isError`/`error` to all six call sites and an inline `text-red-700` branch
+alongside the existing loading/empty-state logic, matching the mutation-error styling already used
+elsewhere (`CredentialDetail.tsx`'s `saveError`, and this session's own item-1 fix): `workspace/
+page.tsx` (`useWorkspaces`), `Sidebar.tsx` (`usePages` + `useCanvases`, once per section),
+`CredentialsModal.tsx` (`useCredentials`, a standalone banner that doesn't gate the rest of the
+modal), and the page/canvas route files (`usePage`/`useCanvas`, an `isError` early-return alongside
+the existing loading/not-found ones).
+
+Verified against a real local Supabase session by forcing each of the six underlying `GET` requests
+to fail (`page.route(...).abort("failed")`) and confirming every message actually rendered — not
+just written and assumed correct. Take-away worth recording: in local `next dev`, a forced query
+failure can take **15-20 seconds** to settle into `isError` (well past `providers.tsx`'s nominal
+`retry: 1`), likely React StrictMode's dev-only double-invoke compounding retry attempts — a
+verification script using a short wait (1-4s, matching item 1's mutation-error timing) will falsely
+read as broken. Plus `pnpm check-types`/`lint` (repo-wide).
+
+### 4. `Modal.tsx` has no dialog semantics — fixed, see [docs/ARCHITECTURE.md](ARCHITECTURE.md) Build Order step 35
+No `role="dialog"`/`aria-modal`, no focus trap, no focus-in-on-open or focus-return-on-close — both
+the backdrop and panel used `role="presentation"` (the panel's was semantically wrong: it strips
+dialog semantics rather than adding them). Tab could move focus out of the modal into the page
+behind it. Affected `CredentialsModal` specifically, which holds sensitive data.
+
+Fixed, confined entirely to `Modal.tsx` (no consumer changed): the panel now gets `role="dialog"` +
+`aria-modal="true"`; a manual Tab/Shift+Tab handler traps focus within the panel's own focusable
+elements (`inert`-ing siblings was considered and rejected — it gets genuinely awkward for the
+nested-modal case, since `MoveCredentialFolderModal` opens from inside `CredentialsModal` and both
+portal to `document.body`); and a `useEffect` moves focus into the panel on open (first focusable
+element, falling back to the panel itself) and back to whatever triggered it on close.
+
+**Real bug found and fixed during verification**: the first implementation guarded the Tab-wrap
+logic against the nested-modal case (only act if `document.activeElement` is inside *this*
+instance's own panel) but left the Escape branch unguarded — every open `Modal` instance adds its
+own `window`-level `keydown` listener, so pressing Escape once fired *both* the inner and outer
+modal's `onClose` simultaneously, closing both instead of just the topmost one. Caught by an actual
+nested-modal test (open Credentials → open the Move-folder dialog → Escape → assert exactly one
+`[role="dialog"]` remains), not just eyeballing the diff. Fixed by moving the same
+panel-contains-focus guard above the Escape/Tab branch instead of only the Tab one.
+
+Verified against a real local Supabase session: dialog role/`aria-modal` present on open; focus
+lands inside the panel immediately (on the Close button, the first focusable element) without an
+explicit call, confirmed via `document.activeElement`; 15 forward Tabs and 5 Shift+Tabs never
+escape the panel; Escape closes and returns focus to the original trigger button. Nested case
+(Credentials → Move-folder) confirmed separately: Tab stays within the innermost dialog, and Escape
+closes only that one, leaving the outer modal open. Plus the full 48-test suite
+(`chromium`/`webkit`/`mobile-safari`) green with no regressions, and `pnpm check-types`/`lint`.
+
+### Low severity batch (label, favicon, error.tsx, metadata) — fixed, see [docs/ARCHITECTURE.md](ARCHITECTURE.md) Build Order step 36
+Four small independent gaps, closed together: no `<label>` on the page/canvas title input
+(`PageEditor.tsx`/`CanvasEditor.tsx`, relied solely on `placeholder="Untitled"`); no favicon at all
+(`apps/web` had no `public/` directory or `app/favicon.ico`/`icon.*`); no `app/error.tsx` anywhere
+(an unexpected render-time throw showed Next's bare default error screen); no `openGraph`/`twitter`/
+explicit `viewport` metadata, `/share/[slug]` pages had no per-page metadata despite being the one
+route meant for external sharing (link previews).
+
+Fixed: `PageEditor.tsx`/`CanvasEditor.tsx` each got an `sr-only` `<label htmlFor>` paired with the
+title input's new `id`; `apps/web/app/icon.tsx` generates a favicon at request time via Next's
+built-in `next/og` `ImageResponse` (a plain "D" monogram in the app's ink-800/paper-50 palette —
+zero-cost, no external asset or service, matching the file-based icon convention Next.js already
+supports); `app/error.tsx` (root) and `app/workspace/error.tsx` (scoped, so the TopBar stays mounted
+around it, per the doc's own suggestion — that's where the state-heavy editors live) both render a
+"Something went wrong."/message/"Try again" fallback; root `layout.tsx` gained `openGraph`/`twitter`
+fields and an explicit `viewport` export, and `share/[slug]/page.tsx` gained a `generateMetadata`
+using the shared page's own title (a second, smaller query beyond the page component's own fetch,
+since the different `.select()` columns mean Next's request memoization won't dedupe them — accepted
+as a minor cost for correctness over rigging up a shared cached fetch for one route).
+
+Verified against a real local Supabase session, not just written and assumed correct: both title
+labels confirmed via `page.getByLabel("Title")` resolving to the actual input in both editors; the
+favicon confirmed by fetching `/icon` directly (200, `image/png`, visually a "D" monogram); both
+error boundaries confirmed by *forcing a real render-time throw* (a temporary always-throwing route
+for the root one; a temporary click-triggered `throw` in an already-authenticated page for the
+workspace-scoped one, since navigating directly to a fresh throwing route raced `AuthGate`'s
+session-reestablishment on full reload and isn't representative of how a real user would ever hit
+this — the failure is mid-session, not on a cold load) — both showed the fallback UI, and "Try
+again" successfully reset the workspace-scoped one back to real content. All temporary test
+files/routes removed afterward, confirmed via a clean `git diff`. Plus `pnpm build` (confirms the
+`/icon` route and both metadata exports compile), `pnpm check-types`/`lint`, and the full 48-test
+e2e suite (`chromium`/`webkit`/`mobile-safari`) green with no regressions.
+
+### Storage orphaning on page/workspace delete — fixed, see [docs/ARCHITECTURE.md](ARCHITECTURE.md) Build Order step 37
+Deleting a page or workspace only cascaded **Postgres rows** (`on delete cascade` on the FK) —
+`useDeletePage`/`useDeleteWorkspace` never called `supabase.storage.from("page-images")
+.remove(...)`. Any image uploaded via the BlockNote editor became permanently orphaned in Storage
+once its page or workspace was deleted — a slow, one-way leak against the 1GB free tier.
+
+Fixed via a new shared helper, `packages/shared/src/lib/removePageImages.ts` (mirroring the
+existing `lib/workspaceUrl.ts` precedent for a plain non-hook utility): `list()`s each given page
+ID's `{workspaceId}/{pageId}` Storage prefix and batches everything found into one `remove()` call.
+Best-effort by design — caught and logged via `console.error` rather than rethrown, since this is a
+slow-leak concern, not a correctness requirement, and blocking a user from deleting a page/workspace
+they want gone over a transient Storage hiccup would be a worse tradeoff. Both hooks now call it
+*before* their row delete, not after — `page_images_delete_member`'s RLS scopes on the caller still
+being a member of the workspace named by the object path's first segment, which a completed row
+delete would already have cascaded away (workspace delete cascades `workspace_members` too).
+`useDeletePage` specifically needed to resolve its *whole descendant subtree* first (deleting a page
+cascades every sub-page under it, per its own existing doc comment, not just the one ID passed in)
+— reused `Sidebar.tsx`'s own established pattern (fetch all of a workspace's `{id, parent_id}` pairs
+in one query, build the tree client-side) rather than adding a new recursive-descendant RPC, since
+that's unwarranted extra migration surface at this app's personal scale.
+
+Verified against a real local Supabase session, not just written and assumed correct: uploaded fake
+images directly via the Storage REST API to a parent page and a child sub-page's exact path
+convention, confirmed both existed via a direct `list()` call, deleted the *parent* page through the
+UI (page-tree "⋯" menu), and confirmed *both* objects were gone — proving the subtree-cascade case,
+not just the single-page case. Repeated the same shape for a whole-workspace delete (image in a
+page, delete the workspace from the switcher) and confirmed the object was gone there too. Plus
+`pnpm check-types`/`lint` (repo-wide) and the full 48-test e2e suite
+(`chromium`/`webkit`/`mobile-safari`) green with no regressions (neither `workspace-delete.spec.ts`
+nor `canvas.spec.ts`'s existing delete flows assert on Storage state, so this also confirmed the
+added Storage calls introduced no new failure mode in the delete mutations themselves).
+
+This closes every finding in this document — everything above is now either fixed or explicitly
+accepted as non-blocking risk.

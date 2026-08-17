@@ -126,7 +126,11 @@ test("wrong passphrase is rejected even on a brand-new vault with zero credentia
   await page.fill("#passphrase", "the-real-passphrase");
   await page.fill("#confirm", "the-real-passphrase");
   await page.click('button:has-text("Create vault")');
-  await expect(page.getByText("Select a credential")).toBeVisible();
+  // "Select a credential" (the empty-detail-pane placeholder) is desktop-only — below `md`,
+  // CredentialsModal shows the (empty) list directly instead of a side-by-side placeholder pane,
+  // so it's never rendered there at all. The search input is the viewport-agnostic signal of "the
+  // vault is unlocked and showing the credential list" this test actually cares about.
+  await expect(page.locator('input[type="search"]')).toBeVisible();
 
   // Close without ever adding a credential, then try to unlock with the wrong passphrase.
   await page.click('button[aria-label="Close"]');
@@ -137,10 +141,10 @@ test("wrong passphrase is rejected even on a brand-new vault with zero credentia
   await expect(
     page.getByText("Wrong passphrase — please try again."),
   ).toBeVisible();
-  await expect(page.getByText("Select a credential")).not.toBeVisible();
+  await expect(page.locator('input[type="search"]')).not.toBeVisible();
 
   // The correct passphrase still works.
   await page.fill("#passphrase", "the-real-passphrase");
   await page.click('button:has-text("Unlock")');
-  await expect(page.getByText("Select a credential")).toBeVisible();
+  await expect(page.locator('input[type="search"]')).toBeVisible();
 });

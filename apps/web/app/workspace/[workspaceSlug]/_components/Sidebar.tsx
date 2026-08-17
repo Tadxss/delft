@@ -15,8 +15,13 @@ export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
   const params = useParams<{ workspaceSlug: string; canvasId?: string }>();
   const workspaceId = parseWorkspaceSlug(params.workspaceSlug);
   const router = useRouter();
-  const { data: pages, isLoading } = usePages(workspaceId);
-  const { data: canvases, isLoading: canvasesLoading } = useCanvases(workspaceId);
+  const { data: pages, isLoading, isError: pagesError, error: pagesErrorObj } = usePages(workspaceId);
+  const {
+    data: canvases,
+    isLoading: canvasesLoading,
+    isError: canvasesError,
+    error: canvasesErrorObj,
+  } = useCanvases(workspaceId);
   const createPage = useCreatePage();
   const createCanvas = useCreateCanvas();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -89,6 +94,10 @@ export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
       </div>
       {isLoading ? (
         <p className="px-1 text-sm text-ink-400">Loading…</p>
+      ) : pagesError ? (
+        <p className="px-1 text-sm text-red-700">
+          Couldn&apos;t load pages: {pagesErrorObj.message}
+        </p>
       ) : roots.length === 0 ? (
         <p className="px-1 text-sm text-ink-400">No pages yet.</p>
       ) : (
@@ -120,6 +129,10 @@ export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
       </div>
       {canvasesLoading ? (
         <p className="px-1 text-sm text-ink-400">Loading…</p>
+      ) : canvasesError ? (
+        <p className="px-1 text-sm text-red-700">
+          Couldn&apos;t load canvases: {canvasesErrorObj.message}
+        </p>
       ) : (canvases ?? []).length === 0 ? (
         <p className="px-1 text-sm text-ink-400">No canvases yet.</p>
       ) : (

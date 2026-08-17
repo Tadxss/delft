@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { signIn, uniqueEmail } from "./helpers";
+import { onlyVisible, openSidebar, signIn, uniqueEmail } from "./helpers";
 
 const SUPABASE_URL = "http://127.0.0.1:54321";
 const ANON_KEY =
@@ -36,7 +36,8 @@ test("create a canvas, draw a shape, and confirm autosave persists it", async ({
   await page.click('button:has-text("Create")');
   await page.waitForURL(/\/workspace\/[^/]+--[^/]+$/, { timeout: 15000 });
 
-  await page.click('button[aria-label="New canvas"]');
+  await openSidebar(page);
+  await page.click('button[aria-label="New canvas"]:visible');
   await page.waitForURL(/\/workspace\/[^/]+--[^/]+\/canvas\/[^/]+$/, { timeout: 15000 });
 
   await page.locator('input[placeholder="Untitled"]').fill("Whiteboard");
@@ -46,14 +47,26 @@ test("create a canvas, draw a shape, and confirm autosave persists it", async ({
   // click the canvas area first to move focus off the input. Selecting a drawing tool opens a
   // floating properties panel (stroke/background/etc.) docked at the canvas's left edge, so the
   // shape itself must be drawn well clear of it (well to the right), not near the top-left corner.
+  //
+  // Real bug found via mobile-viewport e2e coverage: fixed pixel offsets (`box.x + 700`) were
+  // sized for the desktop chromium/webkit projects' ~1280px-wide viewport — on `mobile-safari`'s
+  // 390px-wide `devices["iPhone 13"]` viewport, `box.x + 700` lands off-screen entirely, so the
+  // "drag" never touched the actual canvas and nothing got drawn. Using fractions of the canvas's
+  // own bounding box instead scales correctly to whatever viewport the project renders at.
   const canvasArea = page.locator(".excalidraw__canvas").first();
   const box = await canvasArea.boundingBox();
   if (!box) throw new Error("Excalidraw canvas not found");
-  await page.mouse.click(box.x + 700, box.y + 400);
+  const focusX = box.x + box.width * 0.5;
+  const focusY = box.y + box.height * 0.5;
+  const startX = box.x + box.width * 0.6;
+  const startY = box.y + box.height * 0.35;
+  const endX = box.x + box.width * 0.85;
+  const endY = box.y + box.height * 0.55;
+  await page.mouse.click(focusX, focusY);
   await page.keyboard.press("r");
-  await page.mouse.move(box.x + 700, box.y + 300);
+  await page.mouse.move(startX, startY);
   await page.mouse.down();
-  await page.mouse.move(box.x + 900, box.y + 450);
+  await page.mouse.move(endX, endY);
   await page.mouse.up();
 
   // Wait past the 800ms autosave debounce + a network round trip.
@@ -79,5 +92,6 @@ test("create a canvas, draw a shape, and confirm autosave persists it", async ({
   page.once("dialog", (dialog) => dialog.accept());
   await page.click('button:has-text("Delete")');
   await page.waitForURL(/\/workspace\/[^/]+$/, { timeout: 15000 });
-  await expect(page.getByText("No canvases yet.")).toBeVisible();
+  await openSidebar(page);
+  await expect(onlyVisible(page.getByText("No canvases yet."))).toBeVisible();
 });

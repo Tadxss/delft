@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { signIn, uniqueEmail } from "./helpers";
+import { onlyVisible, openSidebar, signIn, uniqueEmail } from "./helpers";
 
 test("deleting a workspace removes it from the switcher and its data no longer resolves", async ({
   page,
@@ -12,7 +12,8 @@ test("deleting a workspace removes it from the switcher and its data no longer r
   const workspaceSlug = new URL(page.url()).pathname.split("/").pop()!;
 
   // Give it a page, so deletion is actually exercising the on-delete-cascade, not just an empty row.
-  await page.click('button[aria-label="New page"]');
+  await openSidebar(page);
+  await page.click('button[aria-label="New page"]:visible');
   await page.waitForURL(/\/workspace\/[^/]+--[^/]+\/p\/[^/]+$/, { timeout: 15000 });
 
   await page.goto("/workspace");
@@ -27,5 +28,6 @@ test("deleting a workspace removes it from the switcher and its data no longer r
   // revisiting the old URL should show no pages (same "RLS returns zero rows" shape as
   // workspace-isolation.spec.ts, since the row genuinely no longer exists).
   await page.goto(`/workspace/${workspaceSlug}`);
-  await expect(page.getByText("No pages yet.")).toBeVisible();
+  await openSidebar(page);
+  await expect(onlyVisible(page.getByText("No pages yet."))).toBeVisible();
 });
