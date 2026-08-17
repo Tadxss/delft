@@ -24,17 +24,22 @@ debugging of a single spec). Requires the local Supabase stack running and a fre
 database — see "Resetting between runs" below if specs start colliding with leftover data (in
 practice this is rare since every spec uses a freshly generated unique email per run).
 
-Runs against two `playwright.config.ts` projects — `chromium` (`devices["Desktop Chrome"]`) and
-`webkit` (`devices["Desktop Safari"]`) — every spec on both, sequentially (`fullyParallel: false`).
-The `webkit` project exists specifically to catch real Safari/WebKit-engine quirks in three
-dependencies with known iOS Safari history: `browser-image-compression` (WebP encode support),
-`@excalidraw/excalidraw` (touch/pointer-event handling), and `@blocknote/mantine`
-(contentEditable/ProseMirror behavior) — see `docs/ARCHITECTURE.md` Build Order step 32. Run a
-single project with `npx playwright test --project=webkit` (or `--project=chromium`) from
-`apps/web`. No mobile-viewport project (`devices["iPhone 13"]`) yet — every spec assumes the
-desktop sidebar is always visible, but it's off-canvas behind a drawer below `md` (Build Order step
-31); adapting the suite to open the drawer first is separate, not-yet-done work (see
-BETA_READINESS.md item 5).
+Runs against three `playwright.config.ts` projects — `chromium` (`devices["Desktop Chrome"]`),
+`webkit` (`devices["Desktop Safari"]`), and `mobile-safari` (`devices["iPhone 13"]`) — every spec on
+all three, sequentially (`fullyParallel: false`). `webkit`/`mobile-safari` exist specifically to
+catch real Safari/WebKit-engine quirks in three dependencies with known iOS Safari history:
+`browser-image-compression` (WebP encode support), `@excalidraw/excalidraw` (touch/pointer-event
+handling), and `@blocknote/mantine` (contentEditable/ProseMirror behavior) — see
+`docs/ARCHITECTURE.md` Build Order steps 32-33. Run a single project with `npx playwright test
+--project=webkit` (or `--project=chromium`/`--project=mobile-safari`) from `apps/web`.
+
+Sidebar/credentials-modal content that only renders below the `md` breakpoint (the mobile drawer,
+the credentials list/detail single-pane switch — see Build Order step 31) needs the spec to
+explicitly open it first; `e2e/helpers.ts` exports `openSidebar(page)`, `backToList(page)`, and
+`onlyVisible(locator)` for this (the last one because the drawer's content coexists in the DOM with
+a CSS-hidden desktop copy, so a bare role/text locator matches both). All are no-ops on the desktop
+`chromium`/`webkit` projects, so existing specs don't need per-project branching — just call them at
+every point that touches sidebar/credentials-list content, not only the first.
 
 | `e2e/*.spec.ts` | Covers |
 |---|---|

@@ -21,16 +21,10 @@ export default defineConfig({
   // webkit catches the real Safari/WebKit-engine quirks BETA_READINESS.md item 5 flagged as
   // unverified (browser-image-compression WebP encode support, Excalidraw touch/pointer-event
   // handling, BlockNote/ProseMirror contentEditable behavior) — chromium alone can't surface those.
-  //
-  // No `devices["iPhone 13"]`/mobile-viewport project yet: every spec here assumes the desktop
-  // sidebar is always visible (e.g. `page.click('[aria-label="New page"]')`), but below `md` it's
-  // off-canvas inside SidebarShell's drawer (see docs/ARCHITECTURE.md Build Order step 31) — 11 of
-  // 16 specs fail at that first click under `devices["iPhone 13"]`, not because anything is
-  // actually broken, but because they'd need a "open the drawer first" step on narrow viewports.
-  // Adapting the suite for that is real, separate work — see BETA_READINESS.md item 5.
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },
     { name: "webkit", use: { ...devices["Desktop Safari"] } },
+    { name: "mobile-safari", use: { ...devices["iPhone 13"] } },
   ],
   webServer: {
     command: "pnpm dev",

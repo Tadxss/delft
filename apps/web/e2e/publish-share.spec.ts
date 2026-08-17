@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { signIn, uniqueEmail } from "./helpers";
+import { openSidebar, signIn, uniqueEmail } from "./helpers";
 
 test("publishing a page makes it viewable, read-only, at /share/[slug] — and unpublishing takes it down again", async ({
   page,
@@ -11,7 +11,8 @@ test("publishing a page makes it viewable, read-only, at /share/[slug] — and u
   await page.click('button:has-text("Create")');
   await page.waitForURL(/\/workspace\/[^/]+--[^/]+$/, { timeout: 15000 });
 
-  await page.click('button[aria-label="New page"]');
+  await openSidebar(page);
+  await page.click('button[aria-label="New page"]:visible');
   await page.waitForURL(/\/workspace\/[^/]+--[^/]+\/p\/[^/]+$/, { timeout: 15000 });
   await page.locator('input[placeholder="Untitled"]').fill("Public doc");
   const editorRegion = page.locator('[contenteditable="true"]').first();

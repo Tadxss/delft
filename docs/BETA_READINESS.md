@@ -159,24 +159,25 @@ mouse-driven Chromium instance, not actual touch input) — see item 5's own rea
 separately re-audited beyond the `group-hover`/`opacity-0` grep sweep above; worth a second pass if
 real-device testing (item 5) surfaces anything.
 
-### 5. No Safari/WebKit test coverage — partially fixed, see [docs/ARCHITECTURE.md](ARCHITECTURE.md) Build Order step 32
+### 5. No Safari/WebKit test coverage — fixed except real-device testing, see [docs/ARCHITECTURE.md](ARCHITECTURE.md) Build Order steps 32-33
 `playwright.config.ts` only configured `{ name: "chromium", use: devices["Desktop Chrome"] }` — no
 Firefox, no WebKit, no mobile emulation profile. Combined with known iOS Safari quirks in three
 dependencies actually in use (`browser-image-compression`'s WebP encode support, Excalidraw's
 touch/pointer-event handling, BlockNote/ProseMirror's contentEditable behavior), none of this was
 verified automatically or manually.
 
-Fixed: added a `webkit` project (`devices["Desktop Safari"]`) to `playwright.config.ts` — running
-the full suite against it cold surfaced and led to fixing two real, reproducible bugs (a WebKit-only
-hydration race in the shared `signIn()` test helper, and a genuine product bug in
-`AccountModal.tsx`'s `ProfileForm` where the first field a user typed could get silently dropped —
-see Build Order step 32 for the full detail on both). All 16 specs now pass on both `chromium` and
-`webkit`, repeated to confirm no flakiness.
+Fixed: added `webkit` (`devices["Desktop Safari"]`) and `mobile-safari` (`devices["iPhone 13"]`)
+projects to `playwright.config.ts`. Running the full suite against them cold surfaced and led to
+fixing three real, reproducible bugs — a WebKit-only hydration race in the shared `signIn()` test
+helper, a genuine product bug in `AccountModal.tsx`'s `ProfileForm` where the first field a user
+typed could get silently dropped, and (mobile-viewport specifically) `canvas.spec.ts`'s
+shape-drawing step using desktop-sized pixel offsets that landed off-screen on a narrow viewport —
+see Build Order steps 32-33 for the full detail on each. Getting `mobile-safari` green also required
+new `e2e/helpers.ts` exports (`openSidebar`, `backToList`, `onlyVisible`) so specs can reach content
+that's gated behind the mobile drawer/single-pane credentials view (item 3) rather than always
+visible, since the existing suite was written before that UX existed. All 16 specs now pass on all
+three projects, repeated twice back-to-back to confirm no flakiness.
 
 **Not closed by this pass**: the doc's original "manually test on a real iOS Safari device/
-simulator" ask is still open — no real device was available to do this with, so `webkit`'s coverage
-is still emulated/mouse-driven, not real Safari or real touch input. A `devices["iPhone 13"]`
-mobile-viewport project was tried too, but 11 of 16 specs fail immediately since they assume the
-desktop sidebar is always visible — below `md` it's off-canvas inside item 3's drawer. Adapting the
-suite to open the drawer first on narrow viewports is real, separate work; left out of
-`playwright.config.ts` for now rather than landing a project that's mostly red by default.
+simulator" ask is still open — no real device was available to do this with, so all of the above is
+still emulated/mouse-driven WebKit, not real Safari hardware or real touch input.

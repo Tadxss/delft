@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { signIn, uniqueEmail } from "./helpers";
+import { onlyVisible, openSidebar, signIn, uniqueEmail } from "./helpers";
 
 test("create a workspace, create nested pages, edit content, and confirm autosave persists", async ({ page }) => {
   await signIn(page, uniqueEmail("workspace-crud"));
@@ -10,7 +10,8 @@ test("create a workspace, create nested pages, edit content, and confirm autosav
   await page.waitForURL(/\/workspace\/[^/]+--[^/]+$/, { timeout: 15000 });
 
   // Create a root page via the sidebar "+"
-  await page.click('button[aria-label="New page"]');
+  await openSidebar(page);
+  await page.click('button[aria-label="New page"]:visible');
   await page.waitForURL(/\/workspace\/[^/]+--[^/]+\/p\/[^/]+$/, { timeout: 15000 });
 
   // Title
@@ -31,10 +32,12 @@ test("create a workspace, create nested pages, edit content, and confirm autosav
   await expect(page.getByText("First line of real content.")).toBeVisible();
 
   // The saved page should also now show its title in the sidebar tree instead of "Untitled"
-  await expect(page.getByRole("link", { name: "Meeting notes" })).toBeVisible();
+  await openSidebar(page);
+  const pageLink = onlyVisible(page.getByRole("link", { name: "Meeting notes" }));
+  await expect(pageLink).toBeVisible();
 
   // Create a nested sub-page from the tree node's hover "+" control
-  const treeNode = page.getByRole("link", { name: "Meeting notes" }).locator("..");
+  const treeNode = pageLink.locator("..");
   await treeNode.hover();
   const urlBeforeSubPage = page.url();
   await treeNode.getByRole("button", { name: "Add sub-page" }).click();
@@ -52,6 +55,7 @@ test("create a workspace, create nested pages, edit content, and confirm autosav
   // Reload (a real persistence check, not just cache state) and re-expand the parent — expand
   // state is client-only and resets on reload, unlike the tree structure/titles themselves.
   await page.reload();
-  await page.getByRole("button", { name: "Expand" }).first().click();
-  await expect(page.getByRole("link", { name: "Sub-page" })).toBeVisible();
+  await openSidebar(page);
+  await onlyVisible(page.getByRole("button", { name: "Expand" })).first().click();
+  await expect(onlyVisible(page.getByRole("link", { name: "Sub-page" }))).toBeVisible();
 });

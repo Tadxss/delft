@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { signIn, uniqueEmail } from "./helpers";
+import { onlyVisible, openSidebar, signIn, uniqueEmail } from "./helpers";
 
 // The core RLS promise this project is built on: every workspace (and everything inside it) is
 // invisible to every other signed-in user, not just filtered out of the UI. Uses two fully
@@ -24,6 +24,7 @@ test("user B never sees user A's workspace, even by guessing the workspace URL",
   // must not reveal A's pages (RLS returns zero rows, not an error — the sidebar just renders
   // empty, which is the correct "nothing to see here").
   await pageB.goto(`/workspace/${workspaceASlug}`);
-  await expect(pageB.getByText("No pages yet.")).toBeVisible();
+  await openSidebar(pageB);
+  await expect(onlyVisible(pageB.getByText("No pages yet."))).toBeVisible();
   await expect(pageB.getByText("A's private workspace")).not.toBeVisible();
 });

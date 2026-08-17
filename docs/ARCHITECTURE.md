@@ -25,8 +25,9 @@ BETA — a full audit found real gaps (silent autosave failures, no mobile layou
 missing dialog semantics, Storage orphaning on delete, and more, ranked by severity in that doc).
 High severity items 1 (silent autosave failures) and 3 (zero responsive/mobile layout) are fixed as
 of Build Order steps 30/31; Medium severity item 5 (no Safari/WebKit test coverage) is fixed as of
-step 32, with a real-device-testing gap still open (see that step). Item 2 (read-hook errors) and
-the rest of Medium/Low severity is still open as of step 32.
+steps 32-33, with only a real-device-testing gap still open (no iOS Safari device/simulator
+available here — see step 33). Item 2 (read-hook errors) and the rest of Medium/Low severity is
+still open as of step 33.
 
 The one recurring (not one-time) item to keep revisiting alongside that: the image-compression
 settings in `PageEditor.tsx` against real Storage usage as real data accumulates — Supabase
@@ -1009,6 +1010,46 @@ the full policy set and its inline reasoning.
     Verified via the full 16-spec suite on both `chromium` and `webkit` (32/32 green), the two
     fixed specs repeated 3x standalone against `webkit` with no flakes, and `pnpm
     check-types`/`lint` (repo-wide).
+
+33. **Closed step 32's mobile-viewport gap: added a `mobile-safari` (`devices["iPhone 13"]`)
+    project, and a real bug it found.** ✅ *done*. Step 32 tried this and abandoned it — 11 of 16
+    specs failed immediately since they assumed the desktop sidebar/credentials-modal panes are
+    always visible, but below `md` they're gated behind step 31's drawer/single-pane-detail UX.
+
+    - **`e2e/helpers.ts` gained three exports**: `openSidebar(page)` (clicks the drawer toggle,
+      gated on `page.viewportSize()!.width < 768` rather than an instant `toggle.isVisible()`
+      check — same hydration-adjacent-race category as `signIn()` in step 32: checking visibility
+      immediately after a fresh `goto()`/`reload()` can miss a toggle that hasn't rendered yet,
+      where the viewport size is known synchronously before any content loads at all, so there's
+      nothing to race), `backToList(page)` (clicks the credentials modal's mobile-only "← Back"
+      row, via a bounded `waitFor` rather than instant `isVisible()` for the same reason, though
+      the risk is lower there since it's never called immediately after a fresh navigation), and
+      `onlyVisible(locator)` (`.and(page.locator(":visible"))`) — needed because `SidebarShell.tsx`
+      keeps the desktop sidebar mounted (just `hidden md:flex`) even when the drawer is open, so a
+      bare role/text locator matches *both* copies and Playwright's `.click()`/`expect()` default
+      to the first (hidden) one in DOM order and hang. All three are no-ops on `chromium`/`webkit`
+      (desktop viewports, single-pane-per-breakpoint) — existing desktop assertions needed no
+      changes, only insertions at points that touch sidebar/credentials-list content.
+    - Applied across `workspace-pages.spec.ts`, `canvas.spec.ts`, `publish-share.spec.ts`,
+      `workspace-delete.spec.ts`, `workspace-isolation.spec.ts` (sidebar drawer) and
+      `credential-folders.spec.ts` (credentials-modal single-pane) — one `openSidebar`/`backToList`
+      call at *every* touch point, not just the first, since both close again after any navigation
+      or (for the modal) returning to the list. `credentials.spec.ts`'s "Select a credential" check
+      was replaced with checking the search input's visibility instead — that placeholder text is
+      itself desktop-only (mobile shows the list directly rather than a side-by-side empty-state
+      pane), so it was never a valid cross-viewport signal to begin with.
+    - **Real bug found and fixed, in the test suite itself**: `canvas.spec.ts`'s shape-drawing step
+      used fixed pixel offsets (`box.x + 700`, `box.y + 400`) sized for the desktop projects'
+      ~1280px-wide viewport — on `mobile-safari`'s 390px-wide viewport those offsets land
+      completely off-screen, so the "drag" never touched the canvas and `scene.elements` saved
+      empty. Rewritten as fractions of the canvas's own `boundingBox()` (e.g. `box.width * 0.6`)
+      so the same coordinates scale correctly to whatever viewport the project renders at —
+      verified passing on all three projects.
+
+    Verified via the full 16-spec suite on `chromium`, `webkit`, and `mobile-safari` (48/48 green),
+    repeated a second time back-to-back to confirm no flakiness, plus `pnpm check-types`/`lint`
+    (repo-wide). BETA_READINESS.md item 5's only remaining gap after this is the real-device part —
+    no actual iOS Safari device/simulator was available in this environment to test on.
 
 **Deferred, not started:** revisiting `PageEditor.tsx`'s image-compression settings against real
 Storage usage — see **Next Up** above.
