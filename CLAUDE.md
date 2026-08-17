@@ -19,8 +19,10 @@ implementing anything that would realistically require a paid service.
 Credentials Manager (with nested folders), Excalidraw Canvas, and a Notion-style hover-affordance
 UI (icon-only header, hover-reveal sidebar), all covered by an e2e suite, live at
 `https://delft.vercel.app` (auto-deploys on push to `master`). See
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)'s **Next Up** section for current focus (working
-through `docs/BETA_READINESS.md`) and the numbered Build Order for how each feature shipped.
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)'s **Next Up** section for current focus — the
+[docs/BETA_READINESS.md](docs/BETA_READINESS.md) audit is now fully closed out (every finding
+fixed or explicitly accepted, see that doc's own status line) — and the numbered Build Order for
+how each feature shipped.
 
 ## Commands
 

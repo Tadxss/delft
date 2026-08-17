@@ -20,20 +20,18 @@ Read this section first in a new session — it's the answer to "what should I w
 Manager, Excalidraw Canvas, and hosted deployment (live at `https://delft.vercel.app`, auto-deploying
 on push to `master`). See Build Order below for how each shipped.
 
-**Current focus: working through [docs/BETA_READINESS.md](BETA_READINESS.md)** before calling this
-BETA — a full audit found real gaps (silent autosave failures, no mobile layout, `Modal.tsx`
-missing dialog semantics, Storage orphaning on delete, and more, ranked by severity in that doc).
-Every High and Medium severity item is now fixed: 1 (silent autosave failures) and 3 (zero
-responsive/mobile layout) as of Build Order steps 30/31, 2 (read-hook errors) as of step 34, 5 (no
-Safari/WebKit test coverage, steps 32-33 — its one remaining piece, real iOS Safari device/simulator
-testing, was deliberately moved to BETA_READINESS.md's "Accepted risk" section rather than left as
-open work) and 4 (`Modal.tsx` dialog semantics, step 35). The Low severity batch (title `<label>`,
-favicon, `app/error.tsx`, OG/viewport metadata) is fixed too, as of step 36. What's left: only
-Storage orphaning on delete.
+**[docs/BETA_READINESS.md](BETA_READINESS.md) is now fully closed out, as of Build Order step 37**
+— every finding from the original audit (silent autosave failures, no mobile layout, `Modal.tsx`
+missing dialog semantics, no Safari/WebKit test coverage, read-hook errors, the Low-severity batch,
+Storage orphaning on delete) is either fixed (steps 30-37) or explicitly accepted as non-blocking
+risk (no application-level rate limiting; real iOS Safari device/simulator testing, given no device
+was available to set that up). See that doc's own "Fixed"/"Accepted risk" sections for the detail
+on each, and this file's Build Order steps 30-37 for the how/why of each fix.
 
-The one recurring (not one-time) item to keep revisiting alongside that: the image-compression
-settings in `PageEditor.tsx` against real Storage usage as real data accumulates — Supabase
-Storage's free tier caps at 1GB.
+No committed backlog beyond that audit exists right now — what to work on next is an open question
+for whoever picks this up. The one recurring (not one-time) item worth keeping an eye on regardless:
+the image-compression settings in `PageEditor.tsx` against real Storage usage as real data
+accumulates — Supabase Storage's free tier caps at 1GB.
 
 ## Data model
 
@@ -1163,6 +1161,53 @@ the full policy set and its inline reasoning.
     Plus `pnpm build` (confirms the `/icon` route and both `generateMetadata`/`viewport` exports
     actually compile, not just type-check), `pnpm check-types`/`lint`, and the full 48-test e2e
     suite (`chromium`/`webkit`/`mobile-safari`) green with no regressions.
+
+37. **Fixed BETA_READINESS.md's last item: Storage orphaning on page/workspace delete.** ✅ *done*
+    — this closes out every finding in that audit doc. `useDeletePage`/`useDeleteWorkspace`
+    (`packages/shared/src/hooks/`) only ever deleted Postgres rows (`on delete cascade` handles the
+    relational side for free); neither called `supabase.storage.from("page-images")
+    .remove(...)`, so any BlockNote-uploaded image became permanently orphaned once its page or
+    workspace was deleted — a slow, one-way leak against the 1GB free tier.
+
+    - **New shared helper**: `packages/shared/src/lib/removePageImages.ts` (mirroring the existing
+      `lib/workspaceUrl.ts` precedent for a plain non-hook utility, not added to the package's
+      public `index.ts` since it has no consumer outside these two hooks) — `list()`s each given
+      page ID's `{workspaceId}/{pageId}` prefix and batches everything found into one `remove()`
+      call. **Best-effort by design**: caught and logged via `console.error` rather than rethrown
+      — this is a slow-leak concern, not a correctness requirement, and blocking a user from
+      deleting a page/workspace they want gone over a transient Storage hiccup would be a worse
+      tradeoff than occasionally leaving an object behind (the exact failure mode the audit finding
+      itself already called "not catastrophic short-term").
+    - **Ordering matters and is easy to get backwards**: both hooks call the helper *before* their
+      row delete, not after. `page_images_delete_member`'s RLS
+      (`supabase/migrations/20260812140030_storage.sql`) scopes `list()`/`remove()` on the caller
+      still being a member of the workspace named by the object path's first segment — a completed
+      `workspaces` row delete cascades `workspace_members` away too, so any Storage call attempted
+      *after* that point would already be locked out by RLS regardless of who's calling.
+    - **`useDeletePage` needed the whole descendant subtree, not just the one page ID passed in**
+      — deleting a page cascades every sub-page under it (`on delete cascade` on
+      `pages.parent_id`, already documented in that hook's own pre-existing comment), and Storage
+      paths have no concept of a page hierarchy to resolve that automatically. Reused `Sidebar.tsx`'s
+      own established pattern for exactly this shape of problem (fetch all of a workspace's
+      `{id, parent_id}` pairs in one query, build the tree client-side) rather than adding a new
+      recursive-descendant RPC — unwarranted extra migration surface at this app's personal scale.
+    - `useDeleteWorkspace` needed the simpler version: no tree to walk, just every page ID in the
+      workspace.
+
+    Verified against a real local Supabase session, not just written and assumed correct: uploaded
+    fake images directly via the Storage REST API to a parent page and a child sub-page's exact
+    path convention, confirmed both existed via a direct `list()` call, deleted the *parent* page
+    through the UI (page-tree "⋯" menu, which cascades the child too), and confirmed *both*
+    objects were gone — proving the subtree-cascade case specifically, not just a trivial
+    single-page delete. Repeated the same shape for a whole-workspace delete (image in a page,
+    delete the workspace from the switcher) and confirmed the object was gone there too. Along the
+    way, hit the same `AuthGate`-vs-full-reload race documented in step 36 while trying to navigate
+    to the workspace switcher via `page.goto()` — worked around identically, by navigating via a
+    client-side link click instead. Plus `pnpm check-types`/`lint` (repo-wide) and the full
+    48-test e2e suite (`chromium`/`webkit`/`mobile-safari`) green with no regressions — neither
+    `workspace-delete.spec.ts` nor `canvas.spec.ts`'s existing delete flows assert on Storage
+    state, so this also confirmed the added Storage calls introduced no new failure mode in the
+    delete mutations themselves.
 
 **Deferred, not started:** revisiting `PageEditor.tsx`'s image-compression settings against real
 Storage usage — see **Next Up** above.

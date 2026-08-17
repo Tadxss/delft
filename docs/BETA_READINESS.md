@@ -9,6 +9,10 @@ blocks, vault verifier, nested credential folders, sidebar/header redesign, page
 Undo/Redo, profile/avatar upload, username login) shipped in the meantime but none overlap with the
 areas below — every finding still holds as originally written.
 
+**Status as of Build Order step 37: every finding below is either fixed or explicitly accepted as
+non-blocking risk** — see "Fixed" and "Accepted risk" below. Kept as a historical record (not
+deleted) per this doc's own "accumulate, don't delete" convention.
+
 Live app: `https://delft.vercel.app`. Read [docs/ARCHITECTURE.md](ARCHITECTURE.md) and
 [docs/TESTING.md](TESTING.md) first for the existing architecture/test conventions — every fix
 below should follow those same patterns (RLS policy naming, `useX`/`useUpdateX` hook shape,
@@ -21,22 +25,6 @@ repo's existing verification bar — see recent Build Order entries for the stan
 entry to a new "Fixed" section at the bottom with a one-line pointer to the Build Order step that
 covers it, rather than deleting it — same "accumulate, don't delete" convention as
 `ARCHITECTURE.md`.
-
-## Storage orphaning (real gap, ungraded above — assess severity when picked up)
-
-Deleting a page or workspace only cascades **Postgres rows** (`on delete cascade` on the FK) —
-`useDeletePage`/`useDeleteWorkspace` never call `supabase.storage.from("page-images").remove(...)`.
-Any image uploaded via the BlockNote editor becomes permanently orphaned in Storage once its page
-or workspace is deleted. Not catastrophic short-term, but a slow leak against the 1GB free tier
-that never self-heals.
-
-**Files**: `packages/shared/src/hooks/useDeletePage.ts`, `packages/shared/src/hooks/useDeleteWorkspace.ts`.
-
-**Suggested next step**: list objects under the `{workspaceId}/{pageId}/` (or `{workspaceId}/` for
-a whole-workspace delete) prefix and `remove()` them as part of the delete mutation, before or
-after the row delete. Note a workspace delete needs to enumerate every page under it first (or use
-a wildcard-prefix list call) since Storage objects aren't foreign-keyed to Postgres and won't
-cascade on their own.
 
 ## Confirmed clean — no action needed
 
@@ -227,3 +215,38 @@ again" successfully reset the workspace-scoped one back to real content. All tem
 files/routes removed afterward, confirmed via a clean `git diff`. Plus `pnpm build` (confirms the
 `/icon` route and both metadata exports compile), `pnpm check-types`/`lint`, and the full 48-test
 e2e suite (`chromium`/`webkit`/`mobile-safari`) green with no regressions.
+
+### Storage orphaning on page/workspace delete — fixed, see [docs/ARCHITECTURE.md](ARCHITECTURE.md) Build Order step 37
+Deleting a page or workspace only cascaded **Postgres rows** (`on delete cascade` on the FK) —
+`useDeletePage`/`useDeleteWorkspace` never called `supabase.storage.from("page-images")
+.remove(...)`. Any image uploaded via the BlockNote editor became permanently orphaned in Storage
+once its page or workspace was deleted — a slow, one-way leak against the 1GB free tier.
+
+Fixed via a new shared helper, `packages/shared/src/lib/removePageImages.ts` (mirroring the
+existing `lib/workspaceUrl.ts` precedent for a plain non-hook utility): `list()`s each given page
+ID's `{workspaceId}/{pageId}` Storage prefix and batches everything found into one `remove()` call.
+Best-effort by design — caught and logged via `console.error` rather than rethrown, since this is a
+slow-leak concern, not a correctness requirement, and blocking a user from deleting a page/workspace
+they want gone over a transient Storage hiccup would be a worse tradeoff. Both hooks now call it
+*before* their row delete, not after — `page_images_delete_member`'s RLS scopes on the caller still
+being a member of the workspace named by the object path's first segment, which a completed row
+delete would already have cascaded away (workspace delete cascades `workspace_members` too).
+`useDeletePage` specifically needed to resolve its *whole descendant subtree* first (deleting a page
+cascades every sub-page under it, per its own existing doc comment, not just the one ID passed in)
+— reused `Sidebar.tsx`'s own established pattern (fetch all of a workspace's `{id, parent_id}` pairs
+in one query, build the tree client-side) rather than adding a new recursive-descendant RPC, since
+that's unwarranted extra migration surface at this app's personal scale.
+
+Verified against a real local Supabase session, not just written and assumed correct: uploaded fake
+images directly via the Storage REST API to a parent page and a child sub-page's exact path
+convention, confirmed both existed via a direct `list()` call, deleted the *parent* page through the
+UI (page-tree "⋯" menu), and confirmed *both* objects were gone — proving the subtree-cascade case,
+not just the single-page case. Repeated the same shape for a whole-workspace delete (image in a
+page, delete the workspace from the switcher) and confirmed the object was gone there too. Plus
+`pnpm check-types`/`lint` (repo-wide) and the full 48-test e2e suite
+(`chromium`/`webkit`/`mobile-safari`) green with no regressions (neither `workspace-delete.spec.ts`
+nor `canvas.spec.ts`'s existing delete flows assert on Storage state, so this also confirmed the
+added Storage calls introduced no new failure mode in the delete mutations themselves).
+
+This closes every finding in this document — everything above is now either fixed or explicitly
+accepted as non-blocking risk.
