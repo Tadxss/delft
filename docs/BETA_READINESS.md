@@ -114,6 +114,14 @@ cascade on their own.
   auth-endpoint rate limits (`[auth.rate_limit]` in `supabase/config.toml`) still apply to
   sign-in/token-refresh regardless. Revisit if the user base ever grows beyond one trusted person,
   or if Google OAuth is ever opened up more broadly.
+- **No real iOS Safari device/simulator testing** (item 5's one remaining piece). `webkit`/
+  `mobile-safari` Playwright projects (Build Order steps 32-33) cover the WebKit *engine*, but not
+  real Safari on real hardware/touch input — no such device was available to set that up.
+  Deliberately left open rather than adding a paid device-lab service (BrowserStack etc., which
+  would also mean routing a credentials app's traffic through a third party) or a real-Safari CI
+  toolchain (macOS runner + `safaridriver`/Appium — a genuinely separate setup from the rest of the
+  e2e suite). The cheapest real coverage here is manual: open `https://delft.vercel.app` on an
+  iPhone/iPad you own and walk through Pages/Canvas/Credentials once in a while.
 
 ## Fixed
 
@@ -179,5 +187,6 @@ visible, since the existing suite was written before that UX existed. All 16 spe
 three projects, repeated twice back-to-back to confirm no flakiness.
 
 **Not closed by this pass**: the doc's original "manually test on a real iOS Safari device/
-simulator" ask is still open — no real device was available to do this with, so all of the above is
-still emulated/mouse-driven WebKit, not real Safari hardware or real touch input.
+simulator" ask — moved to "Accepted risk" below rather than left as open work, since no real device
+was available here and the alternatives (a paid device lab, or a separate real-Safari CI toolchain)
+were deliberately declined for now.

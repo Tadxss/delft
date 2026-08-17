@@ -25,9 +25,10 @@ BETA — a full audit found real gaps (silent autosave failures, no mobile layou
 missing dialog semantics, Storage orphaning on delete, and more, ranked by severity in that doc).
 High severity items 1 (silent autosave failures) and 3 (zero responsive/mobile layout) are fixed as
 of Build Order steps 30/31; Medium severity item 5 (no Safari/WebKit test coverage) is fixed as of
-steps 32-33, with only a real-device-testing gap still open (no iOS Safari device/simulator
-available here — see step 33). Item 2 (read-hook errors) and the rest of Medium/Low severity is
-still open as of step 33.
+steps 32-33 — its one remaining piece, real iOS Safari device/simulator testing, was deliberately
+moved to BETA_READINESS.md's "Accepted risk" section rather than left as open work (no device
+available here, and the alternatives were declined for now). Item 2 (read-hook errors) and the rest
+of Medium/Low severity is still open as of step 33.
 
 The one recurring (not one-time) item to keep revisiting alongside that: the image-compression
 settings in `PageEditor.tsx` against real Storage usage as real data accumulates — Supabase
@@ -1048,8 +1049,11 @@ the full policy set and its inline reasoning.
 
     Verified via the full 16-spec suite on `chromium`, `webkit`, and `mobile-safari` (48/48 green),
     repeated a second time back-to-back to confirm no flakiness, plus `pnpm check-types`/`lint`
-    (repo-wide). BETA_READINESS.md item 5's only remaining gap after this is the real-device part —
-    no actual iOS Safari device/simulator was available in this environment to test on.
+    (repo-wide). BETA_READINESS.md item 5's only remaining piece after this — real iOS Safari
+    device/simulator testing — was deliberately moved to that doc's "Accepted risk" section: no
+    device was available here, and a paid device lab or a separate real-Safari CI toolchain
+    (macOS runner + `safaridriver`/Appium) were both declined for now. The cheapest real coverage
+    if it's ever wanted is manual: the live app at `https://delft.vercel.app` on an owned device.
 
 **Deferred, not started:** revisiting `PageEditor.tsx`'s image-compression settings against real
 Storage usage — see **Next Up** above.
