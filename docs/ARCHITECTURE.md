@@ -23,12 +23,13 @@ on push to `master`). See Build Order below for how each shipped.
 **Current focus: working through [docs/BETA_READINESS.md](BETA_READINESS.md)** before calling this
 BETA — a full audit found real gaps (silent autosave failures, no mobile layout, `Modal.tsx`
 missing dialog semantics, Storage orphaning on delete, and more, ranked by severity in that doc).
-High severity items 1 (silent autosave failures) and 3 (zero responsive/mobile layout) are fixed as
-of Build Order steps 30/31; Medium severity item 5 (no Safari/WebKit test coverage) is fixed as of
-steps 32-33 — its one remaining piece, real iOS Safari device/simulator testing, was deliberately
-moved to BETA_READINESS.md's "Accepted risk" section rather than left as open work (no device
-available here, and the alternatives were declined for now). Item 2 (read-hook errors) and the rest
-of Medium/Low severity is still open as of step 33.
+Every High severity item is now fixed: 1 (silent autosave failures) and 3 (zero responsive/mobile
+layout) as of Build Order steps 30/31, 2 (read-hook errors) as of step 34. Medium severity item 5
+(no Safari/WebKit test coverage) is fixed as of steps 32-33 — its one remaining piece, real iOS
+Safari device/simulator testing, was deliberately moved to BETA_READINESS.md's "Accepted risk"
+section rather than left as open work (no device available here, and the alternatives were declined
+for now). What's left: Medium severity item 4 (`Modal.tsx` dialog semantics), the Low severity batch
+(title `<label>`, favicon, `app/error.tsx`, OG/viewport metadata), and Storage orphaning on delete.
 
 The one recurring (not one-time) item to keep revisiting alongside that: the image-compression
 settings in `PageEditor.tsx` against real Storage usage as real data accumulates — Supabase
@@ -1054,6 +1055,29 @@ the full policy set and its inline reasoning.
     device was available here, and a paid device lab or a separate real-Safari CI toolchain
     (macOS runner + `safaridriver`/Appium) were both declined for now. The cheapest real coverage
     if it's ever wanted is manual: the live app at `https://delft.vercel.app` on an owned device.
+
+34. **Fixed BETA_READINESS.md item 2: every read-hook consumer swallows errors.** ✅ *done*, the
+    last remaining High-severity item in that doc. `useWorkspaces`, `usePages`, `useCredentials`,
+    `useCanvases`, `usePage`, `useCanvas` were destructured as `{ data, isLoading }` only across
+    all six consumer sites — a failed fetch (RLS error, network drop) looked identical to
+    "genuinely empty" or "not found." Fixed by adding `isError`/`error` and an inline
+    `text-red-700` branch alongside each site's existing loading/empty-state logic: `apps/web/app/
+    workspace/page.tsx`, `Sidebar.tsx` (twice — Pages and Canvas sections), `CredentialsModal.tsx`
+    (a standalone banner, doesn't gate vault-unlock UI), and the page/canvas route files. No hook
+    changes — `.isError`/`.error` were already standard `useQuery` return values, this was purely a
+    UI-consumption gap.
+
+    **Verification note worth keeping**: a first pass at forcing each read to fail
+    (`page.route(...).abort("failed")` + a few seconds' wait, the same technique that worked for
+    step 30's mutation-error check) came back all-negative — every banner showed 0 matches. Traced
+    it to timing, not a code bug: in local `next dev`, a forced query failure took **15-20 seconds**
+    to actually settle into `isError`, well past `providers.tsx`'s nominal `retry: 1` — request
+    logging showed far more than 2 failed attempts before it gave up, consistent with React
+    StrictMode's dev-only double-invoke compounding the retry count. Mutations (step 30) don't hit
+    this since `defaultOptions` only sets `queries.retry`, not `mutations.retry` — that's why the
+    same short-wait technique worked there but not here. Re-verified with `page.waitForSelector`
+    (no fixed timeout) instead of a blind wait, and all six sites confirmed rendering correctly.
+    Plus `pnpm check-types`/`lint` (repo-wide).
 
 **Deferred, not started:** revisiting `PageEditor.tsx`'s image-compression settings against real
 Storage usage — see **Next Up** above.

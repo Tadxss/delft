@@ -22,24 +22,6 @@ entry to a new "Fixed" section at the bottom with a one-line pointer to the Buil
 covers it, rather than deleting it — same "accumulate, don't delete" convention as
 `ARCHITECTURE.md`.
 
-## High severity
-
-### 2. Every read-hook consumer swallows errors
-`useWorkspaces`, `usePages`, `useCredentials`, `useCanvases`, `usePage`, `useCanvas` are
-destructured as `{ data, isLoading }` only, everywhere they're consumed — `.isError`/`.error` is
-never read anywhere in `apps/web`. A failed fetch (RLS error, network drop) is indistinguishable in
-the UI from "genuinely empty" (e.g. "No pages yet.") or "not found." Mutations (writes) generally
-*do* surface errors correctly already (`useCreateWorkspace`, `useCreateCredential`, the auth hooks,
-etc.) — this gap is specifically on the read side.
-
-**Files**: every consumer of the six hooks above — `apps/web/app/workspace/page.tsx`,
-`.../_components/Sidebar.tsx`, `.../credentials/CredentialsModal.tsx`, `.../p/[pageId]/page.tsx`,
-`.../canvas/[canvasId]/page.tsx`.
-
-**Suggested next step**: a consistent small pattern (e.g. a shared `<QueryError error={...} />`
-or just inline `{isError && <p className="text-red-700">...}` matching the mutation-error styling
-already used elsewhere) added to each of these six call sites.
-
 ## Medium severity
 
 ### 4. `Modal.tsx` has no dialog semantics
@@ -190,3 +172,27 @@ three projects, repeated twice back-to-back to confirm no flakiness.
 simulator" ask — moved to "Accepted risk" below rather than left as open work, since no real device
 was available here and the alternatives (a paid device lab, or a separate real-Safari CI toolchain)
 were deliberately declined for now.
+
+### 2. Every read-hook consumer swallows errors — fixed, see [docs/ARCHITECTURE.md](ARCHITECTURE.md) Build Order step 34
+`useWorkspaces`, `usePages`, `useCredentials`, `useCanvases`, `usePage`, `useCanvas` were
+destructured as `{ data, isLoading }` only, everywhere they were consumed — `.isError`/`.error` was
+never read anywhere in `apps/web`. A failed fetch (RLS error, network drop) was indistinguishable in
+the UI from "genuinely empty" (e.g. "No pages yet.") or "not found." Mutations (writes) already
+surfaced errors correctly elsewhere (`useCreateWorkspace`, `useCreateCredential`, the auth hooks) —
+this gap was specifically on the read side.
+
+Fixed by adding `isError`/`error` to all six call sites and an inline `text-red-700` branch
+alongside the existing loading/empty-state logic, matching the mutation-error styling already used
+elsewhere (`CredentialDetail.tsx`'s `saveError`, and this session's own item-1 fix): `workspace/
+page.tsx` (`useWorkspaces`), `Sidebar.tsx` (`usePages` + `useCanvases`, once per section),
+`CredentialsModal.tsx` (`useCredentials`, a standalone banner that doesn't gate the rest of the
+modal), and the page/canvas route files (`usePage`/`useCanvas`, an `isError` early-return alongside
+the existing loading/not-found ones).
+
+Verified against a real local Supabase session by forcing each of the six underlying `GET` requests
+to fail (`page.route(...).abort("failed")`) and confirming every message actually rendered — not
+just written and assumed correct. Take-away worth recording: in local `next dev`, a forced query
+failure can take **15-20 seconds** to settle into `isError` (well past `providers.tsx`'s nominal
+`retry: 1`), likely React StrictMode's dev-only double-invoke compounding retry attempts — a
+verification script using a short wait (1-4s, matching item 1's mutation-error timing) will falsely
+read as broken. Plus `pnpm check-types`/`lint` (repo-wide).

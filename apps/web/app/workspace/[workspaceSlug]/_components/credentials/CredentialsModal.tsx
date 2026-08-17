@@ -33,7 +33,11 @@ export function CredentialsModal({
   // rows to workspace members, and secretCiphertext/secretIv stay encrypted regardless — this just
   // makes a credential available for VaultUnlockPanel to test-decrypt the passphrase against
   // *before* granting access, rather than only after.
-  const { data: credentials } = useCredentials(open ? workspaceId : undefined);
+  const {
+    data: credentials,
+    isError: credentialsError,
+    error: credentialsErrorObj,
+  } = useCredentials(open ? workspaceId : undefined);
   const { data: folders } = useCredentialFolders(
     open ? workspaceId : undefined,
   );
@@ -103,6 +107,12 @@ export function CredentialsModal({
           <X size={16} />
         </button>
       </div>
+
+      {credentialsError && (
+        <p className="shrink-0 border-b border-paper-200 px-4 py-2 text-xs text-red-700">
+          Couldn&apos;t load credentials: {credentialsErrorObj.message}
+        </p>
+      )}
 
       {/* A fixed modal height (above) means every state below must actually fill it — flex's
           default align-items:stretch does that for whichever single child renders here, as long
