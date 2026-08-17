@@ -1304,3 +1304,77 @@ Storage usage — see **Next Up** above.
       scale, choosing instead to rely on Supabase's existing free Auth/API logs and Vercel's existing
       free deploy/function logs (Dashboard → Logs on each platform) when investigating an incident.
       `apps/web/app/error.tsx`'s existing `console.error` + fallback UI (step 36) was left as-is.
+
+40. **Abuse-protection scoping: no custom API/AI surface exists, so the work narrows to the one
+    public route.** ✅ *done*, scoped down with the user rather than built blind. The request asked
+    for rate limiting on "login attempts, API endpoints, account creation, and AI generation
+    requests" — none of the last three exist in this app (no `app/api/**`, no AI feature anywhere),
+    and login/account-creation rate limiting is already GoTrue's built-in `[auth.rate_limit]` (tuned
+    in step 38). Confirmed with the user that the only real gap is `/share/[slug]`
+    (`apps/web/app/share/[slug]/page.tsx`) — the sole unauthenticated, publicly fetchable route,
+    with zero bot/scraper protection.
+
+    Real distributed rate limiting there needs state shared across requests, which Vercel serverless
+    functions don't have on their own (a naive in-memory counter resets on every cold start/scale-out
+    and wouldn't actually stop a scraper) — the standard fix is an external store like Upstash Redis.
+    Asked the user whether to add that new (free-tier) third-party dependency; they chose
+    **best-effort only, no new service**. Implemented the two zero-dependency mitigations available:
+    - `apps/web/app/robots.ts` (Next's file-based robots.txt convention, same pattern as the
+      existing `icon.tsx`): disallows `/share/` and `/workspace/` for all user agents. Verified via
+      `curl http://127.0.0.1:3000/robots.txt`.
+    - `/share/[slug]`'s `generateMetadata` now also returns `robots: { index: false, follow: false }`
+      — belt-and-suspenders for bots that fetch the page but don't honor `robots.txt`.
+    - Confirmed (not changed — already correct) `usePublishPage.ts`'s `generateSlug()` uses 12 hex
+      chars of `crypto.randomUUID()` (48 bits of randomness), already documented as a deliberate
+      "unguessable enough for personal sharing, not meant to resist targeted brute-forcing"
+      tradeoff — left as-is.
+
+    Both are advisory-only against a determined, non-compliant scraper — real bots ignore
+    `robots.txt` outright — but they stop the well-behaved-crawler case (search engine indexing of
+    personal shared content) at zero cost and zero new infrastructure, which is what was in scope
+    after the user declined the Upstash option. Verified: `pnpm check-types`/`lint` clean, and
+    `publish-share.spec.ts` still passes with the new metadata in place.
+
+41. **Input-validation audit: mapped every user-input entry point, then closed the two real gaps
+    found.** ✅ *done*. Asked for SQL/command/script-injection and unsafe-upload protection across
+    every form, upload, and query param. Found **no SQL injection surface** (zero raw SQL
+    string-building anywhere — every DB call goes through the parameterized Supabase client, and
+    the sole `.rpc()` call passes a typed args object), **no command injection surface** (zero
+    `child_process`/`exec`/`spawn` in app code), and **no XSS surface** (zero
+    `dangerouslySetInnerHTML` anywhere; BlockNote page content is stored as structured `jsonb` and
+    always rendered through BlockNote's own block components, both in the editor and the public
+    `/share/[slug]` reader — never as raw HTML). No sanitization library was needed because there's
+    no raw-HTML rendering path to sanitize in the first place.
+
+    Two real gaps did exist, both because this app's only trust boundary is Postgres/Storage
+    itself (no server sits between the client and Supabase, so the client can always be bypassed):
+    - **New migration `20260818000000_storage_upload_limits.sql`**: `page-images` and `avatars`
+      Storage buckets had no `file_size_limit`/`allowed_mime_types` at all — the only thing
+      stopping an oversized or non-image upload was the app's own client-side
+      `browser-image-compression` step, trivially skippable by hitting the Storage API directly
+      with a valid session. Set both to `file_size_limit = 5242880` (5 MiB) and
+      `allowed_mime_types = image/webp, image/png, image/jpeg` — no `image/svg+xml`, since both
+      buckets are public-read and an uploaded SVG can embed `<script>`.
+    - **New migration `20260818000010_text_length_limits.sql`**: several free-text columns had no
+      length limit at the DB level, even though the codebase already had the right pattern in two
+      places (`workspaces.name`'s `check (char_length(name) between 1 and 200)` from `init.sql`,
+      and `profiles.username`'s regex-format check). Extended the same pattern to `pages.title`
+      (≤500), `credentials.title` (≤200), `credentials.url` (≤2000), `credential_folders.name`
+      (≤200), `canvases.title` (≤200), and `profiles.first_name`/`middle_name`/`last_name` (≤100
+      each), `occupation` (≤200), `bio` (≤2000) — each its own `add constraint` so one column's
+      violation can't block the others. Deliberately **not** applied to
+      `credentials.username`/`password`/`notes`: those are client-side AES-GCM ciphertext bundled
+      into `secret_ciphertext`, so the server never sees that plaintext and there's nothing
+      meaningful to length-check.
+
+    Added matching `maxLength` to every corresponding input (workspace name, page title, canvas
+    title, credential title/URL, folder rename, page rename, and the profile name/occupation/bio
+    fields in `AccountModal.tsx`) — UX only, not the real enforcement, so users hit normal browser
+    truncation instead of a raw Postgres constraint-violation error.
+
+    Verified thoroughly: `npx supabase db reset` applied both migrations cleanly against existing
+    seed data; queried `storage.buckets` and every table's `\d` output directly via
+    `docker exec supabase_db_delft psql` to confirm the limits/constraints actually landed (not
+    just assumed from the migration file); `pnpm check-types`/`lint` clean; the full `chromium` e2e
+    suite (16/16, including `profile.spec.ts`'s real avatar upload) still passed with the new
+    Storage restrictions live, confirming the happy path wasn't broken by the new limits.

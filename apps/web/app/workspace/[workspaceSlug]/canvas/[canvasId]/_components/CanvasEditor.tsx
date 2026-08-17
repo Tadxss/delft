@@ -106,6 +106,7 @@ export function CanvasEditor({ canvas }: { canvas: Canvas }) {
           value={title}
           onChange={(e) => handleTitleChange(e.target.value)}
           placeholder="Untitled"
+          maxLength={200}
           className="w-full flex-1 border-none bg-transparent text-2xl font-bold leading-snug text-ink-800 outline-none placeholder:text-ink-400"
         />
         <button
