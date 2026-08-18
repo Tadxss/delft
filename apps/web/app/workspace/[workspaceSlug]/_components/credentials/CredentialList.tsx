@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   DragOverlay,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   pointerWithin,
   useDroppable,
   useSensor,
@@ -104,10 +105,13 @@ export function CredentialList({
     new Set(),
   );
   const [dragError, setDragError] = useState<string | null>(null);
+  // Two sensors, not one PointerSensor for both — see Sidebar.tsx's matching setup for why: a
+  // delay-based constraint (needed on touch, so a scroll swipe isn't hijacked as a drag) makes
+  // mouse dragging feel broken, since it requires holding the pointer still for the full delay
+  // before any movement is allowed. Mouse gets an immediate small-distance threshold instead.
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { delay: 200, tolerance: 8 },
-    }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
   );
   const renameInputRef = useRef<HTMLInputElement>(null);
   // Track the latest renamingFolderId/renameValue via refs so commitRename can read fresh values

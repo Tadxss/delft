@@ -6,7 +6,8 @@ import { useParams, useRouter } from "next/navigation";
 import {
   DndContext,
   DragOverlay,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   pointerWithin,
   useDroppable,
   useSensor,
@@ -72,10 +73,16 @@ export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
     new Set(),
   );
   const [dragError, setDragError] = useState<string | null>(null);
+  // Two sensors, not one PointerSensor for both: a delay-based constraint (needed on touch, so a
+  // scroll swipe isn't immediately hijacked as a drag) makes mouse dragging feel broken, because it
+  // requires holding the pointer still for the full delay before any movement is allowed — an
+  // ordinary "click and immediately drag" gesture moves well before that, which cancels the drag
+  // instead of starting it. Mouse gets a small distance threshold instead (drag starts the instant
+  // the pointer moves a few px, no hold required — the click-vs-drag telling apart mouse-only
+  // clicks already need); touch keeps the delay, since native scroll must stay possible there.
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { delay: 200, tolerance: 8 },
-    }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
   );
 
   const childrenByParent = useMemo(() => {
