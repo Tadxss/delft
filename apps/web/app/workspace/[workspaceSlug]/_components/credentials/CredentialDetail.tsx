@@ -431,7 +431,9 @@ export function CredentialDetail({
             aria-label="Copy username"
             title="Copy username"
             className={`inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs hover:bg-paper-100 ${
-              copied === "username" ? "text-accent-500" : "text-ink-500 hover:text-ink-800"
+              copied === "username"
+                ? "text-accent-500"
+                : "text-ink-500 hover:text-ink-800"
             }`}
           >
             {copied === "username" ? <Check size={13} /> : <Copy size={13} />}
@@ -465,7 +467,9 @@ export function CredentialDetail({
             aria-label="Copy password"
             title="Copy password"
             className={`inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs hover:bg-paper-100 ${
-              copied === "password" ? "text-accent-500" : "text-ink-500 hover:text-ink-800"
+              copied === "password"
+                ? "text-accent-500"
+                : "text-ink-500 hover:text-ink-800"
             }`}
           >
             {copied === "password" ? <Check size={13} /> : <Copy size={13} />}

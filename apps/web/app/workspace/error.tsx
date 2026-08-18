@@ -19,7 +19,9 @@ export default function WorkspaceError({
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
-      <h1 className="text-xl font-semibold text-ink-800">Something went wrong.</h1>
+      <h1 className="text-xl font-semibold text-ink-800">
+        Something went wrong.
+      </h1>
       <p className="max-w-sm text-sm text-ink-500">
         {error.message || "An unexpected error occurred."}
       </p>

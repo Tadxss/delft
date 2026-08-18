@@ -12,13 +12,18 @@ import { CredentialsModal } from "./[workspaceSlug]/_components/credentials/Cred
 
 function TopBar() {
   const params = useParams<{ workspaceSlug?: string }>();
-  const workspaceId = params.workspaceSlug ? parseWorkspaceSlug(params.workspaceSlug) : undefined;
+  const workspaceId = params.workspaceSlug
+    ? parseWorkspaceSlug(params.workspaceSlug)
+    : undefined;
   const [accountOpen, setAccountOpen] = useState(false);
   const [credentialsOpen, setCredentialsOpen] = useState(false);
 
   return (
     <header className="flex h-12 shrink-0 items-center justify-between border-b border-paper-200 bg-paper-100 px-4">
-      <Link href="/workspace" className="text-base font-semibold tracking-tight text-ink-800">
+      <Link
+        href="/workspace"
+        className="text-base font-semibold tracking-tight text-ink-800"
+      >
         Delft
       </Link>
       <div className="flex items-center gap-1">

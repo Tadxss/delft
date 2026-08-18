@@ -82,6 +82,7 @@ via `supabase/setup-cli`, then runs the full `apps/web/e2e/` suite against it).
 ## Architecture
 
 **Monorepo layout** (pnpm workspaces: `apps/*`, `packages/*`):
+
 - `apps/web` — Next.js App Router. Routes in `apps/web/app/`. Uses `@delft/eslint-config` and
   `@delft/typescript-config` as devDependencies rather than local lint/tsconfig rules.
 - `packages/eslint-config`, `packages/typescript-config` — shared presets consumed via

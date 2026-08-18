@@ -9,7 +9,7 @@ Do this:
 1. Check the most recent existing filenames (`ls supabase/migrations | tail -5`) to confirm the
    naming convention is still `YYYYMMDDHHMMSS_description.sql` (14-digit UTC timestamp, underscore,
    short snake_case description — e.g. `20260812140030_storage.sql`).
-2. Generate a timestamp for *now* (don't reuse or guess an old one — it must sort after every
+2. Generate a timestamp for _now_ (don't reuse or guess an old one — it must sort after every
    existing migration) and a short snake_case description derived from $ARGUMENTS.
 3. Create the file with a header comment naming what it does, then leave the SQL body for the user
    to fill in (don't invent schema/RLS/RPC content — that needs actual design, not a template). If

@@ -28,7 +28,9 @@ export function useCreateWorkspace(userId: string | undefined) {
         // sends the user back to sign in fresh, which is the only real fix.
         if (error.code === "23503") {
           await supabase.auth.signOut();
-          throw new Error("Your session is out of date — please sign in again.");
+          throw new Error(
+            "Your session is out of date — please sign in again.",
+          );
         }
         throw error;
       }

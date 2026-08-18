@@ -135,7 +135,11 @@ export function CredentialsModal({
           // CredentialList's own root is `w-full md:w-72`, so at full width it would otherwise
           // collide with the detail pane rather than genuinely replacing it.
           <>
-            <div className={selectedId ? "hidden md:flex" : "flex flex-1 md:flex-none"}>
+            <div
+              className={
+                selectedId ? "hidden md:flex" : "flex flex-1 md:flex-none"
+              }
+            >
               <CredentialList
                 workspaceId={workspaceId}
                 credentials={credentials ?? []}

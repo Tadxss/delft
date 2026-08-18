@@ -14,12 +14,17 @@ const AUTOSAVE_DEBOUNCE_MS = 800;
 // component in this codebase needing that treatment (BlockNote, the Pages editor, tolerates SSR
 // fine). Since ssr:false means the server renders nothing for it at all, there's no server/client
 // HTML to diverge — no hydration-mismatch risk the way the Google-button theme prop had.
-const Excalidraw = dynamic(() => import("@excalidraw/excalidraw").then((mod) => mod.Excalidraw), {
-  ssr: false,
-  loading: () => <div className="h-full w-full" />,
-});
+const Excalidraw = dynamic(
+  () => import("@excalidraw/excalidraw").then((mod) => mod.Excalidraw),
+  {
+    ssr: false,
+    loading: () => <div className="h-full w-full" />,
+  },
+);
 
-type ExcalidrawOnChange = NonNullable<React.ComponentProps<typeof Excalidraw>["onChange"]>;
+type ExcalidrawOnChange = NonNullable<
+  React.ComponentProps<typeof Excalidraw>["onChange"]
+>;
 type ExcalidrawElements = Parameters<ExcalidrawOnChange>[0];
 type ExcalidrawAppState = Parameters<ExcalidrawOnChange>[1];
 
@@ -78,7 +83,10 @@ export function CanvasEditor({ canvas }: { canvas: Canvas }) {
     scheduleSave({ title: value });
   }
 
-  function handleCanvasChange(elements: ExcalidrawElements, appState: ExcalidrawAppState) {
+  function handleCanvasChange(
+    elements: ExcalidrawElements,
+    appState: ExcalidrawAppState,
+  ) {
     // Never persist `files` (the third onChange argument) — no rendered image/binary is stored
     // server-side, matching the image tool being hidden below. `collaborators` is a live Map (not
     // meaningful to persist, and irrelevant in this non-collaborative app) — drop it explicitly.

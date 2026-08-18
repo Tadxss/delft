@@ -128,7 +128,11 @@ export default function LoginPage() {
 
   function handleMagicLinkClick() {
     signIn.mutate(
-      { email, redirectTo: typeof window !== "undefined" ? window.location.origin : undefined },
+      {
+        email,
+        redirectTo:
+          typeof window !== "undefined" ? window.location.origin : undefined,
+      },
       { onSuccess: () => setStep("sent") },
     );
   }
@@ -142,8 +146,10 @@ export default function LoginPage() {
       });
       const width = 480;
       const height = 640;
-      const left = window.screenX + Math.max(0, (window.outerWidth - width) / 2);
-      const top = window.screenY + Math.max(0, (window.outerHeight - height) / 2);
+      const left =
+        window.screenX + Math.max(0, (window.outerWidth - width) / 2);
+      const top =
+        window.screenY + Math.max(0, (window.outerHeight - height) / 2);
       const popup = window.open(
         url,
         "delft-google-signin",
@@ -163,7 +169,9 @@ export default function LoginPage() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-10 px-6">
       <div className="flex flex-col items-center gap-3 text-center">
-        <h1 className="text-4xl font-semibold tracking-tight text-ink-800">Delft</h1>
+        <h1 className="text-4xl font-semibold tracking-tight text-ink-800">
+          Delft
+        </h1>
         <p className="max-w-sm text-sm text-ink-500">
           Careful records. Quiet craft. One private place.
         </p>
@@ -178,8 +186,16 @@ export default function LoginPage() {
               disabled={signInWithGoogle.isPending || awaitingGooglePopup}
               style={
                 mounted && resolvedTheme === "dark"
-                  ? { backgroundColor: "#131314", borderColor: "#8e918f", color: "#e3e3e3" }
-                  : { backgroundColor: "#ffffff", borderColor: "#747775", color: "#1f1f1f" }
+                  ? {
+                      backgroundColor: "#131314",
+                      borderColor: "#8e918f",
+                      color: "#e3e3e3",
+                    }
+                  : {
+                      backgroundColor: "#ffffff",
+                      borderColor: "#747775",
+                      color: "#1f1f1f",
+                    }
               }
               className="flex h-10 items-center justify-center gap-3 rounded-md border text-sm font-medium tracking-wide transition-opacity hover:opacity-90 disabled:opacity-60"
             >
@@ -189,7 +205,9 @@ export default function LoginPage() {
                 : "Continue with Google"}
             </button>
             {signInWithGoogle.isError && (
-              <p className="-mt-2 text-xs text-red-700">{signInWithGoogle.error.message}</p>
+              <p className="-mt-2 text-xs text-red-700">
+                {signInWithGoogle.error.message}
+              </p>
             )}
 
             <div className="flex items-center gap-3 text-xs uppercase tracking-wide text-ink-400">
@@ -199,7 +217,10 @@ export default function LoginPage() {
             </div>
 
             <form onSubmit={handleEmailSubmit} className="flex flex-col gap-3">
-              <label htmlFor="identifier" className="text-xs font-medium uppercase tracking-wide text-ink-500">
+              <label
+                htmlFor="identifier"
+                className="text-xs font-medium uppercase tracking-wide text-ink-500"
+              >
                 Email or username
               </label>
               <input
@@ -223,7 +244,9 @@ export default function LoginPage() {
                 {emailForUsername.isPending ? "Checking…" : "Continue"}
               </button>
               {usernameNotFound && (
-                <p className="text-xs text-red-700">No account found with that username.</p>
+                <p className="text-xs text-red-700">
+                  No account found with that username.
+                </p>
               )}
             </form>
           </>
@@ -242,8 +265,14 @@ export default function LoginPage() {
               </button>
             </div>
 
-            <form onSubmit={handlePasswordSubmit} className="flex flex-col gap-3">
-              <label htmlFor="password" className="text-xs font-medium uppercase tracking-wide text-ink-500">
+            <form
+              onSubmit={handlePasswordSubmit}
+              className="flex flex-col gap-3"
+            >
+              <label
+                htmlFor="password"
+                className="text-xs font-medium uppercase tracking-wide text-ink-500"
+              >
                 Password
               </label>
               <input
@@ -262,7 +291,9 @@ export default function LoginPage() {
                 {signInWithPassword.isPending ? "Signing in…" : "Continue"}
               </button>
               {signInWithPassword.isError && (
-                <p className="text-xs text-red-700">{signInWithPassword.error.message}</p>
+                <p className="text-xs text-red-700">
+                  {signInWithPassword.error.message}
+                </p>
               )}
             </form>
 
@@ -272,15 +303,20 @@ export default function LoginPage() {
               disabled={signIn.isPending}
               className="rounded-md border border-paper-200 px-3 py-2 text-sm text-ink-600 transition-colors hover:bg-paper-50 disabled:opacity-60"
             >
-              {signIn.isPending ? "Sending…" : "Email me a sign-in link instead"}
+              {signIn.isPending
+                ? "Sending…"
+                : "Email me a sign-in link instead"}
             </button>
-            {signIn.isError && <p className="text-xs text-red-700">{signIn.error.message}</p>}
+            {signIn.isError && (
+              <p className="text-xs text-red-700">{signIn.error.message}</p>
+            )}
           </>
         )}
 
         {step === "sent" && (
           <p className="text-center text-sm text-ink-600">
-            Check <span className="font-medium text-ink-800">{email}</span> for a sign-in link.
+            Check <span className="font-medium text-ink-800">{email}</span> for
+            a sign-in link.
           </p>
         )}
       </div>

@@ -13,14 +13,27 @@ import {
 export default function WorkspaceSwitcherPage() {
   const router = useRouter();
   const { user } = useAuthUser();
-  const { data: workspaces, isLoading, isError, error } = useWorkspaces(user?.id);
+  const {
+    data: workspaces,
+    isLoading,
+    isError,
+    error,
+  } = useWorkspaces(user?.id);
   const createWorkspace = useCreateWorkspace(user?.id);
   const deleteWorkspace = useDeleteWorkspace(user?.id);
   const [name, setName] = useState("");
 
-  function handleDelete(e: React.MouseEvent, workspaceId: string, workspaceName: string) {
+  function handleDelete(
+    e: React.MouseEvent,
+    workspaceId: string,
+    workspaceName: string,
+  ) {
     e.stopPropagation();
-    if (!window.confirm(`Delete "${workspaceName}" and everything in it? This can't be undone.`)) {
+    if (
+      !window.confirm(
+        `Delete "${workspaceName}" and everything in it? This can't be undone.`,
+      )
+    ) {
       return;
     }
     deleteWorkspace.mutate({ id: workspaceId });
@@ -47,7 +60,9 @@ export default function WorkspaceSwitcherPage() {
       {isLoading ? (
         <p className="text-sm text-ink-500">Loading…</p>
       ) : isError ? (
-        <p className="text-sm text-red-700">Couldn&apos;t load workspaces: {error.message}</p>
+        <p className="text-sm text-red-700">
+          Couldn&apos;t load workspaces: {error.message}
+        </p>
       ) : workspaces && workspaces.length > 0 ? (
         <ul className="flex flex-col gap-2">
           {workspaces.map((workspace) => (
@@ -72,14 +87,22 @@ export default function WorkspaceSwitcherPage() {
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-ink-500">No workspaces yet — create your first one below.</p>
+        <p className="text-sm text-ink-500">
+          No workspaces yet — create your first one below.
+        </p>
       )}
       {deleteWorkspace.isError && (
         <p className="text-xs text-red-700">{deleteWorkspace.error.message}</p>
       )}
 
-      <form onSubmit={handleCreate} className="flex flex-col gap-2 border-t border-paper-200 pt-6">
-        <label htmlFor="workspace-name" className="text-xs font-medium uppercase tracking-wide text-ink-500">
+      <form
+        onSubmit={handleCreate}
+        className="flex flex-col gap-2 border-t border-paper-200 pt-6"
+      >
+        <label
+          htmlFor="workspace-name"
+          className="text-xs font-medium uppercase tracking-wide text-ink-500"
+        >
           New workspace
         </label>
         <div className="flex gap-2">
@@ -100,7 +123,9 @@ export default function WorkspaceSwitcherPage() {
           </button>
         </div>
         {createWorkspace.isError && (
-          <p className="text-xs text-red-700">{createWorkspace.error.message}</p>
+          <p className="text-xs text-red-700">
+            {createWorkspace.error.message}
+          </p>
         )}
       </form>
     </main>
