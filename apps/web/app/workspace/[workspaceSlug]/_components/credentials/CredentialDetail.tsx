@@ -1,6 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import {
+  Check,
+  Copy,
+  Eye,
+  EyeOff,
+  ExternalLink,
+  Pencil,
+  RefreshCw,
+  Trash2,
+} from "lucide-react";
 import type {
   Credential,
   CredentialFolder,
@@ -311,15 +321,18 @@ export function CredentialDetail({
           <button
             type="button"
             onClick={() => setShowPassword((v) => !v)}
-            className="shrink-0 rounded-md border border-paper-200 px-2 py-1.5 text-xs text-ink-600 hover:bg-paper-50"
+            aria-label={showPassword ? "Hide" : "Show"}
+            title={showPassword ? "Hide" : "Show"}
+            className="shrink-0 rounded-md p-2 text-ink-500 hover:bg-paper-100 hover:text-ink-800"
           >
-            {showPassword ? "Hide" : "Show"}
+            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
           </button>
           <button
             type="button"
             onClick={handleGenerate}
-            className="shrink-0 rounded-md border border-paper-200 px-2 py-1.5 text-xs text-ink-600 hover:bg-paper-50"
+            className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1.5 text-xs text-ink-500 hover:bg-paper-100 hover:text-ink-800"
           >
+            <RefreshCw size={13} />
             Generate
           </button>
         </div>
@@ -375,16 +388,18 @@ export function CredentialDetail({
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className="rounded-md border border-paper-300 px-3 py-1.5 text-xs font-medium text-ink-600 hover:bg-paper-100"
+            className="inline-flex items-center gap-1.5 rounded-md border border-paper-300 px-3 py-1.5 text-xs font-medium text-ink-600 hover:bg-paper-100"
           >
+            <Pencil size={13} />
             Edit
           </button>
           <button
             type="button"
             onClick={handleDelete}
             disabled={deleteCredential.isPending}
-            className="rounded-md px-2 py-1.5 text-xs text-ink-400 hover:bg-paper-100 hover:text-red-700"
+            className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-ink-400 hover:bg-paper-100 hover:text-red-700"
           >
+            <Trash2 size={13} />
             Delete
           </button>
         </div>
@@ -395,9 +410,10 @@ export function CredentialDetail({
           href={credential.url}
           target="_blank"
           rel="noreferrer"
-          className="truncate text-sm text-accent-500 underline"
+          className="inline-flex min-w-0 items-center gap-1 truncate text-sm text-accent-500 underline"
         >
-          {credential.url}
+          <span className="min-w-0 truncate">{credential.url}</span>
+          <ExternalLink size={12} className="shrink-0" />
         </a>
       )}
 
@@ -412,8 +428,13 @@ export function CredentialDetail({
           <button
             type="button"
             onClick={() => handleCopy("username")}
-            className="shrink-0 rounded-md border border-paper-200 px-2 py-1 text-xs text-ink-600 hover:bg-paper-50"
+            aria-label="Copy username"
+            title="Copy username"
+            className={`inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs hover:bg-paper-100 ${
+              copied === "username" ? "text-accent-500" : "text-ink-500 hover:text-ink-800"
+            }`}
           >
+            {copied === "username" ? <Check size={13} /> : <Copy size={13} />}
             {copied === "username" ? "Copied" : "Copy"}
           </button>
         </div>
@@ -432,15 +453,22 @@ export function CredentialDetail({
           <button
             type="button"
             onClick={() => setShowPassword((v) => !v)}
-            className="shrink-0 rounded-md border border-paper-200 px-2 py-1 text-xs text-ink-600 hover:bg-paper-50"
+            aria-label={showPassword ? "Hide" : "Show"}
+            title={showPassword ? "Hide" : "Show"}
+            className="shrink-0 rounded-md p-1.5 text-ink-500 hover:bg-paper-100 hover:text-ink-800"
           >
-            {showPassword ? "Hide" : "Show"}
+            {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
           </button>
           <button
             type="button"
             onClick={() => handleCopy("password")}
-            className="shrink-0 rounded-md border border-paper-200 px-2 py-1 text-xs text-ink-600 hover:bg-paper-50"
+            aria-label="Copy password"
+            title="Copy password"
+            className={`inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs hover:bg-paper-100 ${
+              copied === "password" ? "text-accent-500" : "text-ink-500 hover:text-ink-800"
+            }`}
           >
+            {copied === "password" ? <Check size={13} /> : <Copy size={13} />}
             {copied === "password" ? "Copied" : "Copy"}
           </button>
         </div>

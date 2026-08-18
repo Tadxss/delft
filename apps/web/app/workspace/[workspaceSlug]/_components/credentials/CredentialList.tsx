@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Folder, FolderPlus, Plus, Search } from "lucide-react";
 import type { Credential, CredentialFolder } from "@delft/types";
 import {
   useCreateCredentialFolder,
@@ -12,26 +13,6 @@ import {
   CredentialFolderTreeNode,
   CredentialLeafRow,
 } from "./CredentialFolderTreeNode";
-
-function FolderPlusIcon() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-    >
-      <path
-        d="M3 5a2 2 0 012-2h4l2 2h8a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V5z"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path d="M12 11v4M10 13h4" strokeLinecap="round" />
-    </svg>
-  );
-}
 
 function buildFolderMaps(folders: CredentialFolder[]) {
   const byParent = new Map<string | null, CredentialFolder[]>();
@@ -226,13 +207,19 @@ export function CredentialList({
   return (
     <div className="flex w-full shrink-0 flex-col border-r border-paper-200 md:w-72">
       <div className="flex items-center justify-between gap-2 border-b border-paper-200 p-3">
-        <input
-          type="search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search"
-          className="min-w-0 flex-1 rounded-md border border-paper-200 bg-paper-50 px-2 py-1.5 text-sm text-ink-800 outline-none focus:border-accent-500"
-        />
+        <div className="relative min-w-0 flex-1">
+          <Search
+            size={14}
+            className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-400"
+          />
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search"
+            className="w-full rounded-md border border-paper-200 bg-paper-50 py-1.5 pl-8 pr-2 text-sm text-ink-800 outline-none focus:border-accent-500"
+          />
+        </div>
         <button
           type="button"
           onClick={() => handleNewFolder(null)}
@@ -241,16 +228,16 @@ export function CredentialList({
           title="New folder"
           className="shrink-0 rounded-md p-1.5 text-ink-500 hover:bg-paper-100 hover:text-ink-800 disabled:opacity-60"
         >
-          <FolderPlusIcon />
+          <FolderPlus size={16} />
         </button>
         <button
           type="button"
           onClick={() => handleNewCredential(null)}
           aria-label="New credential"
           title="New credential"
-          className="shrink-0 rounded-md px-2 py-1.5 text-sm text-ink-500 hover:bg-paper-100 hover:text-ink-800"
+          className="shrink-0 rounded-md p-1.5 text-ink-500 hover:bg-paper-100 hover:text-ink-800"
         >
-          +
+          <Plus size={16} />
         </button>
       </div>
 
@@ -267,7 +254,8 @@ export function CredentialList({
                     onClick={() => revealFolder(folder.id)}
                     className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-ink-800 hover:bg-paper-50"
                   >
-                    <span className="truncate">
+                    <Folder size={14} className="shrink-0 text-ink-400" />
+                    <span className="truncate font-medium">
                       {folder.name || "Untitled"}
                     </span>
                   </button>
