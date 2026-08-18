@@ -1565,3 +1565,9 @@ Storage usage — see **Next Up** above.
     chromium/webkit/mobile-safari) passing, including new reorder tests for all four surfaces
     (root + nested pages, folders + credentials with reparent, canvases with reload-persistence
     check).
+
+55. **Add Vercel Speed Insights.** ✅ *done*. Installed `@vercel/speed-insights` and mounted
+    `<SpeedInsights />` in the root layout (`app/layout.tsx`) to collect real-user Core Web Vitals
+    for the production deploy. Free on the Hobby plan for one project up to 10,000 events/month —
+    past that Vercel just pauses recording until the next day rather than billing, so this stays
+    within the zero-cost constraint. Verified: `check-types`/`lint`/`build` clean.
