@@ -29,9 +29,11 @@ was available to set that up). See that doc's own "Fixed"/"Accepted risk" sectio
 on each, and this file's Build Order steps 30-37 for the how/why of each fix.
 
 No committed backlog beyond that audit exists right now — what to work on next is an open question
-for whoever picks this up. The one recurring (not one-time) item worth keeping an eye on regardless:
-the image-compression settings in `PageEditor.tsx` against real Storage usage as real data
-accumulates — Supabase Storage's free tier caps at 1GB.
+for whoever picks this up. A follow-up UI/UX/performance audit (pragmatic, personal-scale lens —
+not scored against a production-SaaS bar) ran after BETA_READINESS closed out; its findings are
+closed out too, as of Build Order steps 42-46. The one recurring (not one-time) item worth keeping
+an eye on regardless: the image-compression settings in `PageEditor.tsx` against real Storage usage
+as real data accumulates — Supabase Storage's free tier caps at 1GB.
 
 ## Data model
 
@@ -1378,3 +1380,62 @@ Storage usage — see **Next Up** above.
     just assumed from the migration file); `pnpm check-types`/`lint` clean; the full `chromium` e2e
     suite (16/16, including `profile.spec.ts`'s real avatar upload) still passed with the new
     Storage restrictions live, confirming the happy path wasn't broken by the new limits.
+
+42. **QueryClient staleTime.** ✅ *done*. `apps/web/app/providers.tsx`'s shared `QueryClient` had no
+    `staleTime`/`refetchOnWindowFocus` override, so all 34 hooks in `packages/shared/src/hooks/`
+    refetched on every component remount and every window refocus — including the full unbounded
+    page/canvas/credential list queries. Set `staleTime: 30_000` and `refetchOnWindowFocus: false`
+    on the shared defaults; no per-hook changes needed since none override `staleTime` themselves.
+    Verified: `pnpm check-types`/`lint` clean.
+
+43. **Sidebar/credentials tree re-render fan-out.** ✅ *done*. `PageTreeNode.tsx` and
+    `CredentialFolderTreeNode.tsx` re-rendered their entire visible subtree on every single
+    expand/collapse click, because the `expanded` state is a `Set<string>` that gets a fresh
+    reference every toggle (`new Set(prev)`), passed straight down through every recursive tree
+    level with no `React.memo` anywhere to stop the cascade. Split a per-node `isExpanded: boolean`
+    out from the raw `expanded: Set<string>` prop (each node still receives the Set, but only to
+    compute its own children's booleans when recursing), wrapped both components in `memo()` with a
+    custom comparator that deliberately excludes `expanded` from the equality check, and stabilized
+    the `toggle`/`createChild`/`handleNewFolder`/`handleNewCredential`/`startRename`/
+    `handleDeleteFolder` callbacks feeding them (`Sidebar.tsx`, `CredentialList.tsx`,
+    `CredentialsModal.tsx`) with `useCallback` — a memoized child still re-renders every time if its
+    callback props are fresh closures every parent render. `commitRename` specifically needed a
+    ref-based rewrite rather than a plain `useCallback`, since it closes over `renameValue` (which
+    changes every keystroke) and is threaded unconditionally into every tree node — a naive
+    dependency array would have reopened the exact same fan-out, just gated on renaming instead of
+    expanding. Verified: `pnpm check-types`/`lint`/`build` clean; 12 e2e tests
+    (`workspace-pages.spec.ts`, `credential-folders.spec.ts`) passing across
+    Chromium/WebKit/Mobile Safari, confirming rename/create/delete/expand behavior is unchanged.
+
+44. **`VaultKeyContext` provider value memoization.** ✅ *done*. `packages/shared/src/vault/
+    VaultKeyContext.tsx`'s provider wraps the entire authenticated app (mounted in
+    `apps/web/app/workspace/layout.tsx`), but its context value — `{ isUnlocked, getKey, unlock,
+    setKey, lock }` — was a fresh object literal every render even though the individual methods
+    were already correctly wrapped in `useCallback`. That re-rendered every `useVaultKey()` consumer
+    on any change to the provider, regardless of whether their own workspace's unlock state
+    actually changed. Wrapped the value object itself in `useMemo`. No public API change —
+    `useVaultKey`/`VaultKeyProvider`'s signatures are untouched, so `CredentialsModal.tsx`,
+    `VaultUnlockPanel.tsx`, and `workspace/layout.tsx` needed no changes. Verified: `pnpm
+    check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-folders.spec.ts`)
+    passing across 3 browsers.
+
+45. **Share-page double-fetch dedup.** ✅ *done*. `/share/[slug]` — the app's one server-rendered
+    route — ran two separate Supabase queries per hit for the same row: `generateMetadata()`
+    (`select("title")`) and the page body (`select("title, content, updated_at")`). Next's request
+    memoization doesn't dedupe across differing `.select()` column lists, so this was a real
+    double-fetch on every hit, already flagged as such in the code's own comment. Extracted the
+    fetch into `apps/web/app/share/[slug]/_lib/getSharedPage.ts`, wrapped in React's `cache()` (keyed
+    on `slug`), fetching the full column set once so both call sites share one query per request —
+    `generateMetadata()` just reads `title` off the same shared result rather than issuing a
+    second, narrower query. Verified: `pnpm check-types`/`lint`/`build` clean; `publish-share.spec.ts`
+    passing across 3 browsers.
+
+46. **Bundle-size visibility.** ✅ *done*, after a false start. Wired up `@next/bundle-analyzer` in
+    `next.config.js` per a standard recommendation, then discovered on testing that it only
+    instruments webpack builds and is explicitly incompatible with Turbopack — which is this app's
+    default builder in Next 16 for both `dev` and `build`. It silently printed "no report will be
+    generated" instead of actually analyzing anything, which would have shipped a devDependency
+    that looked wired up but never worked. Reverted `next.config.js`, removed the dependency before
+    it ever landed in a commit, and used Next's own Turbopack-native `next experimental-analyze`
+    instead — exposed as `pnpm analyze` in `apps/web/package.json`. Zero extra dependency; confirmed
+    with a real run that it writes an analysis to `.next/diagnostics/analyze`.
