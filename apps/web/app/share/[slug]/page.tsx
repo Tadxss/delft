@@ -1,43 +1,20 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
-import type { Database } from "@delft/types";
 import { SharedPageView } from "./_components/SharedPageView";
+import { getSharedPage } from "./_lib/getSharedPage";
 
 export const dynamic = "force-dynamic";
 
-// A plain anon-key client, no session/storage adapter — this route is intentionally public and
-// unauthenticated. It only ever reaches rows the pages_select_published_anon RLS policy (see
-// supabase/migrations) permits: `is_published = true`, no workspace check. The `.eq("is_published",
-// true)` filter below is redundant with that policy but kept anyway — defense in depth, and it
-// means this route's own intent reads clearly without having to cross-reference the migration.
-function createAnonClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anonKey) return null;
-  return createClient<Database>(url, anonKey, {
-    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-  });
-}
-
 // The one route meant for external sharing — link previews (Slack, iMessage, etc.) read these
-// tags when a share URL gets sent around, so it's worth the extra query beyond the page component's
-// own fetch (different `.select()` columns, so Next's request memoization won't dedupe them).
+// tags when a share URL gets sent around. getSharedPage is wrapped in React's cache(), so this
+// query and the page component's below share one Supabase round trip per request instead of two.
 export async function generateMetadata({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const supabase = createAnonClient();
-  if (!supabase) return {};
-
-  const { data: page } = await supabase
-    .from("pages")
-    .select("title")
-    .eq("published_slug", slug)
-    .eq("is_published", true)
-    .maybeSingle();
+  const page = await getSharedPage(slug);
 
   if (!page) return {};
 
@@ -59,15 +36,7 @@ export default async function SharedPagePage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const supabase = createAnonClient();
-  if (!supabase) notFound();
-
-  const { data: page } = await supabase
-    .from("pages")
-    .select("title, content, updated_at")
-    .eq("published_slug", slug)
-    .eq("is_published", true)
-    .maybeSingle();
+  const page = await getSharedPage(slug);
 
   if (!page) notFound();
 
