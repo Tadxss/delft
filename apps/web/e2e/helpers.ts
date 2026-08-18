@@ -27,7 +27,9 @@ export async function getLatestMagicLink(email: string): Promise<string> {
     if (msg) {
       const fullRes = await fetch(`${MAILPIT_URL}/api/v1/message/${msg.ID}`);
       const full = (await fullRes.json()) as { Text: string };
-      const match = full.Text.match(/http:\/\/127\.0\.0\.1:54321\/auth\/v1\/verify\?[^\s)]+/);
+      const match = full.Text.match(
+        /http:\/\/127\.0\.0\.1:54321\/auth\/v1\/verify\?[^\s)]+/,
+      );
       if (match) return match[0];
     }
     await new Promise((resolve) => setTimeout(resolve, 500));
@@ -95,6 +97,43 @@ export async function backToList(page: Page): Promise<void> {
   if (appeared) {
     await backButton.click();
   }
+}
+
+// Drags `source` onto `target` — used by both tree drag-and-drop specs (pages sidebar, credentials
+// folder tree). Both trees' PointerSensor uses an activationConstraint of
+// { delay: 200, tolerance: 8 } specifically so ordinary clicks on a row's Link/buttons aren't
+// hijacked as drags, which means a plain Playwright dragTo() (a single instantaneous move) never
+// satisfies the delay and the drag never activates. This mirrors real pointer behavior instead:
+// press, hold in place past the delay so dnd-kit commits to a drag, then move to the target in
+// steps so its collision detection (which runs on move, not just at drop) has a chance to register
+// the target as "over" before releasing.
+export async function dragElementOnto(
+  page: Page,
+  source: Locator,
+  target: Locator,
+): Promise<void> {
+  const sourceBox = await source.boundingBox();
+  const targetBox = await target.boundingBox();
+  if (!sourceBox || !targetBox) {
+    throw new Error("dragElementOnto: source or target has no bounding box");
+  }
+
+  const sourceX = sourceBox.x + sourceBox.width / 2;
+  const sourceY = sourceBox.y + sourceBox.height / 2;
+  const targetX = targetBox.x + targetBox.width / 2;
+  const targetY = targetBox.y + targetBox.height / 2;
+
+  await page.mouse.move(sourceX, sourceY);
+  await page.mouse.down();
+  // WebKit/mobile Safari need a longer, steadier hold than Chromium for dnd-kit's PointerSensor to
+  // reliably register activation past the 200ms delay constraint (see CredentialList.tsx/
+  // Sidebar.tsx) — 300ms was enough on Chromium but flaky there.
+  await page.waitForTimeout(500);
+  await page.mouse.move(targetX, targetY, { steps: 20 });
+  await page.waitForTimeout(200);
+  await page.mouse.move(targetX, targetY);
+  await page.waitForTimeout(200);
+  await page.mouse.up();
 }
 
 // Sidebar content exists twice in the DOM on mobile viewports whenever the drawer is open — a

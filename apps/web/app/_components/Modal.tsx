@@ -32,7 +32,7 @@ export function Modal({
     if (!open) return;
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key !== "Escape" && e.key !== "Tab") return;
-      // Guards against a nested modal (MoveCredentialFolderModal inside CredentialsModal): every
+      // Guards against a nested modal (one Modal instance opened inside another): every
       // open Modal instance adds its own `window`-level listener, so without this check, one
       // Escape press would close *both* the inner and outer modal at once (their listeners both
       // fire — `window.addEventListener` has no concept of nesting), and Tab-wrapping in the inner
@@ -45,7 +45,9 @@ export function Modal({
         onClose();
         return;
       }
-      const focusable = [...panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)];
+      const focusable = [
+        ...panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+      ];
       const first = focusable[0];
       const last = focusable.at(-1);
       if (!first || !last) return;
@@ -64,9 +66,11 @@ export function Modal({
   // Move focus into the panel on open, and back to whatever triggered it on close.
   useEffect(() => {
     if (open) {
-      previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
+      previouslyFocusedRef.current =
+        document.activeElement as HTMLElement | null;
       const panel = panelRef.current;
-      const firstFocusable = panel?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
+      const firstFocusable =
+        panel?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
       (firstFocusable ?? panel)?.focus();
     } else {
       previouslyFocusedRef.current?.focus();

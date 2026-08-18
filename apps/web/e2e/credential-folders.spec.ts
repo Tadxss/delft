@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { backToList, signIn, uniqueEmail } from "./helpers";
+import { backToList, dragElementOnto, signIn, uniqueEmail } from "./helpers";
 
 async function setUpVault(page: Page) {
   await page.fill("#workspace-name", "Personal");
@@ -117,7 +117,7 @@ test("nested folders are collapsed by default and expand/collapse controls what'
   ).toBeVisible();
 });
 
-test("move a credential between folders via the edit form, and a folder via the move dialog", async ({
+test("move a credential between folders via the edit form, and a folder via drag-and-drop", async ({
   page,
 }) => {
   await signIn(page, uniqueEmail("credential-folders-move"));
@@ -140,20 +140,59 @@ test("move a credential between folders via the edit form, and a folder via the 
     page.getByRole("button", { name: "Chase", exact: true }),
   ).toBeVisible();
 
-  // Create a second root folder, move "Work" into it via the move dialog.
+  // Create a second root folder, drag "Work" onto it to reparent.
   await createRootFolder(page, "Personal");
-  const workRow = folderRow(page, "Work");
-  await workRow.hover();
-  await workRow.getByRole("button", { name: "Move folder" }).click();
-  await page.selectOption("select >> nth=-1", { label: "Personal" });
-  await page.click('button:has-text("Move")');
-  await expect(
-    page.getByRole("button", { name: "Move", exact: true }),
-  ).not.toBeVisible();
+  await dragElementOnto(page, folderRow(page, "Work"), folderRow(page, "Personal"));
 
   // "Work" is now nested under the (collapsed) "Personal" folder, so it's not visible at root...
   await expect(page.locator("button", { hasText: "Work" })).not.toBeVisible();
   // ...until "Personal" is expanded.
+  await folderRow(page, "Personal")
+    .getByRole("button", { name: "Personal" })
+    .click();
+  await expect(
+    page.locator("button", { hasText: "Work" }).first(),
+  ).toBeVisible();
+  // WebKit/mobile Safari need a longer gap than Chromium between completing one drag and starting
+  // another in the same test, or the second drag's pointer/collision state gets confused with the
+  // first's (observed: the second drag's onDragEnd reported the same `over` id as the first drag,
+  // as if dnd-kit's internal state hadn't fully reset). Moving the pointer to a neutral spot with
+  // no droppable/draggable under it, not just waiting in place, is part of forcing that reset.
+  await page.mouse.move(700, 400);
+  await page.waitForTimeout(1000);
+
+  // Drag "Work" back out to the root drop strip (only rendered while a drag is active).
+  const workRow = folderRow(page, "Work");
+  const workBox = await workRow.boundingBox();
+  if (!workBox) throw new Error('Could not find bounding box for "Work"');
+  await page.mouse.move(workBox.x + workBox.width / 2, workBox.y + workBox.height / 2);
+  await page.mouse.down();
+  await page.waitForTimeout(500);
+  const rootStrip = page.getByText("Move to root");
+  await expect(rootStrip).toBeVisible();
+  const rootStripBox = await rootStrip.boundingBox();
+  if (!rootStripBox) throw new Error('Could not find bounding box for "Move to root"');
+  // Explicit discrete moves with small waits between them, not a single batched
+  // mouse.move(..., { steps }) call — WebKit/mobile Safari's synthetic pointer-event dispatch
+  // appeared to let dnd-kit's collision detection go stale across a second drag in the same test
+  // (onDragEnd kept reporting the first drag's target) unless genuinely separate pointermove events
+  // land with real gaps between them.
+  const dropX = rootStripBox.x + rootStripBox.width / 2;
+  const dropY = rootStripBox.y + rootStripBox.height / 2;
+  const fromX = workBox.x + workBox.width / 2;
+  const fromY = workBox.y + workBox.height / 2;
+  const moveSteps = 8;
+  for (let i = 1; i <= moveSteps; i++) {
+    await page.mouse.move(
+      fromX + ((dropX - fromX) * i) / moveSteps,
+      fromY + ((dropY - fromY) * i) / moveSteps,
+    );
+    await page.waitForTimeout(50);
+  }
+  await page.waitForTimeout(300);
+  await page.mouse.up();
+
+  // Collapse "Personal" — "Work" should still be visible at root, not hidden away inside it.
   await folderRow(page, "Personal")
     .getByRole("button", { name: "Personal" })
     .click();

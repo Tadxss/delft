@@ -1,18 +1,58 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  pointerWithin,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
 import { Folder, FolderPlus, Plus, Search } from "lucide-react";
 import type { Credential, CredentialFolder } from "@delft/types";
 import {
   useCreateCredentialFolder,
   useDeleteCredentialFolder,
   useUpdateCredentialFolder,
+  computeSubtreeIds,
 } from "@delft/shared";
-import { MoveCredentialFolderModal } from "./MoveCredentialFolderModal";
 import {
   CredentialFolderTreeNode,
   CredentialLeafRow,
 } from "./CredentialFolderTreeNode";
+
+// Slim strip at the top of the tree, only visually shown while a drag is active — dropping a
+// folder here moves it to the root level. No natural section-header label to repurpose the way
+// Sidebar.tsx's "Pages" header is (this tree's top bar is search + icon buttons, not safe to
+// swallow as a droppable), so this exists as its own dedicated, always-non-overlapping target
+// instead. Always mounted at a CONSTANT height (never conditionally rendered, and never resized
+// between active/inactive) — only opacity toggles. Two real bugs ruled out this way, not just a
+// style preference:
+//   1. A droppable that only mounts once a drag has already started needs dnd-kit to
+//      register/measure it mid-drag, which was unreliable in WebKit/mobile Safari (the drop would
+//      silently fail to register even though the strip was visibly showing as a valid target).
+//   2. Toggling its HEIGHT (not just opacity) between active/inactive pushes every row below it
+//      down the instant ANY drag starts (not just one headed toward root) — which shifts the
+//      bounding box of whatever row you're actually dragging toward mid-drag, since real pointer
+//      coordinates are computed before that shift happens. A real user, not just a test, would
+//      have felt this as the drop target moving out from under their cursor.
+function RootDropStrip({ active }: { active: boolean }) {
+  const { setNodeRef, isOver } = useDroppable({ id: "credentials-root" });
+  return (
+    <div
+      ref={setNodeRef}
+      className={`mx-1 mb-1 flex h-7 shrink-0 items-center justify-center rounded-md border border-dashed text-xs ${
+        active ? "opacity-100" : "pointer-events-none opacity-0"
+      } ${isOver ? "border-accent-500 bg-paper-200 text-ink-800" : "border-paper-300 text-ink-400"}`}
+    >
+      Move to root
+    </div>
+  );
+}
 
 function buildFolderMaps(folders: CredentialFolder[]) {
   const byParent = new Map<string | null, CredentialFolder[]>();
@@ -59,8 +99,15 @@ export function CredentialList({
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
-  const [movingFolder, setMovingFolder] = useState<CredentialFolder | null>(
-    null,
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [excludedDropIds, setExcludedDropIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const [dragError, setDragError] = useState<string | null>(null);
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { delay: 200, tolerance: 8 },
+    }),
   );
   const renameInputRef = useRef<HTMLInputElement>(null);
   // Track the latest renamingFolderId/renameValue via refs so commitRename can read fresh values
@@ -200,6 +247,49 @@ export function CredentialList({
     [workspaceId, deleteFolder.mutate],
   );
 
+  function handleDragStart(event: DragStartEvent) {
+    const id = String(event.active.id);
+    setDraggingId(id);
+    setExcludedDropIds(computeSubtreeIds(id, folders, (f) => f.parentFolderId));
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    setDraggingId(null);
+    setExcludedDropIds(new Set());
+    if (!over) return;
+
+    const activeId = String(active.id);
+    const overId = String(over.id);
+    if (overId === activeId) return;
+
+    const draggedFolder = folders.find((f) => f.id === activeId);
+    if (!draggedFolder) return;
+
+    const targetParentId = overId === "credentials-root" ? null : overId;
+    if (targetParentId !== null) {
+      const excluded = computeSubtreeIds(
+        activeId,
+        folders,
+        (f) => f.parentFolderId,
+      );
+      if (excluded.has(targetParentId)) return;
+    }
+    if (draggedFolder.parentFolderId === targetParentId) return;
+
+    updateFolder.mutate(
+      { id: activeId, parentFolderId: targetParentId },
+      {
+        onError: (e) => setDragError(e.message),
+        onSuccess: () => setDragError(null),
+      },
+    );
+  }
+
+  const draggingFolder = draggingId
+    ? folders.find((f) => f.id === draggingId)
+    : null;
+
   const rootFolders = foldersByParent.get(null) ?? [];
   const rootCredentials = credentialsByFolder.get(null) ?? [];
   const isEmpty = folders.length === 0 && credentials.length === 0;
@@ -241,27 +331,80 @@ export function CredentialList({
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto py-1">
-        {searching ? (
-          matchedFolders.length === 0 && matchedCredentials.length === 0 ? (
-            <p className="p-3 text-sm text-ink-400">No matches.</p>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={pointerWithin}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+        <div className="flex-1 overflow-y-auto py-1">
+          {dragError && (
+            <p className="px-3 pb-1 text-xs text-red-700">
+              Couldn&apos;t move folder: {dragError}
+            </p>
+          )}
+          {!searching && <RootDropStrip active={draggingId !== null} />}
+          {searching ? (
+            matchedFolders.length === 0 && matchedCredentials.length === 0 ? (
+              <p className="p-3 text-sm text-ink-400">No matches.</p>
+            ) : (
+              <ul>
+                {matchedFolders.map((folder) => (
+                  <li key={folder.id}>
+                    <button
+                      type="button"
+                      onClick={() => revealFolder(folder.id)}
+                      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-ink-800 hover:bg-paper-50"
+                    >
+                      <Folder size={14} className="shrink-0 text-ink-400" />
+                      <span className="truncate font-medium">
+                        {folder.name || "Untitled"}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+                {matchedCredentials.map((credential) => (
+                  <CredentialLeafRow
+                    key={credential.id}
+                    credential={credential}
+                    selectedId={selectedId}
+                    onSelect={onSelect}
+                    depth={0}
+                  />
+                ))}
+              </ul>
+            )
+          ) : isEmpty ? (
+            <p className="px-3 py-1.5 text-sm text-ink-400">
+              No credentials yet.
+            </p>
           ) : (
             <ul>
-              {matchedFolders.map((folder) => (
-                <li key={folder.id}>
-                  <button
-                    type="button"
-                    onClick={() => revealFolder(folder.id)}
-                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-ink-800 hover:bg-paper-50"
-                  >
-                    <Folder size={14} className="shrink-0 text-ink-400" />
-                    <span className="truncate font-medium">
-                      {folder.name || "Untitled"}
-                    </span>
-                  </button>
-                </li>
+              {rootFolders.map((folder) => (
+                <CredentialFolderTreeNode
+                  key={folder.id}
+                  folder={folder}
+                  foldersByParent={foldersByParent}
+                  credentialsByFolder={credentialsByFolder}
+                  expanded={expanded}
+                  excludedDropIds={excludedDropIds}
+                  onToggle={toggle}
+                  onCreateSubfolder={handleNewFolder}
+                  onCreateCredential={handleNewCredential}
+                  selectedId={selectedId}
+                  onSelectCredential={onSelect}
+                  renamingFolderId={renamingFolderId}
+                  renameValue={renameValue}
+                  onRenameChange={setRenameValue}
+                  onCommitRename={commitRename}
+                  onCancelRename={cancelRename}
+                  renameInputRef={renameInputRef}
+                  onStartRename={startRename}
+                  onDelete={handleDeleteFolder}
+                  depth={0}
+                />
               ))}
-              {matchedCredentials.map((credential) => (
+              {rootCredentials.map((credential) => (
                 <CredentialLeafRow
                   key={credential.id}
                   credential={credential}
@@ -271,58 +414,17 @@ export function CredentialList({
                 />
               ))}
             </ul>
-          )
-        ) : isEmpty ? (
-          <p className="px-3 py-1.5 text-sm text-ink-400">
-            No credentials yet.
-          </p>
-        ) : (
-          <ul>
-            {rootFolders.map((folder) => (
-              <CredentialFolderTreeNode
-                key={folder.id}
-                folder={folder}
-                foldersByParent={foldersByParent}
-                credentialsByFolder={credentialsByFolder}
-                expanded={expanded}
-                onToggle={toggle}
-                onCreateSubfolder={handleNewFolder}
-                onCreateCredential={handleNewCredential}
-                selectedId={selectedId}
-                onSelectCredential={onSelect}
-                renamingFolderId={renamingFolderId}
-                renameValue={renameValue}
-                onRenameChange={setRenameValue}
-                onCommitRename={commitRename}
-                onCancelRename={cancelRename}
-                renameInputRef={renameInputRef}
-                onStartRename={startRename}
-                onMove={setMovingFolder}
-                onDelete={handleDeleteFolder}
-                depth={0}
-              />
-            ))}
-            {rootCredentials.map((credential) => (
-              <CredentialLeafRow
-                key={credential.id}
-                credential={credential}
-                selectedId={selectedId}
-                onSelect={onSelect}
-                depth={0}
-              />
-            ))}
-          </ul>
-        )}
-      </div>
-
-      {movingFolder && (
-        <MoveCredentialFolderModal
-          folder={movingFolder}
-          folders={folders}
-          open={true}
-          onClose={() => setMovingFolder(null)}
-        />
-      )}
+          )}
+          <DragOverlay>
+            {draggingFolder && (
+              <div className="flex items-center gap-1.5 rounded-md border border-paper-200 bg-paper-50 px-2 py-1 text-sm text-ink-800 shadow-lg">
+                <Folder size={14} className="shrink-0 text-ink-400" />
+                {draggingFolder.name || "Untitled"}
+              </div>
+            )}
+          </DragOverlay>
+        </div>
+      </DndContext>
     </div>
   );
 }

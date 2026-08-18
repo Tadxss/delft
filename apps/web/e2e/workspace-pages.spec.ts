@@ -1,7 +1,15 @@
 import { test, expect } from "@playwright/test";
-import { onlyVisible, openSidebar, signIn, uniqueEmail } from "./helpers";
+import {
+  dragElementOnto,
+  onlyVisible,
+  openSidebar,
+  signIn,
+  uniqueEmail,
+} from "./helpers";
 
-test("create a workspace, create nested pages, edit content, and confirm autosave persists", async ({ page }) => {
+test("create a workspace, create nested pages, edit content, and confirm autosave persists", async ({
+  page,
+}) => {
   await signIn(page, uniqueEmail("workspace-crud"));
 
   // Create workspace
@@ -12,7 +20,9 @@ test("create a workspace, create nested pages, edit content, and confirm autosav
   // Create a root page via the sidebar "+"
   await openSidebar(page);
   await page.click('button[aria-label="New page"]:visible');
-  await page.waitForURL(/\/workspace\/[^/]+--[^/]+\/p\/[^/]+$/, { timeout: 15000 });
+  await page.waitForURL(/\/workspace\/[^/]+--[^/]+\/p\/[^/]+$/, {
+    timeout: 15000,
+  });
 
   // Title
   const titleInput = page.locator('input[placeholder="Untitled"]');
@@ -28,12 +38,16 @@ test("create a workspace, create nested pages, edit content, and confirm autosav
 
   // Reload and confirm both title and content survived the round trip through Postgres
   await page.reload();
-  await expect(page.locator('input[placeholder="Untitled"]')).toHaveValue("Meeting notes");
+  await expect(page.locator('input[placeholder="Untitled"]')).toHaveValue(
+    "Meeting notes",
+  );
   await expect(page.getByText("First line of real content.")).toBeVisible();
 
   // The saved page should also now show its title in the sidebar tree instead of "Untitled"
   await openSidebar(page);
-  const pageLink = onlyVisible(page.getByRole("link", { name: "Meeting notes" }));
+  const pageLink = onlyVisible(
+    page.getByRole("link", { name: "Meeting notes" }),
+  );
   await expect(pageLink).toBeVisible();
 
   // Create a nested sub-page from the tree node's hover "+" control
@@ -46,7 +60,9 @@ test("create a workspace, create nested pages, edit content, and confirm autosav
   // instead of waiting for the actual navigation to the new sub-page — require the URL to
   // genuinely change.
   await page.waitForURL(
-    (url) => url.href !== urlBeforeSubPage && /\/workspace\/[^/]+--[^/]+\/p\/[^/]+$/.test(url.pathname),
+    (url) =>
+      url.href !== urlBeforeSubPage &&
+      /\/workspace\/[^/]+--[^/]+\/p\/[^/]+$/.test(url.pathname),
     { timeout: 15000 },
   );
   await page.locator('input[placeholder="Untitled"]').fill("Sub-page");
@@ -56,7 +72,9 @@ test("create a workspace, create nested pages, edit content, and confirm autosav
   // state is client-only and resets on reload, unlike the tree structure/titles themselves.
   await page.reload();
   await openSidebar(page);
-  await onlyVisible(page.getByRole("button", { name: "Expand" })).first().click();
+  await onlyVisible(page.getByRole("button", { name: "Expand" }))
+    .first()
+    .click();
   const subPageLink = onlyVisible(page.getByRole("link", { name: "Sub-page" }));
   await expect(subPageLink).toBeVisible();
 
@@ -71,7 +89,9 @@ test("create a workspace, create nested pages, edit content, and confirm autosav
   const urlBeforeGrandchild = page.url();
   await subPageTreeNode.getByRole("button", { name: "Add sub-page" }).click();
   await page.waitForURL(
-    (url) => url.href !== urlBeforeGrandchild && /\/workspace\/[^/]+--[^/]+\/p\/[^/]+$/.test(url.pathname),
+    (url) =>
+      url.href !== urlBeforeGrandchild &&
+      /\/workspace\/[^/]+--[^/]+\/p\/[^/]+$/.test(url.pathname),
     { timeout: 15000 },
   );
   await page.locator('input[placeholder="Untitled"]').fill("Grandchild");
@@ -83,15 +103,23 @@ test("create a workspace, create nested pages, edit content, and confirm autosav
   // Desktop's Sidebar instance is never unmounted (just CSS-hidden below `md`), so its expand
   // state already survived the navigation and these re-expands are correctly skipped there.
   await openSidebar(page);
-  const meetingNotesRow = onlyVisible(page.getByRole("link", { name: "Meeting notes" })).locator("..");
-  if (await meetingNotesRow.getByRole("button", { name: "Expand" }).isVisible()) {
+  const meetingNotesRow = onlyVisible(
+    page.getByRole("link", { name: "Meeting notes" }),
+  ).locator("..");
+  if (
+    await meetingNotesRow.getByRole("button", { name: "Expand" }).isVisible()
+  ) {
     await meetingNotesRow.getByRole("button", { name: "Expand" }).click();
   }
-  const subPageRow = onlyVisible(page.getByRole("link", { name: "Sub-page" })).locator("..");
+  const subPageRow = onlyVisible(
+    page.getByRole("link", { name: "Sub-page" }),
+  ).locator("..");
   if (await subPageRow.getByRole("button", { name: "Expand" }).isVisible()) {
     await subPageRow.getByRole("button", { name: "Expand" }).click();
   }
-  const grandchildLink = onlyVisible(page.getByRole("link", { name: "Grandchild" }));
+  const grandchildLink = onlyVisible(
+    page.getByRole("link", { name: "Grandchild" }),
+  );
   await expect(grandchildLink).toBeVisible();
 
   // Pure click, no data change alongside it — this is the exact path that was broken.
@@ -99,4 +127,62 @@ test("create a workspace, create nested pages, edit content, and confirm autosav
   await expect(grandchildLink).not.toBeVisible();
   await subPageRow.getByRole("button", { name: "Expand" }).click();
   await expect(grandchildLink).toBeVisible();
+});
+
+test("drag-and-drop reparents pages, including moving one back to root", async ({ page }) => {
+  await signIn(page, uniqueEmail("workspace-dnd"));
+
+  await page.fill("#workspace-name", "Personal");
+  await page.click('button:has-text("Create")');
+  await page.waitForURL(/\/workspace\/[^/]+--[^/]+$/, { timeout: 15000 });
+
+  // Two root pages. Each "New page" click while already on a /p/[id] URL needs a "the URL must
+  // actually change" wait, not a bare pattern match — see the sub-page creation above for why a
+  // plain waitForURL resolves instantly against whatever /p/[id] URL we're already on.
+  await openSidebar(page);
+  let urlBeforeNewPage = page.url();
+  await page.click('button[aria-label="New page"]:visible');
+  await page.waitForURL(
+    (url) =>
+      url.href !== urlBeforeNewPage &&
+      /\/workspace\/[^/]+--[^/]+\/p\/[^/]+$/.test(url.pathname),
+    { timeout: 15000 },
+  );
+  await page.locator('input[placeholder="Untitled"]').fill("Notes");
+  await page.waitForTimeout(1500);
+
+  await openSidebar(page);
+  urlBeforeNewPage = page.url();
+  await page.click('button[aria-label="New page"]:visible');
+  await page.waitForURL(
+    (url) =>
+      url.href !== urlBeforeNewPage &&
+      /\/workspace\/[^/]+--[^/]+\/p\/[^/]+$/.test(url.pathname),
+    { timeout: 15000 },
+  );
+  await page.locator('input[placeholder="Untitled"]').fill("Archive");
+  await page.waitForTimeout(1500);
+
+  await openSidebar(page);
+  const notesLink = onlyVisible(page.getByRole("link", { name: "Notes" }));
+  const archiveLink = onlyVisible(page.getByRole("link", { name: "Archive" }));
+  await expect(notesLink).toBeVisible();
+  await expect(archiveLink).toBeVisible();
+
+  // Drag "Notes" onto "Archive" to reparent it.
+  await dragElementOnto(page, notesLink.locator(".."), archiveLink.locator(".."));
+
+  // "Notes" is no longer a root page — until "Archive" is expanded to reveal it as a child.
+  // Scoped to Archive's own row for the same reason noted below on the later Collapse click.
+  await expect(onlyVisible(page.getByRole("link", { name: "Notes" }))).not.toBeVisible();
+  await archiveLink.locator("..").getByRole("button", { name: "Expand", exact: true }).click();
+  const nestedNotesLink = onlyVisible(page.getByRole("link", { name: "Notes" }));
+  await expect(nestedNotesLink).toBeVisible();
+
+  // Drag it back onto the "Pages" section header to move it back to root. Once this lands,
+  // "Notes" is visible directly as a root page — no need to touch "Archive" at all, and in fact
+  // its own expand/collapse toggle disappears once it has no children left to show.
+  const pagesHeader = onlyVisible(page.getByText("Pages", { exact: true })).locator("..");
+  await dragElementOnto(page, nestedNotesLink.locator(".."), pagesHeader);
+  await expect(onlyVisible(page.getByRole("link", { name: "Notes" }))).toBeVisible();
 });

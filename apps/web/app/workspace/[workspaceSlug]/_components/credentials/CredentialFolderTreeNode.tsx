@@ -1,11 +1,11 @@
 "use client";
 
-import { memo, type RefObject } from "react";
+import { memo, useCallback, type RefObject } from "react";
+import { useDraggable, useDroppable } from "@dnd-kit/core";
 import {
   ChevronDown,
   ChevronRight,
   Folder,
-  FolderInput,
   FolderPlus,
   KeyRound,
   Pencil,
@@ -54,6 +54,10 @@ export interface CredentialFolderTreeNodeProps {
   foldersByParent: Map<string | null, CredentialFolder[]>;
   credentialsByFolder: Map<string | null, Credential[]>;
   expanded: Set<string>;
+  // Ids that can't be a valid drop target for whatever folder is currently being dragged (its own
+  // id plus every descendant) — computed once per drag session, see CredentialList.tsx. Empty when
+  // nothing is being dragged.
+  excludedDropIds: Set<string>;
   onToggle: (folderId: string) => void;
   onCreateSubfolder: (parentFolderId: string) => void;
   onCreateCredential: (folderId: string) => void;
@@ -66,7 +70,6 @@ export interface CredentialFolderTreeNodeProps {
   onCancelRename: () => void;
   renameInputRef: RefObject<HTMLInputElement | null>;
   onStartRename: (folder: CredentialFolder) => void;
-  onMove: (folder: CredentialFolder) => void;
   onDelete: (folder: CredentialFolder) => void;
   depth: number;
 }
@@ -79,6 +82,7 @@ function CredentialFolderTreeNodeImpl({
   foldersByParent,
   credentialsByFolder,
   expanded,
+  excludedDropIds,
   onToggle,
   onCreateSubfolder,
   onCreateCredential,
@@ -91,7 +95,6 @@ function CredentialFolderTreeNodeImpl({
   onCancelRename,
   renameInputRef,
   onStartRename,
-  onMove,
   onDelete,
   depth,
 }: CredentialFolderTreeNodeProps) {
@@ -100,6 +103,25 @@ function CredentialFolderTreeNodeImpl({
   const hasChildren = subFolders.length > 0 || ownCredentials.length > 0;
   const isExpanded = expanded.has(folder.id);
   const isRenaming = renamingFolderId === folder.id;
+
+  // Row is both the drag source and a drop target — same pattern/rationale as PageTreeNode.tsx.
+  const {
+    listeners,
+    setNodeRef: setDragRef,
+    isDragging,
+  } = useDraggable({ id: folder.id });
+  const { setNodeRef: setDropRef, isOver } = useDroppable({
+    id: folder.id,
+    disabled: excludedDropIds.has(folder.id),
+  });
+  const setRowRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      setDragRef(node);
+      setDropRef(node);
+    },
+    [setDragRef, setDropRef],
+  );
+  const isValidDropTarget = isOver && !excludedDropIds.has(folder.id);
 
   return (
     <li>
@@ -119,7 +141,11 @@ function CredentialFolderTreeNodeImpl({
         />
       ) : (
         <div
-          className="group flex items-center gap-1 rounded-md py-1 pr-1 text-sm text-ink-700 hover:bg-paper-100"
+          ref={setRowRef}
+          {...listeners}
+          className={`group flex items-center gap-1 rounded-md py-1 pr-1 text-sm text-ink-700 hover:bg-paper-100 ${
+            isDragging ? "opacity-40" : ""
+          } ${isValidDropTarget ? "bg-paper-200 ring-2 ring-inset ring-accent-500" : ""}`}
           style={{ paddingLeft: depth * 14 + 4 }}
         >
           <button
@@ -132,7 +158,11 @@ function CredentialFolderTreeNodeImpl({
                 hasChildren ? "" : "invisible"
               }`}
             >
-              {isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+              {isExpanded ? (
+                <ChevronDown size={13} />
+              ) : (
+                <ChevronRight size={13} />
+              )}
             </span>
             <Folder size={14} className="shrink-0 text-ink-400" />
             <span className="min-w-0 flex-1 truncate font-medium">
@@ -169,15 +199,6 @@ function CredentialFolderTreeNodeImpl({
             </button>
             <button
               type="button"
-              onClick={() => onMove(folder)}
-              aria-label="Move folder"
-              title="Move"
-              className="rounded-md p-1.5 text-ink-400 hover:bg-paper-200 hover:text-ink-800"
-            >
-              <FolderInput size={13} />
-            </button>
-            <button
-              type="button"
               onClick={() => onDelete(folder)}
               aria-label="Delete folder"
               title="Delete"
@@ -197,6 +218,7 @@ function CredentialFolderTreeNodeImpl({
               foldersByParent={foldersByParent}
               credentialsByFolder={credentialsByFolder}
               expanded={expanded}
+              excludedDropIds={excludedDropIds}
               onToggle={onToggle}
               onCreateSubfolder={onCreateSubfolder}
               onCreateCredential={onCreateCredential}
@@ -209,7 +231,6 @@ function CredentialFolderTreeNodeImpl({
               onCancelRename={onCancelRename}
               renameInputRef={renameInputRef}
               onStartRename={onStartRename}
-              onMove={onMove}
               onDelete={onDelete}
               depth={depth + 1}
             />
@@ -238,6 +259,7 @@ function areCredentialFolderTreeNodePropsEqual(
     prev.foldersByParent === next.foldersByParent &&
     prev.credentialsByFolder === next.credentialsByFolder &&
     prev.expanded === next.expanded &&
+    prev.excludedDropIds === next.excludedDropIds &&
     prev.onToggle === next.onToggle &&
     prev.onCreateSubfolder === next.onCreateSubfolder &&
     prev.onCreateCredential === next.onCreateCredential &&
@@ -250,7 +272,6 @@ function areCredentialFolderTreeNodePropsEqual(
     prev.onCancelRename === next.onCancelRename &&
     prev.renameInputRef === next.renameInputRef &&
     prev.onStartRename === next.onStartRename &&
-    prev.onMove === next.onMove &&
     prev.onDelete === next.onDelete &&
     prev.depth === next.depth
     // `expanded` IS compared here (unlike an earlier version of this file) — excluding it broke

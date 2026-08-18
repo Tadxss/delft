@@ -1,16 +1,25 @@
 "use client";
 
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { ChevronDown, ChevronRight, MoreHorizontal, Plus } from "lucide-react";
 import type { Page } from "@delft/types";
-import { parseWorkspaceSlug, useDeletePage, useUpdatePage } from "@delft/shared";
+import {
+  parseWorkspaceSlug,
+  useDeletePage,
+  useUpdatePage,
+} from "@delft/shared";
 
 export interface PageTreeNodeProps {
   page: Page;
   childrenByParent: Map<string | null, Page[]>;
   expanded: Set<string>;
+  // Ids that can't be a valid drop target for whatever page is currently being dragged (its own id
+  // plus every descendant) — computed once per drag session, see Sidebar.tsx. Empty when nothing is
+  // being dragged.
+  excludedDropIds: Set<string>;
   onToggle: (pageId: string) => void;
   onCreateChild: (parentId: string) => void;
   depth: number;
@@ -20,6 +29,7 @@ function PageTreeNodeImpl({
   page,
   childrenByParent,
   expanded,
+  excludedDropIds,
   onToggle,
   onCreateChild,
   depth,
@@ -33,6 +43,29 @@ function PageTreeNodeImpl({
   const hasChildren = children.length > 0;
   const isExpanded = expanded.has(page.id);
   const isActive = params.pageId === page.id;
+
+  // Row is both the drag source (grab any page to move it) and a drop target (drop another page
+  // onto it to reparent). `listeners` alone (not `attributes`, which adds a role="button"/tabIndex
+  // meant for a keyboard-drag story this app doesn't implement) goes on the row — see Sidebar.tsx
+  // for the PointerSensor's delay+tolerance activation constraint that keeps ordinary clicks on the
+  // Link/buttons below working normally.
+  const {
+    listeners,
+    setNodeRef: setDragRef,
+    isDragging,
+  } = useDraggable({ id: page.id });
+  const { setNodeRef: setDropRef, isOver } = useDroppable({
+    id: page.id,
+    disabled: excludedDropIds.has(page.id),
+  });
+  const setRowRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      setDragRef(node);
+      setDropRef(node);
+    },
+    [setDragRef, setDropRef],
+  );
+  const isValidDropTarget = isOver && !excludedDropIds.has(page.id);
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
@@ -50,7 +83,8 @@ function PageTreeNodeImpl({
   useEffect(() => {
     if (!menuOpen) return;
     function handleClickOutside(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+      if (menuRef.current && !menuRef.current.contains(e.target as Node))
+        setMenuOpen(false);
     }
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") setMenuOpen(false);
@@ -98,8 +132,14 @@ function PageTreeNodeImpl({
   return (
     <li>
       <div
+        ref={setRowRef}
+        {...listeners}
         className={`group flex items-center gap-1 rounded-md px-1 py-1 text-sm hover:bg-paper-100 ${
           isActive ? "bg-paper-100 font-medium text-ink-800" : "text-ink-600"
+        } ${isDragging ? "opacity-40" : ""} ${
+          isValidDropTarget
+            ? "bg-paper-200 ring-2 ring-inset ring-accent-500"
+            : ""
         }`}
         style={{ paddingLeft: depth * 14 + 4 }}
       >
@@ -192,6 +232,7 @@ function PageTreeNodeImpl({
               page={child}
               childrenByParent={childrenByParent}
               expanded={expanded}
+              excludedDropIds={excludedDropIds}
               onToggle={onToggle}
               onCreateChild={onCreateChild}
               depth={depth + 1}
@@ -203,11 +244,15 @@ function PageTreeNodeImpl({
   );
 }
 
-function arePageTreeNodePropsEqual(prev: PageTreeNodeProps, next: PageTreeNodeProps): boolean {
+function arePageTreeNodePropsEqual(
+  prev: PageTreeNodeProps,
+  next: PageTreeNodeProps,
+): boolean {
   return (
     prev.page === next.page &&
     prev.childrenByParent === next.childrenByParent &&
     prev.expanded === next.expanded &&
+    prev.excludedDropIds === next.excludedDropIds &&
     prev.onToggle === next.onToggle &&
     prev.onCreateChild === next.onCreateChild &&
     prev.depth === next.depth
