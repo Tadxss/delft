@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -71,10 +72,16 @@ export function VaultKeyProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  // This provider wraps the entire authenticated app (apps/web/app/workspace/layout.tsx), so a
+  // fresh value object every render would re-render every useVaultKey() consumer on any change
+  // here, whether or not their own workspace's unlock state changed.
+  const value = useMemo(
+    () => ({ isUnlocked, getKey, unlock, setKey, lock }),
+    [isUnlocked, getKey, unlock, setKey, lock],
+  );
+
   return (
-    <VaultKeyContext.Provider
-      value={{ isUnlocked, getKey, unlock, setKey, lock }}
-    >
+    <VaultKeyContext.Provider value={value}>
       {children}
     </VaultKeyContext.Provider>
   );

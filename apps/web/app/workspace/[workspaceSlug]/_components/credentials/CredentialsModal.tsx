@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { X } from "lucide-react";
 import {
   useCredentialFolders,
@@ -79,10 +79,10 @@ export function CredentialsModal({
     onClose();
   }
 
-  function handleNewCredential(folderId: string | null) {
+  const handleNewCredential = useCallback((folderId: string | null) => {
     setNewCredentialFolderId(folderId);
     setSelectedId("new");
-  }
+  }, []);
 
   const selectedCredential =
     selectedId && selectedId !== "new"

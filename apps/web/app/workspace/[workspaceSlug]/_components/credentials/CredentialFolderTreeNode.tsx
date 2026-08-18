@@ -1,6 +1,6 @@
 "use client";
 
-import type { RefObject } from "react";
+import { memo, type RefObject } from "react";
 import type { Credential, CredentialFolder } from "@delft/types";
 
 function FolderIcon() {
@@ -150,7 +150,10 @@ export interface CredentialFolderTreeNodeProps {
   folder: CredentialFolder;
   foldersByParent: Map<string | null, CredentialFolder[]>;
   credentialsByFolder: Map<string | null, Credential[]>;
+  // Kept for the recursive sub-folder map below — deliberately excluded from
+  // areCredentialFolderTreeNodePropsEqual, same rationale as PageTreeNode.tsx.
   expanded: Set<string>;
+  isExpanded: boolean;
   onToggle: (folderId: string) => void;
   onCreateSubfolder: (parentFolderId: string) => void;
   onCreateCredential: (folderId: string) => void;
@@ -171,11 +174,12 @@ export interface CredentialFolderTreeNodeProps {
 // Mirrors PageTreeNode.tsx's shape (same indentation formula, same hover-reveal pattern) — the one
 // difference is a folder here can hold two kinds of children instead of one: more folders
 // (recursed as more tree nodes) and credentials (rendered as plain leaf rows, no expand toggle).
-export function CredentialFolderTreeNode({
+function CredentialFolderTreeNodeImpl({
   folder,
   foldersByParent,
   credentialsByFolder,
   expanded,
+  isExpanded,
   onToggle,
   onCreateSubfolder,
   onCreateCredential,
@@ -195,7 +199,6 @@ export function CredentialFolderTreeNode({
   const subFolders = foldersByParent.get(folder.id) ?? [];
   const ownCredentials = credentialsByFolder.get(folder.id) ?? [];
   const hasChildren = subFolders.length > 0 || ownCredentials.length > 0;
-  const isExpanded = expanded.has(folder.id);
   const isRenaming = renamingFolderId === folder.id;
 
   return (
@@ -294,6 +297,7 @@ export function CredentialFolderTreeNode({
               foldersByParent={foldersByParent}
               credentialsByFolder={credentialsByFolder}
               expanded={expanded}
+              isExpanded={expanded.has(sub.id)}
               onToggle={onToggle}
               onCreateSubfolder={onCreateSubfolder}
               onCreateCredential={onCreateCredential}
@@ -325,3 +329,37 @@ export function CredentialFolderTreeNode({
     </li>
   );
 }
+
+function areCredentialFolderTreeNodePropsEqual(
+  prev: CredentialFolderTreeNodeProps,
+  next: CredentialFolderTreeNodeProps,
+): boolean {
+  return (
+    prev.folder === next.folder &&
+    prev.foldersByParent === next.foldersByParent &&
+    prev.credentialsByFolder === next.credentialsByFolder &&
+    prev.isExpanded === next.isExpanded &&
+    prev.onToggle === next.onToggle &&
+    prev.onCreateSubfolder === next.onCreateSubfolder &&
+    prev.onCreateCredential === next.onCreateCredential &&
+    prev.selectedId === next.selectedId &&
+    prev.onSelectCredential === next.onSelectCredential &&
+    prev.renamingFolderId === next.renamingFolderId &&
+    prev.renameValue === next.renameValue &&
+    prev.onRenameChange === next.onRenameChange &&
+    prev.onCommitRename === next.onCommitRename &&
+    prev.onCancelRename === next.onCancelRename &&
+    prev.renameInputRef === next.renameInputRef &&
+    prev.onStartRename === next.onStartRename &&
+    prev.onMove === next.onMove &&
+    prev.onDelete === next.onDelete &&
+    prev.depth === next.depth
+    // `expanded` (the raw Set) is deliberately excluded — same rationale as PageTreeNode.tsx.
+  );
+}
+
+export const CredentialFolderTreeNode = memo(
+  CredentialFolderTreeNodeImpl,
+  areCredentialFolderTreeNodePropsEqual,
+);
+CredentialFolderTreeNodeImpl.displayName = "CredentialFolderTreeNode";

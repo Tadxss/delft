@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Credential, CredentialFolder } from "@delft/types";
 import {
   useCreateCredentialFolder,
@@ -82,6 +82,14 @@ export function CredentialList({
     null,
   );
   const renameInputRef = useRef<HTMLInputElement>(null);
+  // Track the latest renamingFolderId/renameValue via refs so commitRename can read fresh values
+  // without needing them in its own dependency array — renameValue changes on every keystroke,
+  // and commitRename is passed unconditionally to every tree node, so a deps-driven identity
+  // change there would reopen the exact re-render fan-out this file's memoization otherwise fixes.
+  const renamingFolderIdRef = useRef(renamingFolderId);
+  renamingFolderIdRef.current = renamingFolderId;
+  const renameValueRef = useRef(renameValue);
+  renameValueRef.current = renameValue;
 
   const createFolder = useCreateCredentialFolder();
   const updateFolder = useUpdateCredentialFolder();
@@ -116,14 +124,14 @@ export function CredentialList({
       )
     : [];
 
-  function toggle(folderId: string) {
+  const toggle = useCallback((folderId: string) => {
     setExpanded((prev) => {
       const next = new Set(prev);
       if (next.has(folderId)) next.delete(folderId);
       else next.add(folderId);
       return next;
     });
-  }
+  }, []);
 
   // Expands a folder and every one of its ancestors — used to reveal a search result in the tree.
   function revealFolder(folderId: string) {
@@ -141,51 +149,75 @@ export function CredentialList({
     });
   }
 
-  function handleNewFolder(parentFolderId: string | null) {
-    createFolder.mutate(
-      { workspaceId, parentFolderId, name: "New folder" },
-      {
-        onSuccess: (folder) => {
-          if (parentFolderId) {
-            setExpanded((prev) => new Set(prev).add(parentFolderId));
-          }
-          setRenamingFolderId(folder.id);
-          setRenameValue(folder.name);
+  const handleNewFolder = useCallback(
+    (parentFolderId: string | null) => {
+      createFolder.mutate(
+        { workspaceId, parentFolderId, name: "New folder" },
+        {
+          onSuccess: (folder) => {
+            if (parentFolderId) {
+              setExpanded((prev) => new Set(prev).add(parentFolderId));
+            }
+            setRenamingFolderId(folder.id);
+            setRenameValue(folder.name);
+          },
         },
-      },
-    );
-  }
+      );
+    },
+    // createFolder.mutate is stable across renders (TanStack Query guarantee); the wrapping
+    // createFolder object isn't, so depending on it would give this callback a new identity every
+    // render and defeat the memoization CredentialFolderTreeNode relies on to skip re-rendering.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [workspaceId, createFolder.mutate],
+  );
 
-  function handleNewCredential(folderId: string | null) {
-    if (folderId) setExpanded((prev) => new Set(prev).add(folderId));
-    onNewCredential(folderId);
-  }
+  const handleNewCredential = useCallback(
+    (folderId: string | null) => {
+      if (folderId) setExpanded((prev) => new Set(prev).add(folderId));
+      onNewCredential(folderId);
+    },
+    [onNewCredential],
+  );
 
-  function startRename(folder: CredentialFolder) {
+  const startRename = useCallback((folder: CredentialFolder) => {
     setRenamingFolderId(folder.id);
     setRenameValue(folder.name);
-  }
+  }, []);
 
-  function commitRename() {
-    if (renamingFolderId) {
+  const commitRename = useCallback(() => {
+    const id = renamingFolderIdRef.current;
+    if (id) {
       updateFolder.mutate({
-        id: renamingFolderId,
-        name: renameValue.trim() || "Untitled",
+        id,
+        name: renameValueRef.current.trim() || "Untitled",
       });
     }
     setRenamingFolderId(null);
-  }
+    // updateFolder.mutate is stable across renders (TanStack Query guarantee); the wrapping
+    // updateFolder object isn't, so depending on it would give this callback a new identity every
+    // render and defeat the memoization CredentialFolderTreeNode relies on to skip re-rendering.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [updateFolder.mutate]);
 
-  function handleDeleteFolder(folder: CredentialFolder) {
-    if (
-      !window.confirm(
-        `Delete "${folder.name || "this folder"}"? Credentials inside will move to the root level; empty subfolders will be deleted.`,
-      )
-    ) {
-      return;
-    }
-    deleteFolder.mutate({ id: folder.id, workspaceId });
-  }
+  const cancelRename = useCallback(() => setRenamingFolderId(null), []);
+
+  const handleDeleteFolder = useCallback(
+    (folder: CredentialFolder) => {
+      if (
+        !window.confirm(
+          `Delete "${folder.name || "this folder"}"? Credentials inside will move to the root level; empty subfolders will be deleted.`,
+        )
+      ) {
+        return;
+      }
+      deleteFolder.mutate({ id: folder.id, workspaceId });
+    },
+    // deleteFolder.mutate is stable across renders (TanStack Query guarantee); the wrapping
+    // deleteFolder object isn't, so depending on it would give this callback a new identity every
+    // render and defeat the memoization CredentialFolderTreeNode relies on to skip re-rendering.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [workspaceId, deleteFolder.mutate],
+  );
 
   const rootFolders = foldersByParent.get(null) ?? [];
   const rootCredentials = credentialsByFolder.get(null) ?? [];
@@ -265,6 +297,7 @@ export function CredentialList({
                 foldersByParent={foldersByParent}
                 credentialsByFolder={credentialsByFolder}
                 expanded={expanded}
+                isExpanded={expanded.has(folder.id)}
                 onToggle={toggle}
                 onCreateSubfolder={handleNewFolder}
                 onCreateCredential={handleNewCredential}
@@ -274,7 +307,7 @@ export function CredentialList({
                 renameValue={renameValue}
                 onRenameChange={setRenameValue}
                 onCommitRename={commitRename}
-                onCancelRename={() => setRenamingFolderId(null)}
+                onCancelRename={cancelRename}
                 renameInputRef={renameInputRef}
                 onStartRename={startRename}
                 onMove={setMovingFolder}
