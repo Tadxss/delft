@@ -10,6 +10,7 @@ export interface UpdateCredentialFolderInput {
   id: string;
   name?: string;
   parentFolderId?: string | null;
+  position?: number;
 }
 
 // Rename and move are the same operation here, same as useUpdatePage folding title/content/parentId
@@ -23,10 +24,11 @@ export function useUpdateCredentialFolder() {
   const queryClient = useQueryClient();
 
   return useMutation<CredentialFolder, Error, UpdateCredentialFolderInput>({
-    mutationFn: async ({ id, name, parentFolderId }) => {
+    mutationFn: async ({ id, name, parentFolderId, position }) => {
       const patch: CredentialFoldersUpdate = {};
       if (name !== undefined) patch.name = name;
       if (parentFolderId !== undefined) patch.parent_folder_id = parentFolderId;
+      if (position !== undefined) patch.position = position;
 
       const { data, error } = await supabase
         .from("credential_folders")

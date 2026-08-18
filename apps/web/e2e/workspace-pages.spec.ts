@@ -1,11 +1,28 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import {
   dragElementOnto,
   onlyVisible,
   openSidebar,
+  reorderStripBefore,
   signIn,
   uniqueEmail,
 } from "./helpers";
+
+// Creates a root page via the sidebar "+" and commits a title — shared by the reorder test below,
+// which needs several root pages created in a known order.
+async function createRootPage(page: Page, title: string): Promise<void> {
+  await openSidebar(page);
+  const urlBefore = page.url();
+  await page.click('button[aria-label="New page"]:visible');
+  await page.waitForURL(
+    (url) =>
+      url.href !== urlBefore &&
+      /\/workspace\/[^/]+--[^/]+\/p\/[^/]+$/.test(url.pathname),
+    { timeout: 15000 },
+  );
+  await page.locator('input[placeholder="Untitled"]').fill(title);
+  await page.waitForTimeout(1500);
+}
 
 test("create a workspace, create nested pages, edit content, and confirm autosave persists", async ({
   page,
@@ -185,4 +202,123 @@ test("drag-and-drop reparents pages, including moving one back to root", async (
   const pagesHeader = onlyVisible(page.getByText("Pages", { exact: true })).locator("..");
   await dragElementOnto(page, nestedNotesLink.locator(".."), pagesHeader);
   await expect(onlyVisible(page.getByRole("link", { name: "Notes" }))).toBeVisible();
+});
+
+test("drag-and-drop reorders sibling pages, at root and nested", async ({ page }) => {
+  await signIn(page, uniqueEmail("workspace-reorder"));
+
+  await page.fill("#workspace-name", "Personal");
+  await page.click('button:has-text("Create")');
+  await page.waitForURL(/\/workspace\/[^/]+--[^/]+$/, { timeout: 15000 });
+
+  // Three root pages, created (and thus initially ordered) Alpha, Beta, Gamma.
+  await createRootPage(page, "Alpha");
+  await createRootPage(page, "Beta");
+  await createRootPage(page, "Gamma");
+
+  await openSidebar(page);
+  const alphaLink = onlyVisible(page.getByRole("link", { name: "Alpha" }));
+  const betaLink = onlyVisible(page.getByRole("link", { name: "Beta" }));
+  const gammaLink = onlyVisible(page.getByRole("link", { name: "Gamma" }));
+  await expect(alphaLink).toBeVisible();
+  await expect(betaLink).toBeVisible();
+  await expect(gammaLink).toBeVisible();
+
+  const initialAlpha = await alphaLink.boundingBox();
+  const initialBeta = await betaLink.boundingBox();
+  const initialGamma = await gammaLink.boundingBox();
+  if (!initialAlpha || !initialBeta || !initialGamma) {
+    throw new Error("Could not find bounding boxes for root pages");
+  }
+  expect(initialAlpha.y).toBeLessThan(initialBeta.y);
+  expect(initialBeta.y).toBeLessThan(initialGamma.y);
+
+  // Drag "Gamma" onto the strip right before "Alpha" — moves it to the very front.
+  await dragElementOnto(
+    page,
+    gammaLink.locator(".."),
+    reorderStripBefore(alphaLink),
+  );
+  // No optimistic update (deliberate, matches every other mutation in this app) — the reordered
+  // position only appears once the invalidate-and-refetch round trip lands, not the instant the
+  // drop event fires.
+  await page.waitForTimeout(600);
+
+  const afterAlpha = await alphaLink.boundingBox();
+  const afterBeta = await betaLink.boundingBox();
+  const afterGamma = await gammaLink.boundingBox();
+  if (!afterAlpha || !afterBeta || !afterGamma) {
+    throw new Error("Could not find bounding boxes for root pages after drag");
+  }
+  expect(afterGamma.y).toBeLessThan(afterAlpha.y);
+  expect(afterAlpha.y).toBeLessThan(afterBeta.y);
+
+  // Same drag interaction reordering two NESTED siblings (children of one parent), not just root
+  // pages — the reorder strips are rendered recursively by PageTreeNode itself, not just Sidebar's
+  // root list, so this exercises a different code path than the root-level drag above.
+  await page.mouse.move(700, 400);
+  await page.waitForTimeout(500);
+
+  const alphaRow = alphaLink.locator("..");
+  await alphaRow.hover();
+  const urlBeforeChild1 = page.url();
+  await alphaRow.getByRole("button", { name: "Add sub-page" }).click();
+  await page.waitForURL(
+    (url) =>
+      url.href !== urlBeforeChild1 &&
+      /\/workspace\/[^/]+--[^/]+\/p\/[^/]+$/.test(url.pathname),
+    { timeout: 15000 },
+  );
+  await page.locator('input[placeholder="Untitled"]').fill("Child One");
+  await page.waitForTimeout(1500);
+
+  await openSidebar(page);
+  const alphaRowAgain = onlyVisible(page.getByRole("link", { name: "Alpha" })).locator("..");
+  await alphaRowAgain.hover();
+  const urlBeforeChild2 = page.url();
+  await alphaRowAgain.getByRole("button", { name: "Add sub-page" }).click();
+  await page.waitForURL(
+    (url) =>
+      url.href !== urlBeforeChild2 &&
+      /\/workspace\/[^/]+--[^/]+\/p\/[^/]+$/.test(url.pathname),
+    { timeout: 15000 },
+  );
+  await page.locator('input[placeholder="Untitled"]').fill("Child Two");
+  await page.waitForTimeout(1500);
+
+  // Below `md`, the sidebar drawer unmounts its own Sidebar instance on every navigation, resetting
+  // its expand state — the auto-expand from creating "Child One"/"Child Two" doesn't survive that on
+  // mobile viewports (desktop's Sidebar instance is never unmounted, so it's unaffected). Same
+  // conditional re-expand this file's first test already uses for the same reason.
+  await openSidebar(page);
+  const alphaRowFinal = onlyVisible(page.getByRole("link", { name: "Alpha" })).locator("..");
+  if (await alphaRowFinal.getByRole("button", { name: "Expand" }).isVisible()) {
+    await alphaRowFinal.getByRole("button", { name: "Expand" }).click();
+  }
+  const child1Link = onlyVisible(page.getByRole("link", { name: "Child One" }));
+  const child2Link = onlyVisible(page.getByRole("link", { name: "Child Two" }));
+  await expect(child1Link).toBeVisible();
+  await expect(child2Link).toBeVisible();
+
+  const initialChild1 = await child1Link.boundingBox();
+  const initialChild2 = await child2Link.boundingBox();
+  if (!initialChild1 || !initialChild2) {
+    throw new Error("Could not find bounding boxes for child pages");
+  }
+  expect(initialChild1.y).toBeLessThan(initialChild2.y);
+
+  // Drag "Child Two" onto the strip right before "Child One" — swaps their order.
+  await dragElementOnto(
+    page,
+    child2Link.locator(".."),
+    reorderStripBefore(child1Link),
+  );
+  await page.waitForTimeout(600);
+
+  const afterChild1 = await child1Link.boundingBox();
+  const afterChild2 = await child2Link.boundingBox();
+  if (!afterChild1 || !afterChild2) {
+    throw new Error("Could not find bounding boxes for child pages after drag");
+  }
+  expect(afterChild2.y).toBeLessThan(afterChild1.y);
 });

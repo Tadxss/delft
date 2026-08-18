@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, memo, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
@@ -11,6 +11,7 @@ import {
   useDeletePage,
   useUpdatePage,
 } from "@delft/shared";
+import { ReorderStrip } from "./ReorderStrip";
 
 export interface PageTreeNodeProps {
   page: Page;
@@ -20,6 +21,10 @@ export interface PageTreeNodeProps {
   // plus every descendant) — computed once per drag session, see Sidebar.tsx. Empty when nothing is
   // being dragged.
   excludedDropIds: Set<string>;
+  // Whether a page drag is active at all — threaded down so ReorderStrip can toggle its hit-testing
+  // on/off (see ReorderStrip's own comment for why: it must stay mounted at zero height always, but
+  // shouldn't intercept pointer events when nothing is being dragged).
+  dragActive: boolean;
   onToggle: (pageId: string) => void;
   onCreateChild: (parentId: string) => void;
   depth: number;
@@ -30,6 +35,7 @@ function PageTreeNodeImpl({
   childrenByParent,
   expanded,
   excludedDropIds,
+  dragActive,
   onToggle,
   onCreateChild,
   depth,
@@ -226,18 +232,32 @@ function PageTreeNodeImpl({
       </div>
       {hasChildren && isExpanded && (
         <ul>
-          {children.map((child) => (
-            <PageTreeNode
-              key={child.id}
-              page={child}
-              childrenByParent={childrenByParent}
-              expanded={expanded}
-              excludedDropIds={excludedDropIds}
-              onToggle={onToggle}
-              onCreateChild={onCreateChild}
-              depth={depth + 1}
-            />
+          {children.map((child, index) => (
+            <Fragment key={child.id}>
+              {/* Strip id encodes "insert right after this sibling" (or "start" for before the
+                  first) rather than a numeric index — see Sidebar.tsx's handleDragEnd for why: it
+                  lets the drop handler resolve neighbors after filtering the dragged item itself
+                  out of the list, without an index needing to shift to account for that removal. */}
+              <ReorderStrip
+                id={`page-strip:${page.id}:${index === 0 ? "start" : children[index - 1]!.id}`}
+                active={dragActive}
+              />
+              <PageTreeNode
+                page={child}
+                childrenByParent={childrenByParent}
+                expanded={expanded}
+                excludedDropIds={excludedDropIds}
+                dragActive={dragActive}
+                onToggle={onToggle}
+                onCreateChild={onCreateChild}
+                depth={depth + 1}
+              />
+            </Fragment>
           ))}
+          <ReorderStrip
+            id={`page-strip:${page.id}:${children[children.length - 1]!.id}`}
+            active={dragActive}
+          />
         </ul>
       )}
     </li>
@@ -253,6 +273,7 @@ function arePageTreeNodePropsEqual(
     prev.childrenByParent === next.childrenByParent &&
     prev.expanded === next.expanded &&
     prev.excludedDropIds === next.excludedDropIds &&
+    prev.dragActive === next.dragActive &&
     prev.onToggle === next.onToggle &&
     prev.onCreateChild === next.onCreateChild &&
     prev.depth === next.depth

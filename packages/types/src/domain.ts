@@ -24,6 +24,7 @@ export interface Page {
   content: unknown;
   isPublished: boolean;
   publishedSlug: string | null;
+  position: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -39,6 +40,7 @@ export interface Credential {
   url: string | null;
   secretCiphertext: string;
   secretIv: string;
+  position: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -58,6 +60,7 @@ export interface CredentialFolder {
   workspaceId: string;
   parentFolderId: string | null;
   name: string;
+  position: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -87,6 +90,7 @@ export interface Canvas {
   workspaceId: string;
   title: string;
   scene: unknown;
+  position: number;
   createdAt: string;
   updatedAt: string;
 }

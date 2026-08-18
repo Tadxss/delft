@@ -5,6 +5,7 @@ export * from "./supabase/mappers";
 export * from "./lib/workspaceUrl";
 export * from "./lib/vaultCrypto";
 export * from "./lib/treeUtils";
+export * from "./lib/positionUtils";
 export * from "./vault/VaultKeyContext";
 export * from "./hooks/useAuthUser";
 export * from "./hooks/useSignInWithMagicLink";

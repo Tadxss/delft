@@ -1,5 +1,11 @@
 import { test, expect, type Page } from "@playwright/test";
-import { backToList, dragElementOnto, signIn, uniqueEmail } from "./helpers";
+import {
+  backToList,
+  dragElementOnto,
+  reorderStripBefore,
+  signIn,
+  uniqueEmail,
+} from "./helpers";
 
 async function setUpVault(page: Page) {
   await page.fill("#workspace-name", "Personal");
@@ -41,6 +47,23 @@ async function createCredentialInFolder(
   await expect(
     page.getByRole("heading", { name: credential.title }),
   ).toBeVisible();
+}
+
+// Creates a credential at the root level (not inside any folder) via the toolbar "New credential"
+// button — used by the reorder test below, which needs several root-level credentials.
+async function createRootCredential(
+  page: Page,
+  credential: { title: string; username: string; password: string },
+): Promise<void> {
+  await page.click('button[aria-label="New credential"]');
+  await page.fill("#title", credential.title);
+  await page.fill("#username", credential.username);
+  await page.fill("#password", credential.password);
+  await page.click('button:has-text("Save")');
+  await expect(
+    page.getByRole("heading", { name: credential.title }),
+  ).toBeVisible();
+  await backToList(page);
 }
 
 test("nested folders are collapsed by default and expand/collapse controls what's visible", async ({
@@ -235,5 +258,106 @@ test("deleting a folder never destroys the credentials inside it, only empty sub
   // ...but the credential inside survived, reparented to root — visible without expanding anything.
   await expect(
     page.getByRole("button", { name: "Leaf", exact: true }),
+  ).toBeVisible();
+});
+
+test("drag-and-drop reorders sibling folders, and reorders/reparents a credential", async ({
+  page,
+}) => {
+  await signIn(page, uniqueEmail("credential-folders-reorder"));
+  await setUpVault(page);
+
+  await createRootFolder(page, "Alpha");
+  await createRootFolder(page, "Bravo");
+  await createRootFolder(page, "Charlie");
+
+  const alphaButton = page.getByRole("button", { name: "Alpha", exact: true });
+  const bravoButton = page.getByRole("button", { name: "Bravo", exact: true });
+  const charlieButton = page.getByRole("button", { name: "Charlie", exact: true });
+  await expect(alphaButton).toBeVisible();
+  await expect(bravoButton).toBeVisible();
+  await expect(charlieButton).toBeVisible();
+
+  const initialAlpha = await alphaButton.boundingBox();
+  const initialBravo = await bravoButton.boundingBox();
+  const initialCharlie = await charlieButton.boundingBox();
+  if (!initialAlpha || !initialBravo || !initialCharlie) {
+    throw new Error("Could not find bounding boxes for root folders");
+  }
+  expect(initialAlpha.y).toBeLessThan(initialBravo.y);
+  expect(initialBravo.y).toBeLessThan(initialCharlie.y);
+
+  // Drag "Charlie" onto the strip right before "Alpha" — moves it to the front.
+  await dragElementOnto(
+    page,
+    folderRow(page, "Charlie"),
+    reorderStripBefore(alphaButton),
+  );
+  // No optimistic update — the reordered position only appears once the invalidate-and-refetch
+  // round trip lands, not the instant the drop event fires.
+  await page.waitForTimeout(600);
+
+  const afterAlpha = await alphaButton.boundingBox();
+  const afterBravo = await bravoButton.boundingBox();
+  const afterCharlie = await charlieButton.boundingBox();
+  if (!afterAlpha || !afterBravo || !afterCharlie) {
+    throw new Error("Could not find bounding boxes for root folders after drag");
+  }
+  expect(afterCharlie.y).toBeLessThan(afterAlpha.y);
+  expect(afterAlpha.y).toBeLessThan(afterBravo.y);
+
+  // WebKit/mobile Safari need a longer gap between drags in the same test than Chromium — see the
+  // matching note on the folder-move test above.
+  await page.mouse.move(700, 400);
+  await page.waitForTimeout(1000);
+
+  // Two root-level credentials, to exercise reordering among credentials specifically (not just
+  // folders) — created via the toolbar, not inside any folder.
+  await createRootCredential(page, {
+    title: "Delta",
+    username: "carol",
+    password: "delta-pass1",
+  });
+  await createRootCredential(page, {
+    title: "Echo",
+    username: "dave",
+    password: "echo-pass12",
+  });
+
+  const deltaButton = page.getByRole("button", { name: "Delta", exact: true });
+  const echoButton = page.getByRole("button", { name: "Echo", exact: true });
+  await expect(deltaButton).toBeVisible();
+  await expect(echoButton).toBeVisible();
+
+  const initialDelta = await deltaButton.boundingBox();
+  const initialEcho = await echoButton.boundingBox();
+  if (!initialDelta || !initialEcho) {
+    throw new Error("Could not find bounding boxes for root credentials");
+  }
+  expect(initialDelta.y).toBeLessThan(initialEcho.y);
+
+  // Reorder: drag "Echo" onto the strip right before "Delta".
+  await dragElementOnto(page, echoButton, reorderStripBefore(deltaButton));
+  await page.waitForTimeout(600);
+
+  const afterDelta = await deltaButton.boundingBox();
+  const afterEcho = await echoButton.boundingBox();
+  if (!afterDelta || !afterEcho) {
+    throw new Error("Could not find bounding boxes for root credentials after reorder");
+  }
+  expect(afterEcho.y).toBeLessThan(afterDelta.y);
+
+  await page.mouse.move(700, 400);
+  await page.waitForTimeout(1000);
+
+  // Reparent: drag "Delta" (a credential, not a folder) onto the "Alpha" folder row.
+  await dragElementOnto(page, deltaButton, alphaButton);
+
+  await expect(
+    page.getByRole("button", { name: "Delta", exact: true }),
+  ).not.toBeVisible();
+  await alphaButton.click();
+  await expect(
+    page.getByRole("button", { name: "Delta", exact: true }),
   ).toBeVisible();
 });

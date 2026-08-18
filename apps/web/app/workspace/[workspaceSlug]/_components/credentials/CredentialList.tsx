@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -13,18 +13,23 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { Folder, FolderPlus, Plus, Search } from "lucide-react";
+import { Folder, FolderPlus, KeyRound, Plus, Search } from "lucide-react";
 import type { Credential, CredentialFolder } from "@delft/types";
 import {
   useCreateCredentialFolder,
   useDeleteCredentialFolder,
+  useUpdateCredential,
   useUpdateCredentialFolder,
   computeSubtreeIds,
+  computeAppendPosition,
+  computeReorderPosition,
 } from "@delft/shared";
 import {
   CredentialFolderTreeNode,
   CredentialLeafRow,
 } from "./CredentialFolderTreeNode";
+import { ReorderStrip } from "../ReorderStrip";
+import { offsetDragOverlay } from "../dragOverlayOffset";
 
 // Slim strip at the top of the tree, only visually shown while a drag is active — dropping a
 // folder here moves it to the root level. No natural section-header label to repurpose the way
@@ -125,6 +130,7 @@ export function CredentialList({
 
   const createFolder = useCreateCredentialFolder();
   const updateFolder = useUpdateCredentialFolder();
+  const updateCredential = useUpdateCredential();
   const deleteFolder = useDeleteCredentialFolder();
 
   useEffect(() => {
@@ -251,38 +257,111 @@ export function CredentialList({
     [workspaceId, deleteFolder.mutate],
   );
 
+  // Draggable ids in this tree are prefixed by kind ("folder:xxx" / "credential:xxx") — unlike
+  // Sidebar.tsx's pages tree, this one drags two different kinds of item through the same
+  // DndContext, so handleDragEnd needs to know which kind was picked up before it can decide what a
+  // given drop target even means (a folder onto a folder reparents/reorders folders; a credential
+  // onto a folder reparents it; a credential onto a credential-reorder-strip repositions it).
   function handleDragStart(event: DragStartEvent) {
-    const id = String(event.active.id);
-    setDraggingId(id);
-    setExcludedDropIds(computeSubtreeIds(id, folders, (f) => f.parentFolderId));
+    const rawId = String(event.active.id);
+    setDraggingId(rawId);
+    if (rawId.startsWith("folder:")) {
+      const id = rawId.slice("folder:".length);
+      setExcludedDropIds(computeSubtreeIds(id, folders, (f) => f.parentFolderId));
+    } else {
+      // Dragging a credential — it has no descendants, so nothing is excluded as a target.
+      setExcludedDropIds(new Set());
+    }
   }
 
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
-    setDraggingId(null);
-    setExcludedDropIds(new Set());
-    if (!over) return;
+  function handleFolderDragEnd(folderId: string, overId: string) {
+    if (overId === folderId) return;
 
-    const activeId = String(active.id);
-    const overId = String(over.id);
-    if (overId === activeId) return;
-
-    const draggedFolder = folders.find((f) => f.id === activeId);
+    const draggedFolder = folders.find((f) => f.id === folderId);
     if (!draggedFolder) return;
 
-    const targetParentId = overId === "credentials-root" ? null : overId;
-    if (targetParentId !== null) {
-      const excluded = computeSubtreeIds(
-        activeId,
-        folders,
-        (f) => f.parentFolderId,
+    // The credential group's own leading strip ("...:start") doubles as "append this folder as the
+    // new last folder in that parent" whenever that parent has both folders and credentials — see
+    // this file's root rendering and CredentialFolderTreeNode.tsx for why the folder group's own
+    // trailing strip is deliberately not rendered in that case (it would physically overlap this
+    // one, both sitting at a zero-height boundary with no row between them).
+    if (overId.startsWith("credential-leaf-strip:") && overId.endsWith(":start")) {
+      const rest = overId.slice("credential-leaf-strip:".length);
+      const parentKey = rest.slice(0, rest.indexOf(":"));
+      const targetParentId = parentKey === "root" ? null : parentKey;
+      if (targetParentId !== null) {
+        const excluded = computeSubtreeIds(folderId, folders, (f) => f.parentFolderId);
+        if (excluded.has(targetParentId)) return;
+      }
+      updateFolder.mutate(
+        {
+          id: folderId,
+          parentFolderId: targetParentId,
+          position: computeAppendPosition(
+            (foldersByParent.get(targetParentId) ?? []).filter((f) => f.id !== folderId),
+          ),
+        },
+        {
+          onError: (e) => setDragError(e.message),
+          onSuccess: () => setDragError(null),
+        },
       );
+      return;
+    }
+
+    // Dropped on a reorder strip between two folders (or before the first / after the last) —
+    // reorder within, or reparent into, whichever parent that strip belongs to.
+    if (overId.startsWith("credential-folder-strip:")) {
+      const rest = overId.slice("credential-folder-strip:".length);
+      const sep = rest.indexOf(":");
+      const parentKey = rest.slice(0, sep);
+      const afterId = rest.slice(sep + 1);
+      const targetParentId = parentKey === "root" ? null : parentKey;
+      if (afterId === folderId) return;
+
+      if (targetParentId !== null) {
+        const excluded = computeSubtreeIds(folderId, folders, (f) => f.parentFolderId);
+        if (excluded.has(targetParentId)) return;
+      }
+
+      const siblings = (foldersByParent.get(targetParentId) ?? []).filter(
+        (f) => f.id !== folderId,
+      );
+      const anchorIndex =
+        afterId === "start" ? -1 : siblings.findIndex((f) => f.id === afterId);
+      const before = anchorIndex >= 0 ? siblings[anchorIndex]!.position : null;
+      const after = siblings[anchorIndex + 1]?.position ?? null;
+
+      updateFolder.mutate(
+        {
+          id: folderId,
+          parentFolderId: targetParentId,
+          position: computeReorderPosition(before, after),
+        },
+        {
+          onError: (e) => setDragError(e.message),
+          onSuccess: () => setDragError(null),
+        },
+      );
+      return;
+    }
+
+    // Dropped directly on the root strip or another folder's row — reparent, appended at the end.
+    if (!overId.startsWith("folder:") && overId !== "credentials-root") return;
+    const targetParentId =
+      overId === "credentials-root" ? null : overId.slice("folder:".length);
+    if (targetParentId !== null) {
+      const excluded = computeSubtreeIds(folderId, folders, (f) => f.parentFolderId);
       if (excluded.has(targetParentId)) return;
     }
     if (draggedFolder.parentFolderId === targetParentId) return;
 
     updateFolder.mutate(
-      { id: activeId, parentFolderId: targetParentId },
+      {
+        id: folderId,
+        parentFolderId: targetParentId,
+        position: computeAppendPosition(foldersByParent.get(targetParentId) ?? []),
+      },
       {
         onError: (e) => setDragError(e.message),
         onSuccess: () => setDragError(null),
@@ -290,9 +369,84 @@ export function CredentialList({
     );
   }
 
-  const draggingFolder = draggingId
-    ? folders.find((f) => f.id === draggingId)
-    : null;
+  function handleCredentialDragEnd(credentialId: string, overId: string) {
+    if (overId === credentialId) return;
+    const draggedCredential = credentials.find((c) => c.id === credentialId);
+    if (!draggedCredential) return;
+
+    // Dropped on a reorder strip between two credentials in some specific folder's own list.
+    if (overId.startsWith("credential-leaf-strip:")) {
+      const rest = overId.slice("credential-leaf-strip:".length);
+      const sep = rest.indexOf(":");
+      const parentKey = rest.slice(0, sep);
+      const afterId = rest.slice(sep + 1);
+      const targetFolderId = parentKey === "root" ? null : parentKey;
+      if (afterId === credentialId) return;
+
+      const siblings = (credentialsByFolder.get(targetFolderId) ?? []).filter(
+        (c) => c.id !== credentialId,
+      );
+      const anchorIndex =
+        afterId === "start" ? -1 : siblings.findIndex((c) => c.id === afterId);
+      const before = anchorIndex >= 0 ? siblings[anchorIndex]!.position : null;
+      const after = siblings[anchorIndex + 1]?.position ?? null;
+
+      updateCredential.mutate(
+        {
+          id: credentialId,
+          folderId: targetFolderId,
+          position: computeReorderPosition(before, after),
+        },
+        {
+          onError: (e) => setDragError(e.message),
+          onSuccess: () => setDragError(null),
+        },
+      );
+      return;
+    }
+
+    // Dropped directly on the root strip or a folder's row — reparent, appended at the end.
+    if (!overId.startsWith("folder:") && overId !== "credentials-root") return;
+    const targetFolderId =
+      overId === "credentials-root" ? null : overId.slice("folder:".length);
+    if (draggedCredential.folderId === targetFolderId) return;
+
+    updateCredential.mutate(
+      {
+        id: credentialId,
+        folderId: targetFolderId,
+        position: computeAppendPosition(credentialsByFolder.get(targetFolderId) ?? []),
+      },
+      {
+        onError: (e) => setDragError(e.message),
+        onSuccess: () => setDragError(null),
+      },
+    );
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    const rawActiveId = String(active.id);
+    setDraggingId(null);
+    setExcludedDropIds(new Set());
+    if (!over) return;
+    const overId = String(over.id);
+
+    if (rawActiveId.startsWith("folder:")) {
+      handleFolderDragEnd(rawActiveId.slice("folder:".length), overId);
+    } else if (rawActiveId.startsWith("credential:")) {
+      handleCredentialDragEnd(rawActiveId.slice("credential:".length), overId);
+    }
+  }
+
+  const draggingFolder =
+    draggingId && draggingId.startsWith("folder:")
+      ? folders.find((f) => f.id === draggingId.slice("folder:".length))
+      : null;
+  const draggingCredential =
+    draggingId && draggingId.startsWith("credential:")
+      ? credentials.find((c) => c.id === draggingId.slice("credential:".length))
+      : null;
 
   const rootFolders = foldersByParent.get(null) ?? [];
   const rootCredentials = credentialsByFolder.get(null) ?? [];
@@ -338,13 +492,14 @@ export function CredentialList({
       <DndContext
         sensors={sensors}
         collisionDetection={pointerWithin}
+        modifiers={[offsetDragOverlay]}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
         <div className="flex-1 overflow-y-auto py-1">
           {dragError && (
             <p className="px-3 pb-1 text-xs text-red-700">
-              Couldn&apos;t move folder: {dragError}
+              Couldn&apos;t move: {dragError}
             </p>
           )}
           {!searching && <RootDropStrip active={draggingId !== null} />}
@@ -384,39 +539,64 @@ export function CredentialList({
             </p>
           ) : (
             <ul>
-              {rootFolders.map((folder) => (
-                <CredentialFolderTreeNode
-                  key={folder.id}
-                  folder={folder}
-                  foldersByParent={foldersByParent}
-                  credentialsByFolder={credentialsByFolder}
-                  expanded={expanded}
-                  excludedDropIds={excludedDropIds}
-                  onToggle={toggle}
-                  onCreateSubfolder={handleNewFolder}
-                  onCreateCredential={handleNewCredential}
-                  selectedId={selectedId}
-                  onSelectCredential={onSelect}
-                  renamingFolderId={renamingFolderId}
-                  renameValue={renameValue}
-                  onRenameChange={setRenameValue}
-                  onCommitRename={commitRename}
-                  onCancelRename={cancelRename}
-                  renameInputRef={renameInputRef}
-                  onStartRename={startRename}
-                  onDelete={handleDeleteFolder}
-                  depth={0}
-                />
+              {rootFolders.map((folder, index) => (
+                <Fragment key={folder.id}>
+                  <ReorderStrip
+                    id={`credential-folder-strip:root:${index === 0 ? "start" : rootFolders[index - 1]!.id}`}
+                    active={draggingId !== null}
+                  />
+                  <CredentialFolderTreeNode
+                    folder={folder}
+                    foldersByParent={foldersByParent}
+                    credentialsByFolder={credentialsByFolder}
+                    expanded={expanded}
+                    excludedDropIds={excludedDropIds}
+                    dragActive={draggingId !== null}
+                    onToggle={toggle}
+                    onCreateSubfolder={handleNewFolder}
+                    onCreateCredential={handleNewCredential}
+                    selectedId={selectedId}
+                    onSelectCredential={onSelect}
+                    renamingFolderId={renamingFolderId}
+                    renameValue={renameValue}
+                    onRenameChange={setRenameValue}
+                    onCommitRename={commitRename}
+                    onCancelRename={cancelRename}
+                    renameInputRef={renameInputRef}
+                    onStartRename={startRename}
+                    onDelete={handleDeleteFolder}
+                    depth={0}
+                  />
+                </Fragment>
               ))}
-              {rootCredentials.map((credential) => (
-                <CredentialLeafRow
-                  key={credential.id}
-                  credential={credential}
-                  selectedId={selectedId}
-                  onSelect={onSelect}
-                  depth={0}
+              {/* Only rendered when there's no credential group right after it — see the matching
+                  comment in CredentialFolderTreeNode.tsx for why. */}
+              {rootFolders.length > 0 && rootCredentials.length === 0 && (
+                <ReorderStrip
+                  id={`credential-folder-strip:root:${rootFolders[rootFolders.length - 1]!.id}`}
+                  active={draggingId !== null}
                 />
+              )}
+              {rootCredentials.map((credential, index) => (
+                <Fragment key={credential.id}>
+                  <ReorderStrip
+                    id={`credential-leaf-strip:root:${index === 0 ? "start" : rootCredentials[index - 1]!.id}`}
+                    active={draggingId !== null}
+                  />
+                  <CredentialLeafRow
+                    credential={credential}
+                    selectedId={selectedId}
+                    onSelect={onSelect}
+                    depth={0}
+                  />
+                </Fragment>
               ))}
+              {rootCredentials.length > 0 && (
+                <ReorderStrip
+                  id={`credential-leaf-strip:root:${rootCredentials[rootCredentials.length - 1]!.id}`}
+                  active={draggingId !== null}
+                />
+              )}
             </ul>
           )}
           <DragOverlay>
@@ -424,6 +604,12 @@ export function CredentialList({
               <div className="flex items-center gap-1.5 rounded-md border border-paper-200 bg-paper-50 px-2 py-1 text-sm text-ink-800 shadow-lg">
                 <Folder size={14} className="shrink-0 text-ink-400" />
                 {draggingFolder.name || "Untitled"}
+              </div>
+            )}
+            {draggingCredential && (
+              <div className="flex items-center gap-1.5 rounded-md border border-paper-200 bg-paper-50 px-2 py-1 text-sm text-ink-800 shadow-lg">
+                <KeyRound size={14} className="shrink-0 text-ink-400" />
+                {draggingCredential.title || "Untitled"}
               </div>
             )}
           </DragOverlay>

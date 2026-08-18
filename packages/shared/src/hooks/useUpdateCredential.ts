@@ -12,6 +12,7 @@ export interface UpdateCredentialInput {
   url?: string | null;
   secretCiphertext?: string;
   secretIv?: string;
+  position?: number;
 }
 
 // `updated_at` is maintained server-side by credentials_set_updated_at, not passed in. Callers
@@ -29,6 +30,7 @@ export function useUpdateCredential() {
       url,
       secretCiphertext,
       secretIv,
+      position,
     }) => {
       const patch: CredentialsUpdate = {};
       if (folderId !== undefined) patch.folder_id = folderId;
@@ -37,6 +39,7 @@ export function useUpdateCredential() {
       if (secretCiphertext !== undefined)
         patch.secret_ciphertext = secretCiphertext;
       if (secretIv !== undefined) patch.secret_iv = secretIv;
+      if (position !== undefined) patch.position = position;
 
       const { data, error } = await supabase
         .from("credentials")

@@ -9,6 +9,7 @@ export interface UpdateCanvasInput {
   id: string;
   title?: string;
   scene?: unknown;
+  position?: number;
 }
 
 // Backs both the title field and the canvas autosave (apps/web debounces calls to this hook,
@@ -19,10 +20,11 @@ export function useUpdateCanvas() {
   const queryClient = useQueryClient();
 
   return useMutation<Canvas, Error, UpdateCanvasInput>({
-    mutationFn: async ({ id, title, scene }) => {
+    mutationFn: async ({ id, title, scene, position }) => {
       const patch: CanvasesUpdate = {};
       if (title !== undefined) patch.title = title;
       if (scene !== undefined) patch.scene = scene as Json;
+      if (position !== undefined) patch.position = position;
 
       const { data, error } = await supabase
         .from("canvases")
@@ -35,7 +37,9 @@ export function useUpdateCanvas() {
     },
     onSuccess: (canvas) => {
       queryClient.setQueryData<Canvas>(["canvas", canvas.id], canvas);
-      queryClient.invalidateQueries({ queryKey: ["canvases", canvas.workspaceId] });
+      queryClient.invalidateQueries({
+        queryKey: ["canvases", canvas.workspaceId],
+      });
     },
   });
 }

@@ -136,6 +136,26 @@ export async function dragElementOnto(
   await page.mouse.up();
 }
 
+// Locates a ReorderStrip's hit-area div immediately before/after a given row — used to test
+// drag-to-reorder (Sidebar/PageTreeNode, CredentialList/CredentialFolderTreeNode). `rowDescendant`
+// is any element *inside* the row (its Link/button), not the row's own <li> — ReorderStrip.tsx
+// always renders as a sibling <li> immediately before/after the row's <li> within the same parent
+// <ul>, so xpath sibling traversal finds it without the test needing to know its internal id
+// (which encodes an adjacent sibling's uuid, not something a test can predict cleanly).
+export function reorderStripBefore(rowDescendant: Locator): Locator {
+  return rowDescendant
+    .locator("xpath=ancestor::li[1]/preceding-sibling::li[1]")
+    .locator("div")
+    .first();
+}
+
+export function reorderStripAfter(rowDescendant: Locator): Locator {
+  return rowDescendant
+    .locator("xpath=ancestor::li[1]/following-sibling::li[1]")
+    .locator("div")
+    .first();
+}
+
 // Sidebar content exists twice in the DOM on mobile viewports whenever the drawer is open — a
 // CSS-hidden desktop copy (SidebarShell.tsx's `hidden md:flex` wrapper) plus the visible drawer
 // copy, both backed by the same `Sidebar` component instance-for-instance. A bare role/text locator
