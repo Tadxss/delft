@@ -187,7 +187,12 @@ function CredentialFolderTreeNodeImpl({
               {folder.name || "Untitled"}
             </span>
           </button>
-          <div className="flex shrink-0 items-center gap-0.5 md:hidden md:group-hover:flex">
+          {/* Opacity/pointer-events toggle, not a display (hidden/flex) toggle — the space for
+              these four buttons is always reserved, so hovering never reflows the row (which would
+              re-truncate the folder name and read as the row "jumping"/zooming). Mirrors
+              PageTreeNode.tsx's chevron, which reserves its own space the same way; mobile (below
+              `md`) keeps these always visible/interactive, same as before. */}
+          <div className="flex shrink-0 items-center gap-0.5 md:pointer-events-none md:opacity-0 md:group-hover:pointer-events-auto md:group-hover:opacity-100 md:group-focus-within:pointer-events-auto md:group-focus-within:opacity-100">
             <button
               type="button"
               onClick={() => onCreateSubfolder(folder.id)}
