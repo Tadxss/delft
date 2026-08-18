@@ -17,7 +17,7 @@ export function useCredentialFolders(workspaceId: string | undefined) {
         .from("credential_folders")
         .select("*")
         .eq("workspace_id", workspaceId as string)
-        .order("name", { ascending: true });
+        .order("position", { ascending: true });
       if (error) throw error;
       return (data ?? []).map(mapCredentialFolderRow);
     },

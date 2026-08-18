@@ -1,7 +1,9 @@
 import { test, expect } from "@playwright/test";
 import { signIn, uniqueEmail } from "./helpers";
 
-test("a fresh user can sign in via magic link and lands on the workspace switcher", async ({ page }) => {
+test("a fresh user can sign in via magic link and lands on the workspace switcher", async ({
+  page,
+}) => {
   const email = uniqueEmail("sign-in");
   await signIn(page, email);
 
@@ -12,8 +14,12 @@ test("a fresh user can sign in via magic link and lands on the workspace switche
   expect(page.url()).not.toContain("access_token");
 });
 
-test("visiting an authenticated route while signed out redirects to the login screen", async ({ page }) => {
+test("visiting an authenticated route while signed out redirects to the login screen", async ({
+  page,
+}) => {
   await page.goto("/workspace");
   await expect(page).toHaveURL("http://127.0.0.1:3000/");
-  await expect(page.getByText("Careful records. Quiet craft. One private place.")).toBeVisible();
+  await expect(
+    page.getByText("Careful records. Quiet craft. One private place."),
+  ).toBeVisible();
 });

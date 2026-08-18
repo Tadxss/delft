@@ -21,17 +21,24 @@ export async function removePageImages(
     const paths: string[] = [];
     for (const pageId of pageIds) {
       const prefix = `${workspaceId}/${pageId}`;
-      const { data: files, error } = await supabase.storage.from("page-images").list(prefix);
+      const { data: files, error } = await supabase.storage
+        .from("page-images")
+        .list(prefix);
       if (error) throw error;
       for (const file of files ?? []) {
         paths.push(`${prefix}/${file.name}`);
       }
     }
     if (paths.length > 0) {
-      const { error } = await supabase.storage.from("page-images").remove(paths);
+      const { error } = await supabase.storage
+        .from("page-images")
+        .remove(paths);
       if (error) throw error;
     }
   } catch (error) {
-    console.error("removePageImages: failed to clean up page-images Storage objects", error);
+    console.error(
+      "removePageImages: failed to clean up page-images Storage objects",
+      error,
+    );
   }
 }

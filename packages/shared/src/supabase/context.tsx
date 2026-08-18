@@ -11,7 +11,11 @@ export function SupabaseProvider({
   client: SupabaseClient<Database>;
   children: ReactNode;
 }) {
-  return <SupabaseContext.Provider value={client}>{children}</SupabaseContext.Provider>;
+  return (
+    <SupabaseContext.Provider value={client}>
+      {children}
+    </SupabaseContext.Provider>
+  );
 }
 
 // Each app wraps its root in <SupabaseProvider client={createSupabaseClient(...)}>, so every hook

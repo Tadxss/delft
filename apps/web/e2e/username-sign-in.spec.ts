@@ -14,10 +14,14 @@ test("set a username, sign in with it, and confirm an unknown username is reject
 
   // Set a username via the profile form.
   await page.getByRole("button", { name: "Account settings" }).click();
-  await page.getByRole("button", { name: "Update profile", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Update profile", exact: true })
+    .click();
   await page.fill("#username", username);
   await page.getByRole("button", { name: "Save profile" }).click();
-  await expect(page.getByText("Profile saved.")).toBeVisible({ timeout: 10000 });
+  await expect(page.getByText("Profile saved.")).toBeVisible({
+    timeout: 10000,
+  });
 
   // Set a password too, so we can actually sign in with it.
   await page.getByRole("button", { name: "Back" }).click();
@@ -25,7 +29,9 @@ test("set a username, sign in with it, and confirm an unknown username is reject
   await page.fill("#password", "Correct-Horse-Battery9");
   await page.fill("#confirm", "Correct-Horse-Battery9");
   await page.click('button:has-text("Save password")');
-  await expect(page.getByText("Password saved.")).toBeVisible({ timeout: 10000 });
+  await expect(page.getByText("Password saved.")).toBeVisible({
+    timeout: 10000,
+  });
 
   await page.getByRole("button", { name: "Back" }).click();
   await page.click('button:has-text("Sign out")');
@@ -35,7 +41,9 @@ test("set a username, sign in with it, and confirm an unknown username is reject
   // prompt, since there's no email to send a magic link to either in that case.
   await page.fill("#identifier", "definitely-not-a-real-username");
   await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await expect(page.getByText("No account found with that username.")).toBeVisible({
+  await expect(
+    page.getByText("No account found with that username."),
+  ).toBeVisible({
     timeout: 10000,
   });
   await expect(page.locator("#password")).toHaveCount(0);

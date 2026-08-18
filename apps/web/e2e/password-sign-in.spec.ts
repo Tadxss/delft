@@ -1,7 +1,9 @@
 import { test, expect } from "@playwright/test";
 import { signIn, uniqueEmail } from "./helpers";
 
-test("a user can set a password from the Account modal and sign in with it afterward", async ({ page }) => {
+test("a user can set a password from the Account modal and sign in with it afterward", async ({
+  page,
+}) => {
   const email = uniqueEmail("pw");
   await signIn(page, email);
 
@@ -10,7 +12,9 @@ test("a user can set a password from the Account modal and sign in with it after
   await page.fill("#password", "Correct-Horse-Battery9");
   await page.fill("#confirm", "Correct-Horse-Battery9");
   await page.click('button:has-text("Save password")');
-  await expect(page.getByText("Password saved.")).toBeVisible({ timeout: 10000 });
+  await expect(page.getByText("Password saved.")).toBeVisible({
+    timeout: 10000,
+  });
 
   await page.getByRole("button", { name: "Back" }).click();
   await page.click('button:has-text("Sign out")');

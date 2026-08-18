@@ -27,10 +27,12 @@ export function useAuthUser(): AuthUserState {
       setState({ user, isSignedIn: user != null, loading: false });
     });
 
-    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
-      const user = session?.user ?? null;
-      setState({ user, isSignedIn: user != null, loading: false });
-    });
+    const { data: subscription } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        const user = session?.user ?? null;
+        setState({ user, isSignedIn: user != null, loading: false });
+      },
+    );
 
     return () => {
       cancelled = true;

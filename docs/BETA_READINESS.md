@@ -53,7 +53,7 @@ covers it, rather than deleting it — same "accumulate, don't delete" conventio
   sign-in/token-refresh regardless. Revisit if the user base ever grows beyond one trusted person,
   or if Google OAuth is ever opened up more broadly.
 - **No real iOS Safari device/simulator testing** (item 5's one remaining piece). `webkit`/
-  `mobile-safari` Playwright projects (Build Order steps 32-33) cover the WebKit *engine*, but not
+  `mobile-safari` Playwright projects (Build Order steps 32-33) cover the WebKit _engine_, but not
   real Safari on real hardware/touch input — no such device was available to set that up.
   Deliberately left open rather than adding a paid device-lab service (BrowserStack etc., which
   would also mean routing a credentials app's traffic through a third party) or a real-Safari CI
@@ -64,6 +64,7 @@ covers it, rather than deleting it — same "accumulate, don't delete" conventio
 ## Fixed
 
 ### 1. Silent autosave failures (Pages + Canvas) — fixed, see [docs/ARCHITECTURE.md](ARCHITECTURE.md) Build Order step 30
+
 `PageEditor.tsx`'s and `CanvasEditor.tsx`'s `scheduleSave` called `updatePage.mutate(...)` /
 `updateCanvas.mutate(...)` with no `onError` callback, and neither component ever read
 `.isError`/`.error` off the mutation object. If a session expired mid-edit, or any request failed
@@ -79,6 +80,7 @@ Supabase session by forcing the underlying `PATCH` requests to fail and confirmi
 rendered in both editors, plus `pnpm check-types`/`lint`.
 
 ### 3. Zero responsive/mobile layout — fixed, see [docs/ARCHITECTURE.md](ARCHITECTURE.md) Build Order step 31
+
 Confirmed via grep: 0 uses of `sm:`/`md:`/`lg:`/`xl:`/`2xl:` anywhere in `apps/web/app`, no
 `@media` queries in `globals.css`. `Sidebar.tsx` had a hardcoded `w-64` with no viewport-based
 collapse, `PageEditor.tsx` had fixed `px-8`/`pt-28` regardless of viewport, and
@@ -106,6 +108,7 @@ separately re-audited beyond the `group-hover`/`opacity-0` grep sweep above; wor
 real-device testing (item 5) surfaces anything.
 
 ### 5. No Safari/WebKit test coverage — fixed except real-device testing, see [docs/ARCHITECTURE.md](ARCHITECTURE.md) Build Order steps 32-33
+
 `playwright.config.ts` only configured `{ name: "chromium", use: devices["Desktop Chrome"] }` — no
 Firefox, no WebKit, no mobile emulation profile. Combined with known iOS Safari quirks in three
 dependencies actually in use (`browser-image-compression`'s WebP encode support, Excalidraw's
@@ -130,6 +133,7 @@ was available here and the alternatives (a paid device lab, or a separate real-S
 were deliberately declined for now.
 
 ### 2. Every read-hook consumer swallows errors — fixed, see [docs/ARCHITECTURE.md](ARCHITECTURE.md) Build Order step 34
+
 `useWorkspaces`, `usePages`, `useCredentials`, `useCanvases`, `usePage`, `useCanvas` were
 destructured as `{ data, isLoading }` only, everywhere they were consumed — `.isError`/`.error` was
 never read anywhere in `apps/web`. A failed fetch (RLS error, network drop) was indistinguishable in
@@ -154,6 +158,7 @@ verification script using a short wait (1-4s, matching item 1's mutation-error t
 read as broken. Plus `pnpm check-types`/`lint` (repo-wide).
 
 ### 4. `Modal.tsx` has no dialog semantics — fixed, see [docs/ARCHITECTURE.md](ARCHITECTURE.md) Build Order step 35
+
 No `role="dialog"`/`aria-modal`, no focus trap, no focus-in-on-open or focus-return-on-close — both
 the backdrop and panel used `role="presentation"` (the panel's was semantically wrong: it strips
 dialog semantics rather than adding them). Tab could move focus out of the modal into the page
@@ -167,9 +172,9 @@ portal to `document.body`); and a `useEffect` moves focus into the panel on open
 element, falling back to the panel itself) and back to whatever triggered it on close.
 
 **Real bug found and fixed during verification**: the first implementation guarded the Tab-wrap
-logic against the nested-modal case (only act if `document.activeElement` is inside *this*
+logic against the nested-modal case (only act if `document.activeElement` is inside _this_
 instance's own panel) but left the Escape branch unguarded — every open `Modal` instance adds its
-own `window`-level `keydown` listener, so pressing Escape once fired *both* the inner and outer
+own `window`-level `keydown` listener, so pressing Escape once fired _both_ the inner and outer
 modal's `onClose` simultaneously, closing both instead of just the topmost one. Caught by an actual
 nested-modal test (open Credentials → open the Move-folder dialog → Escape → assert exactly one
 `[role="dialog"]` remains), not just eyeballing the diff. Fixed by moving the same
@@ -184,6 +189,7 @@ closes only that one, leaving the outer modal open. Plus the full 48-test suite
 (`chromium`/`webkit`/`mobile-safari`) green with no regressions, and `pnpm check-types`/`lint`.
 
 ### Low severity batch (label, favicon, error.tsx, metadata) — fixed, see [docs/ARCHITECTURE.md](ARCHITECTURE.md) Build Order step 36
+
 Four small independent gaps, closed together: no `<label>` on the page/canvas title input
 (`PageEditor.tsx`/`CanvasEditor.tsx`, relied solely on `placeholder="Untitled"`); no favicon at all
 (`apps/web` had no `public/` directory or `app/favicon.ico`/`icon.*`); no `app/error.tsx` anywhere
@@ -206,7 +212,7 @@ as a minor cost for correctness over rigging up a shared cached fetch for one ro
 Verified against a real local Supabase session, not just written and assumed correct: both title
 labels confirmed via `page.getByLabel("Title")` resolving to the actual input in both editors; the
 favicon confirmed by fetching `/icon` directly (200, `image/png`, visually a "D" monogram); both
-error boundaries confirmed by *forcing a real render-time throw* (a temporary always-throwing route
+error boundaries confirmed by _forcing a real render-time throw_ (a temporary always-throwing route
 for the root one; a temporary click-triggered `throw` in an already-authenticated page for the
 workspace-scoped one, since navigating directly to a fresh throwing route raced `AuthGate`'s
 session-reestablishment on full reload and isn't representative of how a real user would ever hit
@@ -217,6 +223,7 @@ files/routes removed afterward, confirmed via a clean `git diff`. Plus `pnpm bui
 e2e suite (`chromium`/`webkit`/`mobile-safari`) green with no regressions.
 
 ### Storage orphaning on page/workspace delete — fixed, see [docs/ARCHITECTURE.md](ARCHITECTURE.md) Build Order step 37
+
 Deleting a page or workspace only cascaded **Postgres rows** (`on delete cascade` on the FK) —
 `useDeletePage`/`useDeleteWorkspace` never called `supabase.storage.from("page-images")
 .remove(...)`. Any image uploaded via the BlockNote editor became permanently orphaned in Storage
@@ -228,10 +235,10 @@ ID's `{workspaceId}/{pageId}` Storage prefix and batches everything found into o
 Best-effort by design — caught and logged via `console.error` rather than rethrown, since this is a
 slow-leak concern, not a correctness requirement, and blocking a user from deleting a page/workspace
 they want gone over a transient Storage hiccup would be a worse tradeoff. Both hooks now call it
-*before* their row delete, not after — `page_images_delete_member`'s RLS scopes on the caller still
+_before_ their row delete, not after — `page_images_delete_member`'s RLS scopes on the caller still
 being a member of the workspace named by the object path's first segment, which a completed row
 delete would already have cascaded away (workspace delete cascades `workspace_members` too).
-`useDeletePage` specifically needed to resolve its *whole descendant subtree* first (deleting a page
+`useDeletePage` specifically needed to resolve its _whole descendant subtree_ first (deleting a page
 cascades every sub-page under it, per its own existing doc comment, not just the one ID passed in)
 — reused `Sidebar.tsx`'s own established pattern (fetch all of a workspace's `{id, parent_id}` pairs
 in one query, build the tree client-side) rather than adding a new recursive-descendant RPC, since
@@ -239,8 +246,8 @@ that's unwarranted extra migration surface at this app's personal scale.
 
 Verified against a real local Supabase session, not just written and assumed correct: uploaded fake
 images directly via the Storage REST API to a parent page and a child sub-page's exact path
-convention, confirmed both existed via a direct `list()` call, deleted the *parent* page through the
-UI (page-tree "⋯" menu), and confirmed *both* objects were gone — proving the subtree-cascade case,
+convention, confirmed both existed via a direct `list()` call, deleted the _parent_ page through the
+UI (page-tree "⋯" menu), and confirmed _both_ objects were gone — proving the subtree-cascade case,
 not just the single-page case. Repeated the same shape for a whole-workspace delete (image in a
 page, delete the workspace from the switcher) and confirmed the object was gone there too. Plus
 `pnpm check-types`/`lint` (repo-wide) and the full 48-test e2e suite

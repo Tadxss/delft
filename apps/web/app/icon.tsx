@@ -8,24 +8,22 @@ export const contentType = "image/png";
 // the app's ink-800/paper-50 palette rather than a designed logo, since there isn't one yet.
 export default function Icon() {
   return new ImageResponse(
-    (
-      <div
-        style={{
-          width: "100%",
-          height: "100%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "#28251f",
-          color: "#faf9f7",
-          fontSize: 20,
-          fontWeight: 700,
-          fontFamily: "sans-serif",
-        }}
-      >
-        D
-      </div>
-    ),
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "#28251f",
+        color: "#faf9f7",
+        fontSize: 20,
+        fontWeight: 700,
+        fontFamily: "sans-serif",
+      }}
+    >
+      D
+    </div>,
     { ...size },
   );
 }

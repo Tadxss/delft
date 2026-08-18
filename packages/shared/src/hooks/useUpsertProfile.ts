@@ -24,7 +24,16 @@ export function useUpsertProfile() {
   const queryClient = useQueryClient();
 
   return useMutation<Profile, Error, UpsertProfileInput>({
-    mutationFn: async ({ id, username, firstName, middleName, lastName, occupation, bio, avatarUrl }) => {
+    mutationFn: async ({
+      id,
+      username,
+      firstName,
+      middleName,
+      lastName,
+      occupation,
+      bio,
+      avatarUrl,
+    }) => {
       const patch: ProfilesUpsert = { id };
       if (username !== undefined) patch.username = username;
       if (firstName !== undefined) patch.first_name = firstName;

@@ -1,20 +1,30 @@
 "use client";
 
-import { memo, useEffect, useRef, useState } from "react";
+import { Fragment, memo, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { ChevronDown, ChevronRight, MoreHorizontal, Plus } from "lucide-react";
 import type { Page } from "@delft/types";
-import { parseWorkspaceSlug, useDeletePage, useUpdatePage } from "@delft/shared";
+import {
+  parseWorkspaceSlug,
+  useDeletePage,
+  useUpdatePage,
+} from "@delft/shared";
+import { ReorderStrip } from "./ReorderStrip";
 
 export interface PageTreeNodeProps {
   page: Page;
   childrenByParent: Map<string | null, Page[]>;
-  // Kept for the recursive children map below (each child needs the latest Set to compute its own
-  // isExpanded) — deliberately excluded from arePageTreeNodePropsEqual, since it gets a new
-  // reference on every toggle anywhere in the tree and would defeat memoization if compared.
   expanded: Set<string>;
-  isExpanded: boolean;
+  // Ids that can't be a valid drop target for whatever page is currently being dragged (its own id
+  // plus every descendant) — computed once per drag session, see Sidebar.tsx. Empty when nothing is
+  // being dragged.
+  excludedDropIds: Set<string>;
+  // Whether a page drag is active at all — threaded down so ReorderStrip can toggle its hit-testing
+  // on/off (see ReorderStrip's own comment for why: it must stay mounted at zero height always, but
+  // shouldn't intercept pointer events when nothing is being dragged).
+  dragActive: boolean;
   onToggle: (pageId: string) => void;
   onCreateChild: (parentId: string) => void;
   depth: number;
@@ -24,7 +34,8 @@ function PageTreeNodeImpl({
   page,
   childrenByParent,
   expanded,
-  isExpanded,
+  excludedDropIds,
+  dragActive,
   onToggle,
   onCreateChild,
   depth,
@@ -36,7 +47,31 @@ function PageTreeNodeImpl({
   const deletePage = useDeletePage();
   const children = childrenByParent.get(page.id) ?? [];
   const hasChildren = children.length > 0;
+  const isExpanded = expanded.has(page.id);
   const isActive = params.pageId === page.id;
+
+  // Row is both the drag source (grab any page to move it) and a drop target (drop another page
+  // onto it to reparent). `listeners` alone (not `attributes`, which adds a role="button"/tabIndex
+  // meant for a keyboard-drag story this app doesn't implement) goes on the row — see Sidebar.tsx
+  // for the PointerSensor's delay+tolerance activation constraint that keeps ordinary clicks on the
+  // Link/buttons below working normally.
+  const {
+    listeners,
+    setNodeRef: setDragRef,
+    isDragging,
+  } = useDraggable({ id: page.id });
+  const { setNodeRef: setDropRef, isOver } = useDroppable({
+    id: page.id,
+    disabled: excludedDropIds.has(page.id),
+  });
+  const setRowRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      setDragRef(node);
+      setDropRef(node);
+    },
+    [setDragRef, setDropRef],
+  );
+  const isValidDropTarget = isOver && !excludedDropIds.has(page.id);
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
@@ -54,7 +89,8 @@ function PageTreeNodeImpl({
   useEffect(() => {
     if (!menuOpen) return;
     function handleClickOutside(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+      if (menuRef.current && !menuRef.current.contains(e.target as Node))
+        setMenuOpen(false);
     }
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") setMenuOpen(false);
@@ -102,8 +138,14 @@ function PageTreeNodeImpl({
   return (
     <li>
       <div
+        ref={setRowRef}
+        {...listeners}
         className={`group flex items-center gap-1 rounded-md px-1 py-1 text-sm hover:bg-paper-100 ${
           isActive ? "bg-paper-100 font-medium text-ink-800" : "text-ink-600"
+        } ${isDragging ? "opacity-40" : ""} ${
+          isValidDropTarget
+            ? "bg-paper-200 ring-2 ring-inset ring-accent-500"
+            : ""
         }`}
         style={{ paddingLeft: depth * 14 + 4 }}
       >
@@ -111,7 +153,7 @@ function PageTreeNodeImpl({
           type="button"
           onClick={() => onToggle(page.id)}
           aria-label={isExpanded ? "Collapse" : "Expand"}
-          className={`flex h-4 w-4 shrink-0 items-center justify-center text-ink-400 ${
+          className={`relative flex h-4 w-4 shrink-0 items-center justify-center text-ink-400 before:absolute before:-left-2 before:-right-1 before:-top-1.5 before:-bottom-1.5 before:content-[''] ${
             hasChildren
               ? "opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100"
               : "invisible"
@@ -149,7 +191,7 @@ function PageTreeNodeImpl({
           type="button"
           onClick={() => onCreateChild(page.id)}
           aria-label="Add sub-page"
-          className="flex h-4 w-4 shrink-0 items-center justify-center text-ink-400 hover:text-ink-700 md:hidden md:group-hover:flex md:group-focus-within:flex"
+          className="relative flex h-4 w-4 shrink-0 items-center justify-center text-ink-400 before:absolute before:-left-1 before:-right-0.5 before:-top-1.5 before:-bottom-1.5 before:content-[''] hover:text-ink-700 md:hidden md:group-hover:flex md:group-focus-within:flex"
         >
           <Plus size={14} />
         </button>
@@ -159,7 +201,7 @@ function PageTreeNodeImpl({
             onClick={() => setMenuOpen((prev) => !prev)}
             aria-label="Page actions"
             aria-haspopup="menu"
-            className="flex h-4 w-4 shrink-0 items-center justify-center text-ink-400 hover:text-ink-700 md:hidden md:group-hover:flex md:group-focus-within:flex"
+            className="relative flex h-4 w-4 shrink-0 items-center justify-center text-ink-400 before:absolute before:-left-0.5 before:-right-2.5 before:-top-1.5 before:-bottom-1.5 before:content-[''] hover:text-ink-700 md:hidden md:group-hover:flex md:group-focus-within:flex"
           >
             <MoreHorizontal size={14} />
           </button>
@@ -190,35 +232,58 @@ function PageTreeNodeImpl({
       </div>
       {hasChildren && isExpanded && (
         <ul>
-          {children.map((child) => (
-            <PageTreeNode
-              key={child.id}
-              page={child}
-              childrenByParent={childrenByParent}
-              expanded={expanded}
-              isExpanded={expanded.has(child.id)}
-              onToggle={onToggle}
-              onCreateChild={onCreateChild}
-              depth={depth + 1}
-            />
+          {children.map((child, index) => (
+            <Fragment key={child.id}>
+              {/* Strip id encodes "insert right after this sibling" (or "start" for before the
+                  first) rather than a numeric index — see Sidebar.tsx's handleDragEnd for why: it
+                  lets the drop handler resolve neighbors after filtering the dragged item itself
+                  out of the list, without an index needing to shift to account for that removal. */}
+              <ReorderStrip
+                id={`page-strip:${page.id}:${index === 0 ? "start" : children[index - 1]!.id}`}
+                active={dragActive}
+              />
+              <PageTreeNode
+                page={child}
+                childrenByParent={childrenByParent}
+                expanded={expanded}
+                excludedDropIds={excludedDropIds}
+                dragActive={dragActive}
+                onToggle={onToggle}
+                onCreateChild={onCreateChild}
+                depth={depth + 1}
+              />
+            </Fragment>
           ))}
+          <ReorderStrip
+            id={`page-strip:${page.id}:${children[children.length - 1]!.id}`}
+            active={dragActive}
+          />
         </ul>
       )}
     </li>
   );
 }
 
-function arePageTreeNodePropsEqual(prev: PageTreeNodeProps, next: PageTreeNodeProps): boolean {
+function arePageTreeNodePropsEqual(
+  prev: PageTreeNodeProps,
+  next: PageTreeNodeProps,
+): boolean {
   return (
     prev.page === next.page &&
     prev.childrenByParent === next.childrenByParent &&
-    prev.isExpanded === next.isExpanded &&
+    prev.expanded === next.expanded &&
+    prev.excludedDropIds === next.excludedDropIds &&
+    prev.dragActive === next.dragActive &&
     prev.onToggle === next.onToggle &&
     prev.onCreateChild === next.onCreateChild &&
     prev.depth === next.depth
-    // `expanded` (the raw Set) is deliberately excluded: it's only read internally to compute each
-    // CHILD's own isExpanded prop, and it gets a new reference on every toggle anywhere in the
-    // tree. Comparing it here would re-render every node on every toggle, defeating the memo.
+    // `expanded` IS compared here (unlike an earlier version of this file) — excluding it broke
+    // toggling for any node whose own isExpanded doesn't change but a NESTED descendant's does: the
+    // descendant's isExpanded is only ever recomputed by its direct parent's render, so skipping the
+    // parent's re-render (because the parent's own isExpanded looked unchanged) left descendants
+    // stuck on stale expand state. Comparing `expanded` normally means a toggle anywhere re-renders
+    // the whole tree again, same as before any memoization existed — correct behavior over a
+    // perf optimization that doesn't matter yet at this app's scale.
   );
 }
 

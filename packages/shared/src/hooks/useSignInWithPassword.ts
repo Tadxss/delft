@@ -8,7 +8,10 @@ export function useSignInWithPassword() {
 
   return useMutation<void, Error, { email: string; password: string }>({
     mutationFn: async ({ email, password }) => {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
       if (error) throw error;
     },
   });

@@ -10,6 +10,7 @@ export interface UpdatePageInput {
   title?: string;
   content?: unknown;
   parentId?: string | null;
+  position?: number;
 }
 
 // Backs both the title field and the BlockNote autosave (apps/web debounces calls to this hook by
@@ -20,11 +21,12 @@ export function useUpdatePage() {
   const queryClient = useQueryClient();
 
   return useMutation<Page, Error, UpdatePageInput>({
-    mutationFn: async ({ id, title, content, parentId }) => {
+    mutationFn: async ({ id, title, content, parentId, position }) => {
       const patch: PagesUpdate = {};
       if (title !== undefined) patch.title = title;
       if (content !== undefined) patch.content = content as Json;
       if (parentId !== undefined) patch.parent_id = parentId;
+      if (position !== undefined) patch.position = position;
 
       const { data, error } = await supabase
         .from("pages")

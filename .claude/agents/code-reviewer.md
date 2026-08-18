@@ -40,7 +40,7 @@ satisfy).
 3. **Consistency with this codebase's own conventions**, not generic best practice: one hook per
    file in `packages/shared/src/hooks/`, snake_case↔camelCase mapping only at the
    `packages/shared/src/supabase/mappers.ts` boundary, RLS policy naming `<table>_<action>_
-   <qualifier>`. Check whether a similar problem is already solved elsewhere before flagging
+<qualifier>`. Check whether a similar problem is already solved elsewhere before flagging
    "missing" reuse of something that doesn't exist yet.
 4. **Simplicity/scope.** Flag unrequested abstractions, dead code, or a fix that grew into an
    unrelated refactor. Credentials management and the Excalidraw-style canvas are explicitly

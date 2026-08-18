@@ -8,7 +8,10 @@ export function useDeleteCredential() {
 
   return useMutation<void, Error, { id: string; workspaceId: string }>({
     mutationFn: async ({ id }) => {
-      const { error } = await supabase.from("credentials").delete().eq("id", id);
+      const { error } = await supabase
+        .from("credentials")
+        .delete()
+        .eq("id", id);
       if (error) throw error;
     },
     onSuccess: (_data, { workspaceId }) => {

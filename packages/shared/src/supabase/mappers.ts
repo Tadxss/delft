@@ -54,6 +54,7 @@ export function mapPageRow(row: PageRow): Page {
     content: row.content,
     isPublished: row.is_published,
     publishedSlug: row.published_slug,
+    position: row.position,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -68,6 +69,7 @@ export function mapCredentialRow(row: CredentialRow): Credential {
     url: row.url,
     secretCiphertext: row.secret_ciphertext,
     secretIv: row.secret_iv,
+    position: row.position,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -81,6 +83,7 @@ export function mapCredentialFolderRow(
     workspaceId: row.workspace_id,
     parentFolderId: row.parent_folder_id,
     name: row.name,
+    position: row.position,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -92,6 +95,7 @@ export function mapCanvasRow(row: CanvasRow): Canvas {
     workspaceId: row.workspace_id,
     title: row.title,
     scene: row.scene,
+    position: row.position,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

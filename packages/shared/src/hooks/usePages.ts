@@ -11,7 +11,10 @@ export interface UsePagesOptions {
 }
 
 // Direct RLS-gated read — pages_select_member already limits this to the caller's own workspace.
-export function usePages(workspaceId: string | undefined, options: UsePagesOptions = {}) {
+export function usePages(
+  workspaceId: string | undefined,
+  options: UsePagesOptions = {},
+) {
   const supabase = useSupabaseClient();
   const { parentId } = options;
 
@@ -23,10 +26,13 @@ export function usePages(workspaceId: string | undefined, options: UsePagesOptio
         .from("pages")
         .select("*")
         .eq("workspace_id", workspaceId as string)
-        .order("created_at", { ascending: true });
+        .order("position", { ascending: true });
 
       if (parentId !== undefined) {
-        query = parentId === null ? query.is("parent_id", null) : query.eq("parent_id", parentId);
+        query =
+          parentId === null
+            ? query.is("parent_id", null)
+            : query.eq("parent_id", parentId);
       }
 
       const { data, error } = await query;

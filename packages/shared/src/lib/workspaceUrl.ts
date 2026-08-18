@@ -15,7 +15,9 @@ export function slugifyWorkspaceName(name: string): string {
 // `/workspace/{slug}--{id}` — human-readable name up front so the URL doesn't read as an internal
 // id, but the real id is always present after the "--" so links never break if the workspace is
 // later renamed (the slug segment is purely decorative, never looked up against).
-export function buildWorkspaceHref(workspace: Pick<Workspace, "id" | "name">): string {
+export function buildWorkspaceHref(
+  workspace: Pick<Workspace, "id" | "name">,
+): string {
   return `/workspace/${slugifyWorkspaceName(workspace.name)}--${workspace.id}`;
 }
 

@@ -18,7 +18,7 @@ export function useCredentials(workspaceId: string | undefined) {
         .from("credentials")
         .select("*")
         .eq("workspace_id", workspaceId as string)
-        .order("title", { ascending: true });
+        .order("position", { ascending: true });
       if (error) throw error;
       return (data ?? []).map(mapCredentialRow);
     },

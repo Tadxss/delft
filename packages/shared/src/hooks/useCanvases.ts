@@ -16,7 +16,7 @@ export function useCanvases(workspaceId: string | undefined) {
         .from("canvases")
         .select("*")
         .eq("workspace_id", workspaceId as string)
-        .order("created_at", { ascending: true });
+        .order("position", { ascending: true });
       if (error) throw error;
       return (data ?? []).map(mapCanvasRow);
     },

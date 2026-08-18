@@ -4,7 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, LogOut, User, X } from "lucide-react";
 import imageCompression from "browser-image-compression";
-import { useAuthUser, useProfile, useSetPassword, useSignOut, useUploadAvatar, useUpsertProfile } from "@delft/shared";
+import {
+  useAuthUser,
+  useProfile,
+  useSetPassword,
+  useSignOut,
+  useUploadAvatar,
+  useUpsertProfile,
+} from "@delft/shared";
 import { OCCUPATIONS } from "../_lib/occupations";
 import { Modal } from "./Modal";
 
@@ -12,7 +19,13 @@ const MIN_PASSWORD_LENGTH = 8;
 
 type View = "list" | "password" | "profile";
 
-export function AccountModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function AccountModal({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
   const { user } = useAuthUser();
   const router = useRouter();
   const signOut = useSignOut();
@@ -90,7 +103,8 @@ export function AccountModal({ open, onClose }: { open: boolean; onClose: () => 
       {view === "list" ? (
         <div className="flex flex-col gap-4 overflow-y-auto p-4">
           <p className="text-xs text-ink-500">
-            Signed in as <span className="font-medium text-ink-700">{user?.email}</span>
+            Signed in as{" "}
+            <span className="font-medium text-ink-700">{user?.email}</span>
           </p>
 
           <button
@@ -123,10 +137,14 @@ export function AccountModal({ open, onClose }: { open: boolean; onClose: () => 
       ) : view === "password" ? (
         <div className="flex flex-col gap-2 overflow-y-auto p-4">
           <p className="text-xs text-ink-500">
-            Sign in with a password instead of waiting on a magic-link email each time.
+            Sign in with a password instead of waiting on a magic-link email
+            each time.
           </p>
           <form onSubmit={handleSubmit} className="mt-1 flex flex-col gap-2">
-            <label htmlFor="password" className="text-xs font-medium uppercase tracking-wide text-ink-500">
+            <label
+              htmlFor="password"
+              className="text-xs font-medium uppercase tracking-wide text-ink-500"
+            >
               New password
             </label>
             <input
@@ -139,7 +157,10 @@ export function AccountModal({ open, onClose }: { open: boolean; onClose: () => 
               onChange={(e) => setPasswordValue(e.target.value)}
               className="rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
             />
-            <label htmlFor="confirm" className="text-xs font-medium uppercase tracking-wide text-ink-500">
+            <label
+              htmlFor="confirm"
+              className="text-xs font-medium uppercase tracking-wide text-ink-500"
+            >
               Confirm password
             </label>
             <input
@@ -159,9 +180,19 @@ export function AccountModal({ open, onClose }: { open: boolean; onClose: () => 
             >
               {setPassword.isPending ? "Saving…" : "Save password"}
             </button>
-            {mismatch && <p className="text-xs text-red-700">Passwords don&apos;t match.</p>}
-            {setPassword.isError && <p className="text-xs text-red-700">{setPassword.error.message}</p>}
-            {saved && <p className="text-xs text-emerald-700">Password saved.</p>}
+            {mismatch && (
+              <p className="text-xs text-red-700">
+                Passwords don&apos;t match.
+              </p>
+            )}
+            {setPassword.isError && (
+              <p className="text-xs text-red-700">
+                {setPassword.error.message}
+              </p>
+            )}
+            {saved && (
+              <p className="text-xs text-emerald-700">Password saved.</p>
+            )}
           </form>
         </div>
       ) : (
@@ -232,7 +263,8 @@ function ProfileForm({ userId }: { userId: string | undefined }) {
     e.preventDefault();
     if (!userId) return;
     setSaved(false);
-    const finalOccupation = occupation === "Other" ? customOccupation.trim() : occupation;
+    const finalOccupation =
+      occupation === "Other" ? customOccupation.trim() : occupation;
     upsertProfile.mutate(
       {
         id: userId,
@@ -264,7 +296,11 @@ function ProfileForm({ userId }: { userId: string | undefined }) {
         <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border border-paper-200 bg-paper-100">
           {avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- avatars are small, user-uploaded images with no build-time known dimensions; next/image's optimization isn't worth the config for this
-            <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+            <img
+              src={avatarUrl}
+              alt=""
+              className="h-full w-full object-cover"
+            />
           ) : (
             <User size={22} className="text-ink-400" />
           )}
@@ -286,13 +322,18 @@ function ProfileForm({ userId }: { userId: string | undefined }) {
             {uploadAvatar.isPending ? "Uploading…" : "Change photo"}
           </button>
           {uploadAvatar.isError && (
-            <p className="mt-1 text-xs text-red-700">{uploadAvatar.error.message}</p>
+            <p className="mt-1 text-xs text-red-700">
+              {uploadAvatar.error.message}
+            </p>
           )}
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="mt-2 flex flex-col gap-2">
-        <label htmlFor="username" className="text-xs font-medium uppercase tracking-wide text-ink-500">
+        <label
+          htmlFor="username"
+          className="text-xs font-medium uppercase tracking-wide text-ink-500"
+        >
           Username (optional)
         </label>
         <input
@@ -303,11 +344,14 @@ function ProfileForm({ userId }: { userId: string | undefined }) {
           className="rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
         />
         <p className="-mt-1 text-xs text-ink-400">
-          Lowercase letters, numbers, and underscores only, 3–20 characters. Lets you sign in with
-          this instead of your email.
+          Lowercase letters, numbers, and underscores only, 3–20 characters.
+          Lets you sign in with this instead of your email.
         </p>
 
-        <label htmlFor="firstName" className="text-xs font-medium uppercase tracking-wide text-ink-500">
+        <label
+          htmlFor="firstName"
+          className="text-xs font-medium uppercase tracking-wide text-ink-500"
+        >
           First name
         </label>
         <input
@@ -318,7 +362,10 @@ function ProfileForm({ userId }: { userId: string | undefined }) {
           className="rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
         />
 
-        <label htmlFor="middleName" className="text-xs font-medium uppercase tracking-wide text-ink-500">
+        <label
+          htmlFor="middleName"
+          className="text-xs font-medium uppercase tracking-wide text-ink-500"
+        >
           Middle name (optional)
         </label>
         <input
@@ -329,7 +376,10 @@ function ProfileForm({ userId }: { userId: string | undefined }) {
           className="rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
         />
 
-        <label htmlFor="lastName" className="text-xs font-medium uppercase tracking-wide text-ink-500">
+        <label
+          htmlFor="lastName"
+          className="text-xs font-medium uppercase tracking-wide text-ink-500"
+        >
           Last name
         </label>
         <input
@@ -340,7 +390,10 @@ function ProfileForm({ userId }: { userId: string | undefined }) {
           className="rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
         />
 
-        <label htmlFor="occupation" className="text-xs font-medium uppercase tracking-wide text-ink-500">
+        <label
+          htmlFor="occupation"
+          className="text-xs font-medium uppercase tracking-wide text-ink-500"
+        >
           Occupation
         </label>
         <select
@@ -367,7 +420,10 @@ function ProfileForm({ userId }: { userId: string | undefined }) {
           />
         )}
 
-        <label htmlFor="bio" className="text-xs font-medium uppercase tracking-wide text-ink-500">
+        <label
+          htmlFor="bio"
+          className="text-xs font-medium uppercase tracking-wide text-ink-500"
+        >
           Bio
         </label>
         <textarea

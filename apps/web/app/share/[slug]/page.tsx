@@ -42,7 +42,9 @@ export default async function SharedPagePage({
 
   return (
     <main className="mx-auto max-w-3xl px-8 pb-16 pt-20">
-      <h1 className="mb-8 text-3xl font-bold text-ink-800">{page.title || "Untitled"}</h1>
+      <h1 className="mb-8 text-3xl font-bold text-ink-800">
+        {page.title || "Untitled"}
+      </h1>
       {/* Trusted content: only the signed-in workspace owner can ever author it, rendered here
           read-only (no toolbar/side menu/drag handles — see SharedPageView) for the published
           slug. Print-to-PDF from the browser is the intended export path for this view. */}

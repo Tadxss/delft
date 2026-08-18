@@ -2,10 +2,15 @@
 
 import { useState, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { createSupabaseClient, SupabaseProvider, type SupabaseStorageAdapter } from "@delft/shared";
+import {
+  createSupabaseClient,
+  SupabaseProvider,
+  type SupabaseStorageAdapter,
+} from "@delft/shared";
 
 const webStorageAdapter: SupabaseStorageAdapter = {
-  getItem: (key) => (typeof window === "undefined" ? null : window.localStorage.getItem(key)),
+  getItem: (key) =>
+    typeof window === "undefined" ? null : window.localStorage.getItem(key),
   setItem: (key, value) => {
     if (typeof window !== "undefined") window.localStorage.setItem(key, value);
   },
@@ -28,7 +33,11 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 // `pnpm dev` before `.env.local` is filled in — see apps/web/.env.local.example.
 const supabase =
   supabaseUrl && supabaseAnonKey
-    ? createSupabaseClient({ url: supabaseUrl, anonKey: supabaseAnonKey, storage: webStorageAdapter })
+    ? createSupabaseClient({
+        url: supabaseUrl,
+        anonKey: supabaseAnonKey,
+        storage: webStorageAdapter,
+      })
     : null;
 
 export function Providers({ children }: { children: ReactNode }) {
@@ -46,7 +55,9 @@ export function Providers({ children }: { children: ReactNode }) {
   );
 
   if (!supabase) {
-    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+    return (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
   }
 
   return (

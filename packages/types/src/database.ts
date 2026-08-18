@@ -38,6 +38,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          position: number
           scene: Json
           title: string
           updated_at: string
@@ -46,6 +47,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          position?: number
           scene?: Json
           title?: string
           updated_at?: string
@@ -54,6 +56,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          position?: number
           scene?: Json
           title?: string
           updated_at?: string
@@ -75,6 +78,7 @@ export type Database = {
           id: string
           name: string
           parent_folder_id: string | null
+          position: number
           updated_at: string
           workspace_id: string
         }
@@ -83,6 +87,7 @@ export type Database = {
           id?: string
           name?: string
           parent_folder_id?: string | null
+          position?: number
           updated_at?: string
           workspace_id: string
         }
@@ -91,6 +96,7 @@ export type Database = {
           id?: string
           name?: string
           parent_folder_id?: string | null
+          position?: number
           updated_at?: string
           workspace_id?: string
         }
@@ -116,6 +122,7 @@ export type Database = {
           created_at: string
           folder_id: string | null
           id: string
+          position: number
           secret_ciphertext: string
           secret_iv: string
           title: string
@@ -127,6 +134,7 @@ export type Database = {
           created_at?: string
           folder_id?: string | null
           id?: string
+          position?: number
           secret_ciphertext: string
           secret_iv: string
           title?: string
@@ -138,6 +146,7 @@ export type Database = {
           created_at?: string
           folder_id?: string | null
           id?: string
+          position?: number
           secret_ciphertext?: string
           secret_iv?: string
           title?: string
@@ -169,6 +178,7 @@ export type Database = {
           id: string
           is_published: boolean
           parent_id: string | null
+          position: number
           published_slug: string | null
           title: string
           updated_at: string
@@ -180,6 +190,7 @@ export type Database = {
           id?: string
           is_published?: boolean
           parent_id?: string | null
+          position?: number
           published_slug?: string | null
           title?: string
           updated_at?: string
@@ -191,6 +202,7 @@ export type Database = {
           id?: string
           is_published?: boolean
           parent_id?: string | null
+          position?: number
           published_slug?: string | null
           title?: string
           updated_at?: string

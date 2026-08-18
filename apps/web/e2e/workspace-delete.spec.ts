@@ -14,13 +14,19 @@ test("deleting a workspace removes it from the switcher and its data no longer r
   // Give it a page, so deletion is actually exercising the on-delete-cascade, not just an empty row.
   await openSidebar(page);
   await page.click('button[aria-label="New page"]:visible');
-  await page.waitForURL(/\/workspace\/[^/]+--[^/]+\/p\/[^/]+$/, { timeout: 15000 });
+  await page.waitForURL(/\/workspace\/[^/]+--[^/]+\/p\/[^/]+$/, {
+    timeout: 15000,
+  });
 
   await page.goto("/workspace");
   await expect(page.getByText("Throwaway")).toBeVisible();
 
   page.once("dialog", (dialog) => dialog.accept());
-  await page.getByText("Throwaway").locator("..").getByRole("button", { name: "Delete" }).click();
+  await page
+    .getByText("Throwaway")
+    .locator("..")
+    .getByRole("button", { name: "Delete" })
+    .click();
 
   await expect(page.getByText("Throwaway")).not.toBeVisible();
 

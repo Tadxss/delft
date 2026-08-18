@@ -25,7 +25,9 @@ export function useCreateCanvas() {
       return mapCanvasRow(data);
     },
     onSuccess: (canvas) => {
-      queryClient.invalidateQueries({ queryKey: ["canvases", canvas.workspaceId] });
+      queryClient.invalidateQueries({
+        queryKey: ["canvases", canvas.workspaceId],
+      });
     },
   });
 }

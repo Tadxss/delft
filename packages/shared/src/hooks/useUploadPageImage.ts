@@ -9,7 +9,11 @@ import { useSupabaseClient } from "../supabase/context";
 export function useUploadPageImage() {
   const supabase = useSupabaseClient();
 
-  return useMutation<string, Error, { workspaceId: string; pageId: string; file: Blob }>({
+  return useMutation<
+    string,
+    Error,
+    { workspaceId: string; pageId: string; file: Blob }
+  >({
     mutationFn: async ({ workspaceId, pageId, file }) => {
       const path = `${workspaceId}/${pageId}/${crypto.randomUUID()}.webp`;
       const { error } = await supabase.storage

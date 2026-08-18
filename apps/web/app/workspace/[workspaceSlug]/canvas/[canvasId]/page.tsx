@@ -6,7 +6,12 @@ import { CanvasEditor } from "./_components/CanvasEditor";
 
 export default function CanvasRoute() {
   const params = useParams<{ canvasId: string }>();
-  const { data: canvas, isLoading, isError, error } = useCanvas(params.canvasId);
+  const {
+    data: canvas,
+    isLoading,
+    isError,
+    error,
+  } = useCanvas(params.canvasId);
 
   if (isLoading) {
     return (

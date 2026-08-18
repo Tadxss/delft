@@ -5,7 +5,9 @@ import { onlyVisible, openSidebar, signIn, uniqueEmail } from "./helpers";
 // invisible to every other signed-in user, not just filtered out of the UI. Uses two fully
 // separate browser contexts (separate cookies/localStorage) to simulate two real accounts, per
 // votero's e2e convention of never sharing a context between simulated users.
-test("user B never sees user A's workspace, even by guessing the workspace URL", async ({ browser }) => {
+test("user B never sees user A's workspace, even by guessing the workspace URL", async ({
+  browser,
+}) => {
   const pageA = await (await browser.newContext()).newPage();
   await signIn(pageA, uniqueEmail("isolation-a"));
   await pageA.fill("#workspace-name", "A's private workspace");

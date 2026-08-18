@@ -17,23 +17,27 @@ export function usePublishPage() {
   const supabase = useSupabaseClient();
   const queryClient = useQueryClient();
 
-  return useMutation<Page, Error, { id: string; existingSlug?: string | null }>({
-    mutationFn: async ({ id, existingSlug }) => {
-      const { data, error } = await supabase
-        .from("pages")
-        .update({
-          is_published: true,
-          published_slug: existingSlug ?? generateSlug(),
-        })
-        .eq("id", id)
-        .select()
-        .single();
-      if (error) throw error;
-      return mapPageRow(data);
+  return useMutation<Page, Error, { id: string; existingSlug?: string | null }>(
+    {
+      mutationFn: async ({ id, existingSlug }) => {
+        const { data, error } = await supabase
+          .from("pages")
+          .update({
+            is_published: true,
+            published_slug: existingSlug ?? generateSlug(),
+          })
+          .eq("id", id)
+          .select()
+          .single();
+        if (error) throw error;
+        return mapPageRow(data);
+      },
+      onSuccess: (page) => {
+        queryClient.setQueryData<Page>(["page", page.id], page);
+        queryClient.invalidateQueries({
+          queryKey: ["pages", page.workspaceId],
+        });
+      },
     },
-    onSuccess: (page) => {
-      queryClient.setQueryData<Page>(["page", page.id], page);
-      queryClient.invalidateQueries({ queryKey: ["pages", page.workspaceId] });
-    },
-  });
+  );
 }

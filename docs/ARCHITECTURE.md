@@ -31,9 +31,11 @@ on each, and this file's Build Order steps 30-37 for the how/why of each fix.
 No committed backlog beyond that audit exists right now — what to work on next is an open question
 for whoever picks this up. A follow-up UI/UX/performance audit (pragmatic, personal-scale lens —
 not scored against a production-SaaS bar) ran after BETA_READINESS closed out; its findings are
-closed out too, as of Build Order steps 42-46. The one recurring (not one-time) item worth keeping
-an eye on regardless: the image-compression settings in `PageEditor.tsx` against real Storage usage
-as real data accumulates — Supabase Storage's free tier caps at 1GB.
+closed out too, as of Build Order steps 42-49. Since then: the Credentials sidebar got a visual
+redesign (step 50), and both sidebar trees (Pages, Credentials) gained full drag-and-drop —
+reparenting (step 52) and sibling reordering (step 54). The one recurring (not one-time) item worth
+keeping an eye on regardless: the image-compression settings in `PageEditor.tsx` against real
+Storage usage as real data accumulates — Supabase Storage's free tier caps at 1GB.
 
 ## Data model
 
@@ -47,23 +49,31 @@ as real data accumulates — Supabase Storage's free tier caps at 1GB.
   than `owner_id` directly, so extending to real multi-user sharing later is a data change, not a
   schema/policy rewrite.
 - `pages (id, workspace_id, parent_id, title, content jsonb, is_published, published_slug,
-  created_at, updated_at)` — `parent_id` self-references `pages` for the sidebar tree.
-- `credentials (id, workspace_id, folder_id, title, url, secret_ciphertext, secret_iv, created_at,
-  updated_at)` — `title`/`url` plaintext (list view + search); `secret_ciphertext`/`secret_iv` are
+  position, created_at, updated_at)` — `parent_id` self-references `pages` for the sidebar tree.
+  `position` (`double precision`) is a manually-settable sibling order — see Build Order step 54.
+- `credentials (id, workspace_id, folder_id, title, url, secret_ciphertext, secret_iv, position,
+  created_at, updated_at)` — `title`/`url` plaintext (list view + search); `secret_ciphertext`/`secret_iv` are
   one AES-GCM ciphertext+iv pair encrypting a `{username, password, notes}` JSON payload per
   credential. See Build Order step 16. `folder_id` (nullable, `on delete set null`) places it in a
-  `credential_folders` folder, or at root when null — see Build Order step 24.
-- `credential_folders (id, workspace_id, parent_folder_id, name, created_at, updated_at)` — pure
-  containers (name only, no secret of their own), nesting arbitrarily deep via `parent_folder_id`
-  (self-referencing, `on delete cascade` — unlike `credentials.folder_id`, which is deliberately
-  `on delete set null` so deleting a folder never destroys the credentials inside it). Two triggers
-  (`check_credential_folder_parent`, `check_credential_folder_workspace`) guard against cycles and
-  cross-workspace linking, since RLS's flat per-row membership check can't catch either on its own.
-  See Build Order step 24.
-- `canvases (id, workspace_id, title, scene jsonb, created_at, updated_at)` — flat, no `parent_id`
-  (standalone items, not a tree like `pages`). `scene` is Excalidraw's own `{elements, appState}`
-  shape; the `files` argument from Excalidraw's `onChange` (embedded image binaries) is never
-  persisted. See Build Order step 17.
+  `credential_folders` folder, or at root when null — see Build Order step 24. `position` (Build
+  Order step 54) is scoped per `folder_id` group.
+- `credential_folders (id, workspace_id, parent_folder_id, name, position, created_at,
+  updated_at)` — pure containers (name only, no secret of their own), nesting arbitrarily deep via
+  `parent_folder_id` (self-referencing, `on delete cascade` — unlike `credentials.folder_id`, which
+  is deliberately `on delete set null` so deleting a folder never destroys the credentials inside
+  it). Two triggers (`check_credential_folder_parent`, `check_credential_folder_workspace`) guard
+  against cycles and cross-workspace linking, since RLS's flat per-row membership check can't catch
+  either on its own. See Build Order step 24; `position` (per `parent_folder_id` group) is step 54.
+- `canvases (id, workspace_id, title, scene jsonb, position, created_at, updated_at)` — flat, no
+  `parent_id` (standalone items, not a tree like `pages`). `scene` is Excalidraw's own
+  `{elements, appState}` shape; the `files` argument from Excalidraw's `onChange` (embedded image
+  binaries) is never persisted. See Build Order step 17; `position` is step 54.
+- **Manual ordering** (`position`, all four tables above, Build Order step 54): `double precision`,
+  reordered via a client-computed midpoint between two neighbors
+  (`packages/shared/src/lib/positionUtils.ts`) rather than an integer-with-gaps or
+  fractional-indexing scheme — deliberately the simplest option that still supports O(1) reorders,
+  accepted as fine at this app's realistic write volume (see that step for the
+  float-precision-exhaustion tradeoff this implies).
 - `profiles (id, username, first_name, middle_name, last_name, occupation, bio, avatar_url,
   created_at, updated_at)` — the first **non-workspace-scoped** table; `id` is both PK and FK to
   `auth.users`, one row per user. Auto-created blank on signup via an `AFTER INSERT` trigger on
@@ -1439,3 +1449,119 @@ Storage usage — see **Next Up** above.
     it ever landed in a commit, and used Next's own Turbopack-native `next experimental-analyze`
     instead — exposed as `pnpm analyze` in `apps/web/package.json`. Zero extra dependency; confirmed
     with a real run that it writes an analysis to `.next/diagnostics/analyze`.
+
+47. **Branch-discipline guardrail: a `PreToolUse` hook blocking `git commit`/`git push` on
+    `master`.** ✅ *done*. This repo's workflow is develop → PR → `master` (`master` auto-deploys to
+    production on push), but this session committed 5 fixes directly to `master` by mistake before
+    catching it and moving them to `develop` (stash + cherry-pick + reset — nothing had been pushed,
+    so this was fully local). `.claude/hooks/block-master-git-writes.js` + `.claude/settings.json`
+    now check the current branch before any Bash/PowerShell `git commit`/`git push` and deny it with
+    a clear message if the branch is `master`. Verified via pipe-tests against synthesized hook
+    input and a live sentinel-file test confirming it actually fires.
+
+48. **Touch/click target audit fix: `TopBar`, `ThemeToggle`, `Sidebar`, `PageTreeNode` icon
+    buttons.** ✅ *done*. Several buttons were well under the ~44px comfort floor (down to 16×16 for
+    the tree-row buttons). Added an invisible `before:absolute` pseudo-element to each, extending
+    the clickable area past the visible edges with no layout shift — asymmetric per button, not a
+    uniform inset, since several sit only 4-8px from another interactive neighbor (a sibling button,
+    or `PageTreeNode`'s title `Link`) that a uniform expansion would have stolen clicks from. Only
+    the two standalone `TopBar` buttons reach the full 44×44; every other button is capped short on
+    at least one axis by a real neighbor, the correct outcome given the layout.
+
+49. **Route-level `loading.tsx` for the page and canvas editor routes.** ✅ *done*. Both routes are
+    client components that only showed a loading state once mounted and their own query had
+    started, leaving a blank flash during the route-transition/hydration gap.
+    `apps/web/app/workspace/[workspaceSlug]/p/[pageId]/loading.tsx` and the matching
+    `canvas/[canvasId]/loading.tsx` fill that gap via Next's built-in Suspense convention, reusing
+    each route's own already-existing loading markup.
+
+50. **Credentials vault modal redesign.** ✅ *done*. The sidebar tree and detail pane read as
+    generic/unpolished against the rest of the app. Switched every hand-rolled inline SVG icon
+    (including a bare unicode chevron glyph) to `lucide-react` — already used everywhere else in the
+    app, the biggest single consistency gap — added a ghost icon-button pattern for utility actions
+    (Copy/Show/Generate, folder-row hover actions) replacing a bordered-box-with-text-label look, a
+    `KeyRound` icon on credential rows so they read consistently with folders' own icon,
+    `font-medium` folder names, and an accent-colored left bar on the selected row so selection is
+    unambiguous at a glance. Kept the Show/Hide password button's `aria-label` as exactly
+    `"Show"`/`"Hide"` (matching its previous visible text) since `credentials.spec.ts` targets it by
+    accessible name — going icon-only without that would have silently broken the test.
+
+51. **Fix: broken expand/collapse on nested sidebar/folder-tree rows — a regression from step 43.**
+    ✅ *done*. Step 43's re-render optimization excluded the raw `expanded: Set<string>` from each
+    node's memo comparator, relying instead on a separately-passed `isExpanded` boolean computed by
+    each node's *parent* during the parent's own render — so whenever the parent's own `isExpanded`
+    looked unchanged, its memo check skipped re-rendering it, which also skipped recomputing
+    `isExpanded` for any of its children (only ever done inside the parent's render). Toggling
+    anything below the root level silently did nothing unless some unrelated change happened to
+    force the parent to re-render anyway — reported directly ("sub folder is hard to click... can't
+    minimize", then "same thing on the main sidebar"). Reverted to computing `isExpanded` internally
+    from a normally-compared `expanded` prop in both `PageTreeNode.tsx` and
+    `CredentialFolderTreeNode.tsx` — gives up step 43's "skip re-render on an unrelated toggle"
+    optimization (a scale this app hasn't reached yet) in favor of correctness. Added regression
+    tests to `workspace-pages.spec.ts`/`credential-folders.spec.ts` that toggle a nested (non-root)
+    row via a plain click with no accompanying data change — the exact path the existing tests never
+    exercised, which is how this shipped unnoticed. Verified by temporarily reintroducing the bug:
+    the new test fails immediately, and passes again once reverted.
+
+52. **Drag-and-drop reparenting: pages sidebar + credentials folder tree.** ✅ *done*. Pages and
+    credential folders can now be dragged onto another item to reparent them, or onto a root drop
+    target to move back to the top level — requested directly ("should be drag and drop only if we
+    want to move folders on credentials and pages... part on sidebar"). `CredentialsModal`'s old
+    "Move" button and its dropdown-based `MoveCredentialFolderModal.tsx` are gone entirely — drag is
+    now the only way to move a folder, matching pages (which never had a move mechanism at all
+    before this). Used `@dnd-kit/core` (Pointer Events, not native HTML5 drag-and-drop, which has
+    well-known unreliable touch support — this app's e2e suite runs a real `mobile-safari` project,
+    see step 33). Both trees share one activation constraint and `pointerWithin` collision detection
+    (checks actual cursor position; the default `rectIntersection` was ambiguous for adjacent,
+    closely-packed rows and picked the wrong target in WebKit). A real safety gap was closed along
+    the way, not just a UI feature: `pages.parent_id` had zero server-side cycle-prevention before
+    this (unlike `credential_folders`, which got one specifically because "move a folder" needed it
+    — see step 24's migration). New `pages_check_parent` trigger
+    (`supabase/migrations/20260818140000_pages_check_parent.sql`) mirrors it — self-parent, cycle,
+    and cross-workspace checks — verified directly via `psql`, not just assumed correct from the
+    SQL. New shared `packages/shared/src/lib/treeUtils.ts`'s `computeSubtreeIds` (ported from the
+    deleted modal's own exclusion logic) backs both trees' "can't drop onto my own descendant" UI
+    guard.
+
+53. **Fix: drag-and-drop never activated for real mouse users.** ✅ *done*. Step 52 shipped both
+    trees on a single `PointerSensor` with a 200ms-delay + 8px-tolerance activation constraint
+    (chosen so touch-scrolling inside the credentials list's `overflow-y-auto` container kept
+    working) — that constraint requires holding the pointer still for the full delay before any
+    movement is allowed, so an ordinary "click and immediately drag" gesture moves well before 200ms
+    elapses, cancelling the drag instead of starting it. Reported directly ("I can't drag and
+    drop... should be like Notion when you click hold the item"). The e2e suite never caught this
+    because it simulated an artificial "hold perfectly still, then move" gesture to satisfy the same
+    constraint, not how anyone actually drags. Split into two sensors — dnd-kit's standard pattern
+    for this exact tension: `MouseSensor` with a small distance-only threshold (drag starts the
+    instant the pointer moves a few px, matching Notion-style responsiveness) and `TouchSensor`
+    keeping the original delay (still needed there). Re-verified the full drag-and-drop e2e suite
+    across chromium/webkit/mobile-safari.
+
+54. **Drag-to-reorder siblings: pages, credential folders, credentials, canvases.** ✅ *done*. Step
+    52 covered reparenting only — no way to drop an item at a specific position among its siblings,
+    reported directly against a screenshot of three sibling root pages ("one thing I can't do is
+    drag and drop it for them to re-order there positions"). Added a `position` (`double precision`)
+    column to all four tables (`supabase/migrations/20260818150000_position_ordering.sql`),
+    backfilled to preserve each table's current visible order exactly, reordered via a
+    client-computed midpoint between two neighbors (`packages/shared/src/lib/positionUtils.ts`'s
+    `computeReorderPosition`/`computeAppendPosition`) rather than an integer-with-gaps or
+    fractional-indexing scheme — the simplest option that still supports O(1) reorders, accepted
+    given this app's realistic (not high-volume) write pattern; see the Data model section above for
+    the float-precision tradeoff this implies. New `ReorderStrip.tsx` — a thin, always-mounted,
+    zero-height drop target rendered between every pair of siblings (and before/after the group) —
+    gives a "drop a line between two rows" interaction distinct from dropping *onto* a row (still
+    reparents, appended at the end). Extended to credentials and canvases, which had no drag support
+    at all before this (the user explicitly asked for full symmetry, not just pages/folders).
+    Two real bugs found and fixed during testing, not just test artifacts: (1) reading the DOM
+    immediately after a drop raced this app's deliberate no-optimistic-update convention — every
+    reorder e2e assertion needed a settle wait after the drag, same latency real users see; (2) at
+    the boundary between the credential tree's folder-group and credential-group, two adjacent
+    zero-height strips physically overlapped at the same point, so `pointerWithin` sometimes picked
+    the wrong one — fixed by removing the redundant strip and having the survivor serve both
+    purposes (see `CredentialList.tsx`'s `handleFolderDragEnd`). Also added `dragOverlayOffset.ts`,
+    a dnd-kit `Modifier` shifting the drag ghost away from the cursor so it stops covering the drop
+    indicator it exists to help aim at — reported directly ("it is blocking the view of where it
+    would land"). Verified: `check-types`/`lint`/`build` clean; full e2e suite (60 tests,
+    chromium/webkit/mobile-safari) passing, including new reorder tests for all four surfaces
+    (root + nested pages, folders + credentials with reparent, canvases with reload-persistence
+    check).

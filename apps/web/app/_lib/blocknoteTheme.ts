@@ -1,4 +1,8 @@
-import { darkDefaultTheme, lightDefaultTheme, type Theme } from "@blocknote/mantine";
+import {
+  darkDefaultTheme,
+  lightDefaultTheme,
+  type Theme,
+} from "@blocknote/mantine";
 
 // Notion's own font — no webfont file, just each OS's native UI font. Matches the `sans` stack in
 // tailwind.config.cjs; kept as a literal string here too since BlockNote's Theme type wants a CSS
@@ -14,7 +18,9 @@ const NOTION_FONT_STACK =
 // the editor's own background/text to transparent/`var(--foreground)`, and its font (BlockNote
 // defaults to an Inter-first stack) to the same system stack as the rest of the app, lets the
 // editor blend straight into the page instead of reading as a separate, differently-branded widget.
-export function resolveBlockNoteTheme(resolvedTheme: string | undefined): Theme {
+export function resolveBlockNoteTheme(
+  resolvedTheme: string | undefined,
+): Theme {
   const base = resolvedTheme === "dark" ? darkDefaultTheme : lightDefaultTheme;
   return {
     ...base,

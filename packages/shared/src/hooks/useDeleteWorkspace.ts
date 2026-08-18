@@ -18,7 +18,11 @@ export function useDeleteWorkspace(userId: string | undefined) {
         .select("id")
         .eq("workspace_id", id);
       if (fetchError) throw fetchError;
-      await removePageImages(supabase, id, (pages ?? []).map((page) => page.id));
+      await removePageImages(
+        supabase,
+        id,
+        (pages ?? []).map((page) => page.id),
+      );
 
       const { error } = await supabase.from("workspaces").delete().eq("id", id);
       if (error) throw error;

@@ -15,7 +15,9 @@ export function useSignInWithGoogle() {
         provider: "google",
         options: {
           skipBrowserRedirect: true,
-          ...(options?.redirectTo ? { redirectTo: options.redirectTo } : undefined),
+          ...(options?.redirectTo
+            ? { redirectTo: options.redirectTo }
+            : undefined),
         },
       });
       if (error) throw error;

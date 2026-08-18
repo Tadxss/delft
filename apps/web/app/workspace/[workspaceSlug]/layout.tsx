@@ -2,7 +2,11 @@
 
 import { SidebarShell } from "./_components/SidebarShell";
 
-export default function WorkspaceLayout({ children }: { children: React.ReactNode }) {
+export default function WorkspaceLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <div className="flex flex-1">
       <SidebarShell />
