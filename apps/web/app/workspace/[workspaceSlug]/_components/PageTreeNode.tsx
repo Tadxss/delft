@@ -10,11 +10,7 @@ import { parseWorkspaceSlug, useDeletePage, useUpdatePage } from "@delft/shared"
 export interface PageTreeNodeProps {
   page: Page;
   childrenByParent: Map<string | null, Page[]>;
-  // Kept for the recursive children map below (each child needs the latest Set to compute its own
-  // isExpanded) — deliberately excluded from arePageTreeNodePropsEqual, since it gets a new
-  // reference on every toggle anywhere in the tree and would defeat memoization if compared.
   expanded: Set<string>;
-  isExpanded: boolean;
   onToggle: (pageId: string) => void;
   onCreateChild: (parentId: string) => void;
   depth: number;
@@ -24,7 +20,6 @@ function PageTreeNodeImpl({
   page,
   childrenByParent,
   expanded,
-  isExpanded,
   onToggle,
   onCreateChild,
   depth,
@@ -36,6 +31,7 @@ function PageTreeNodeImpl({
   const deletePage = useDeletePage();
   const children = childrenByParent.get(page.id) ?? [];
   const hasChildren = children.length > 0;
+  const isExpanded = expanded.has(page.id);
   const isActive = params.pageId === page.id;
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -196,7 +192,6 @@ function PageTreeNodeImpl({
               page={child}
               childrenByParent={childrenByParent}
               expanded={expanded}
-              isExpanded={expanded.has(child.id)}
               onToggle={onToggle}
               onCreateChild={onCreateChild}
               depth={depth + 1}
@@ -212,13 +207,17 @@ function arePageTreeNodePropsEqual(prev: PageTreeNodeProps, next: PageTreeNodePr
   return (
     prev.page === next.page &&
     prev.childrenByParent === next.childrenByParent &&
-    prev.isExpanded === next.isExpanded &&
+    prev.expanded === next.expanded &&
     prev.onToggle === next.onToggle &&
     prev.onCreateChild === next.onCreateChild &&
     prev.depth === next.depth
-    // `expanded` (the raw Set) is deliberately excluded: it's only read internally to compute each
-    // CHILD's own isExpanded prop, and it gets a new reference on every toggle anywhere in the
-    // tree. Comparing it here would re-render every node on every toggle, defeating the memo.
+    // `expanded` IS compared here (unlike an earlier version of this file) — excluding it broke
+    // toggling for any node whose own isExpanded doesn't change but a NESTED descendant's does: the
+    // descendant's isExpanded is only ever recomputed by its direct parent's render, so skipping the
+    // parent's re-render (because the parent's own isExpanded looked unchanged) left descendants
+    // stuck on stale expand state. Comparing `expanded` normally means a toggle anywhere re-renders
+    // the whole tree again, same as before any memoization existed — correct behavior over a
+    // perf optimization that doesn't matter yet at this app's scale.
   );
 }
 

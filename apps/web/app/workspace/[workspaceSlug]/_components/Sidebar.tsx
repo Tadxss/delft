@@ -115,7 +115,6 @@ export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
               page={page}
               childrenByParent={childrenByParent}
               expanded={expanded}
-              isExpanded={expanded.has(page.id)}
               onToggle={toggle}
               onCreateChild={createChild}
               depth={0}

@@ -57,5 +57,46 @@ test("create a workspace, create nested pages, edit content, and confirm autosav
   await page.reload();
   await openSidebar(page);
   await onlyVisible(page.getByRole("button", { name: "Expand" })).first().click();
-  await expect(onlyVisible(page.getByRole("link", { name: "Sub-page" }))).toBeVisible();
+  const subPageLink = onlyVisible(page.getByRole("link", { name: "Sub-page" }));
+  await expect(subPageLink).toBeVisible();
+
+  // Regression check: toggling a NESTED page (a child, not a root) via a plain click, with no
+  // other data change happening at the same time. A previous version of the tree's re-render
+  // optimization computed a page's expanded state only when its *parent* re-rendered — so
+  // toggling "Sub-page" (a child of the root "Meeting notes") didn't visibly update anything,
+  // because "Meeting notes" saw its own expanded state as unchanged and skipped re-rendering,
+  // silently dropping "Sub-page"'s fresh state along with it.
+  const subPageTreeNode = subPageLink.locator("..");
+  await subPageTreeNode.hover();
+  const urlBeforeGrandchild = page.url();
+  await subPageTreeNode.getByRole("button", { name: "Add sub-page" }).click();
+  await page.waitForURL(
+    (url) => url.href !== urlBeforeGrandchild && /\/workspace\/[^/]+--[^/]+\/p\/[^/]+$/.test(url.pathname),
+    { timeout: 15000 },
+  );
+  await page.locator('input[placeholder="Untitled"]').fill("Grandchild");
+  await page.waitForTimeout(1500);
+
+  // Below `md`, SidebarShell's drawer only mounts its own <Sidebar> instance while open
+  // (`{mobileOpen && <Sidebar/>}`) and force-closes on every navigation — so on mobile viewports
+  // this navigation just unmounted the drawer's Sidebar, resetting its expand state entirely.
+  // Desktop's Sidebar instance is never unmounted (just CSS-hidden below `md`), so its expand
+  // state already survived the navigation and these re-expands are correctly skipped there.
+  await openSidebar(page);
+  const meetingNotesRow = onlyVisible(page.getByRole("link", { name: "Meeting notes" })).locator("..");
+  if (await meetingNotesRow.getByRole("button", { name: "Expand" }).isVisible()) {
+    await meetingNotesRow.getByRole("button", { name: "Expand" }).click();
+  }
+  const subPageRow = onlyVisible(page.getByRole("link", { name: "Sub-page" })).locator("..");
+  if (await subPageRow.getByRole("button", { name: "Expand" }).isVisible()) {
+    await subPageRow.getByRole("button", { name: "Expand" }).click();
+  }
+  const grandchildLink = onlyVisible(page.getByRole("link", { name: "Grandchild" }));
+  await expect(grandchildLink).toBeVisible();
+
+  // Pure click, no data change alongside it — this is the exact path that was broken.
+  await subPageRow.getByRole("button", { name: "Collapse" }).click();
+  await expect(grandchildLink).not.toBeVisible();
+  await subPageRow.getByRole("button", { name: "Expand" }).click();
+  await expect(grandchildLink).toBeVisible();
 });

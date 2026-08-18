@@ -285,7 +285,6 @@ export function CredentialList({
                 foldersByParent={foldersByParent}
                 credentialsByFolder={credentialsByFolder}
                 expanded={expanded}
-                isExpanded={expanded.has(folder.id)}
                 onToggle={toggle}
                 onCreateSubfolder={handleNewFolder}
                 onCreateCredential={handleNewCredential}

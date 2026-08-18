@@ -78,6 +78,43 @@ test("nested folders are collapsed by default and expand/collapse controls what'
   await expect(
     page.getByRole("button", { name: "Chase", exact: true }),
   ).toBeVisible();
+
+  // Regression check: toggling a NESTED folder (not a root one) via a plain click, with no other
+  // data change happening at the same time. A previous version of the tree's re-render
+  // optimization computed a folder's expanded state only when its *parent* re-rendered — so
+  // toggling "Inner" here didn't visibly update anything, because "Work" (Inner's parent) saw its
+  // own expanded state as unchanged and skipped re-rendering, silently dropping Inner's fresh
+  // state. Named "Inner" rather than something like "Sub" specifically to avoid colliding with
+  // folderRow()'s substring `hasText` match against the "New subfolder" hover-action button.
+  const workRow = folderRow(page, "Work");
+  await workRow.hover();
+  await workRow.getByRole("button", { name: "New subfolder" }).click();
+  await page.waitForSelector("li input");
+  await page.locator("li input").fill("Inner");
+  await page.keyboard.press("Enter");
+  // Creating "Inner" itself doesn't force a full re-render burst the way adding a credential does
+  // — give it a credential via its own hover action (this DOES auto-expand "Inner" via a real
+  // data change, same as "Work" above), then leave that data change behind before the pure-click
+  // toggle below.
+  await createCredentialInFolder(page, "Inner", {
+    title: "Nested",
+    username: "carol",
+    password: "nested-pass",
+  });
+  await backToList(page);
+  await expect(
+    page.getByRole("button", { name: "Nested", exact: true }),
+  ).toBeVisible();
+
+  // Pure click, no data change alongside it — this is the exact path that was broken.
+  await folderRow(page, "Inner").getByRole("button", { name: "Inner" }).click();
+  await expect(
+    page.getByRole("button", { name: "Nested", exact: true }),
+  ).not.toBeVisible();
+  await folderRow(page, "Inner").getByRole("button", { name: "Inner" }).click();
+  await expect(
+    page.getByRole("button", { name: "Nested", exact: true }),
+  ).toBeVisible();
 });
 
 test("move a credential between folders via the edit form, and a folder via the move dialog", async ({

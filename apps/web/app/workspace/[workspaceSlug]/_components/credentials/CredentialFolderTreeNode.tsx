@@ -53,10 +53,7 @@ export interface CredentialFolderTreeNodeProps {
   folder: CredentialFolder;
   foldersByParent: Map<string | null, CredentialFolder[]>;
   credentialsByFolder: Map<string | null, Credential[]>;
-  // Kept for the recursive sub-folder map below — deliberately excluded from
-  // areCredentialFolderTreeNodePropsEqual, same rationale as PageTreeNode.tsx.
   expanded: Set<string>;
-  isExpanded: boolean;
   onToggle: (folderId: string) => void;
   onCreateSubfolder: (parentFolderId: string) => void;
   onCreateCredential: (folderId: string) => void;
@@ -82,7 +79,6 @@ function CredentialFolderTreeNodeImpl({
   foldersByParent,
   credentialsByFolder,
   expanded,
-  isExpanded,
   onToggle,
   onCreateSubfolder,
   onCreateCredential,
@@ -102,6 +98,7 @@ function CredentialFolderTreeNodeImpl({
   const subFolders = foldersByParent.get(folder.id) ?? [];
   const ownCredentials = credentialsByFolder.get(folder.id) ?? [];
   const hasChildren = subFolders.length > 0 || ownCredentials.length > 0;
+  const isExpanded = expanded.has(folder.id);
   const isRenaming = renamingFolderId === folder.id;
 
   return (
@@ -200,7 +197,6 @@ function CredentialFolderTreeNodeImpl({
               foldersByParent={foldersByParent}
               credentialsByFolder={credentialsByFolder}
               expanded={expanded}
-              isExpanded={expanded.has(sub.id)}
               onToggle={onToggle}
               onCreateSubfolder={onCreateSubfolder}
               onCreateCredential={onCreateCredential}
@@ -241,7 +237,7 @@ function areCredentialFolderTreeNodePropsEqual(
     prev.folder === next.folder &&
     prev.foldersByParent === next.foldersByParent &&
     prev.credentialsByFolder === next.credentialsByFolder &&
-    prev.isExpanded === next.isExpanded &&
+    prev.expanded === next.expanded &&
     prev.onToggle === next.onToggle &&
     prev.onCreateSubfolder === next.onCreateSubfolder &&
     prev.onCreateCredential === next.onCreateCredential &&
@@ -257,7 +253,12 @@ function areCredentialFolderTreeNodePropsEqual(
     prev.onMove === next.onMove &&
     prev.onDelete === next.onDelete &&
     prev.depth === next.depth
-    // `expanded` (the raw Set) is deliberately excluded — same rationale as PageTreeNode.tsx.
+    // `expanded` IS compared here (unlike an earlier version of this file) — excluding it broke
+    // toggling for any folder whose own isExpanded doesn't change but a NESTED subfolder's does:
+    // the subfolder's isExpanded is only ever recomputed by its direct parent's render, so skipping
+    // the parent's re-render (because the parent's own isExpanded looked unchanged) left nested
+    // folders stuck on stale expand state — reported as "can't expand/collapse a subfolder." See
+    // PageTreeNode.tsx's matching fix and comment for the same bug in the pages sidebar.
   );
 }
 
