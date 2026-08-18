@@ -111,7 +111,7 @@ function PageTreeNodeImpl({
           type="button"
           onClick={() => onToggle(page.id)}
           aria-label={isExpanded ? "Collapse" : "Expand"}
-          className={`flex h-4 w-4 shrink-0 items-center justify-center text-ink-400 ${
+          className={`relative flex h-4 w-4 shrink-0 items-center justify-center text-ink-400 before:absolute before:-left-2 before:-right-1 before:-top-1.5 before:-bottom-1.5 before:content-[''] ${
             hasChildren
               ? "opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100"
               : "invisible"
@@ -149,7 +149,7 @@ function PageTreeNodeImpl({
           type="button"
           onClick={() => onCreateChild(page.id)}
           aria-label="Add sub-page"
-          className="flex h-4 w-4 shrink-0 items-center justify-center text-ink-400 hover:text-ink-700 md:hidden md:group-hover:flex md:group-focus-within:flex"
+          className="relative flex h-4 w-4 shrink-0 items-center justify-center text-ink-400 before:absolute before:-left-1 before:-right-0.5 before:-top-1.5 before:-bottom-1.5 before:content-[''] hover:text-ink-700 md:hidden md:group-hover:flex md:group-focus-within:flex"
         >
           <Plus size={14} />
         </button>
@@ -159,7 +159,7 @@ function PageTreeNodeImpl({
             onClick={() => setMenuOpen((prev) => !prev)}
             aria-label="Page actions"
             aria-haspopup="menu"
-            className="flex h-4 w-4 shrink-0 items-center justify-center text-ink-400 hover:text-ink-700 md:hidden md:group-hover:flex md:group-focus-within:flex"
+            className="relative flex h-4 w-4 shrink-0 items-center justify-center text-ink-400 before:absolute before:-left-0.5 before:-right-2.5 before:-top-1.5 before:-bottom-1.5 before:content-[''] hover:text-ink-700 md:hidden md:group-hover:flex md:group-focus-within:flex"
           >
             <MoreHorizontal size={14} />
           </button>

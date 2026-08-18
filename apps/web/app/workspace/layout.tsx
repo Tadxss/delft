@@ -27,7 +27,7 @@ function TopBar() {
             type="button"
             onClick={() => setCredentialsOpen(true)}
             aria-label="Credentials"
-            className="flex h-8 w-8 items-center justify-center rounded text-ink-500 hover:bg-paper-100 hover:text-ink-800"
+            className="relative flex h-8 w-8 items-center justify-center rounded text-ink-500 before:absolute before:-left-2.5 before:-right-0.5 before:-top-2 before:-bottom-2 before:content-[''] hover:bg-paper-100 hover:text-ink-800"
           >
             <KeyRound size={18} />
           </button>
@@ -37,7 +37,7 @@ function TopBar() {
           type="button"
           onClick={() => setAccountOpen(true)}
           aria-label="Account settings"
-          className="flex h-8 w-8 items-center justify-center rounded text-ink-500 hover:bg-paper-100 hover:text-ink-800"
+          className="relative flex h-8 w-8 items-center justify-center rounded text-ink-500 before:absolute before:-left-0.5 before:-right-2.5 before:-top-2 before:-bottom-2 before:content-[''] hover:bg-paper-100 hover:text-ink-800"
         >
           <Settings size={18} />
         </button>

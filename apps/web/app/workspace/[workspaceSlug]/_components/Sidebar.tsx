@@ -81,7 +81,7 @@ export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
           type="button"
           onClick={onCollapse}
           aria-label="Collapse sidebar"
-          className="rounded px-1.5 py-0.5 text-ink-500 opacity-100 hover:bg-paper-100 hover:text-ink-800 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100"
+          className="relative rounded px-1.5 py-0.5 text-ink-500 opacity-100 before:absolute before:-left-2 before:-right-2.5 before:-top-3 before:-bottom-1 before:content-[''] hover:bg-paper-100 hover:text-ink-800 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100"
         >
           <ChevronsLeft size={14} />
         </button>
@@ -93,7 +93,7 @@ export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
             type="button"
             onClick={() => createChild(null)}
             aria-label="New page"
-            className="rounded px-1.5 py-0.5 text-ink-500 hover:bg-paper-100 hover:text-ink-800"
+            className="relative rounded px-1.5 py-0.5 text-ink-500 before:absolute before:-left-2 before:-right-2.5 before:-top-1 before:-bottom-1.5 before:content-[''] hover:bg-paper-100 hover:text-ink-800"
           >
             <Plus size={14} />
           </button>
@@ -130,7 +130,7 @@ export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
           type="button"
           onClick={createNewCanvas}
           aria-label="New canvas"
-          className="rounded px-1.5 py-0.5 text-ink-500 hover:bg-paper-100 hover:text-ink-800"
+          className="relative rounded px-1.5 py-0.5 text-ink-500 before:absolute before:-left-2 before:-right-2.5 before:-top-3 before:-bottom-2 before:content-[''] hover:bg-paper-100 hover:text-ink-800"
         >
           <Plus size={14} />
         </button>
