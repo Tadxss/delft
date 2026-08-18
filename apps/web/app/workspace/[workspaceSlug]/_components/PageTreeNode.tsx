@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ChevronDown, ChevronRight, MoreHorizontal, Plus } from "lucide-react";
@@ -10,16 +10,21 @@ import { parseWorkspaceSlug, useDeletePage, useUpdatePage } from "@delft/shared"
 export interface PageTreeNodeProps {
   page: Page;
   childrenByParent: Map<string | null, Page[]>;
+  // Kept for the recursive children map below (each child needs the latest Set to compute its own
+  // isExpanded) — deliberately excluded from arePageTreeNodePropsEqual, since it gets a new
+  // reference on every toggle anywhere in the tree and would defeat memoization if compared.
   expanded: Set<string>;
+  isExpanded: boolean;
   onToggle: (pageId: string) => void;
   onCreateChild: (parentId: string) => void;
   depth: number;
 }
 
-export function PageTreeNode({
+function PageTreeNodeImpl({
   page,
   childrenByParent,
   expanded,
+  isExpanded,
   onToggle,
   onCreateChild,
   depth,
@@ -31,7 +36,6 @@ export function PageTreeNode({
   const deletePage = useDeletePage();
   const children = childrenByParent.get(page.id) ?? [];
   const hasChildren = children.length > 0;
-  const isExpanded = expanded.has(page.id);
   const isActive = params.pageId === page.id;
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -192,6 +196,7 @@ export function PageTreeNode({
               page={child}
               childrenByParent={childrenByParent}
               expanded={expanded}
+              isExpanded={expanded.has(child.id)}
               onToggle={onToggle}
               onCreateChild={onCreateChild}
               depth={depth + 1}
@@ -202,3 +207,20 @@ export function PageTreeNode({
     </li>
   );
 }
+
+function arePageTreeNodePropsEqual(prev: PageTreeNodeProps, next: PageTreeNodeProps): boolean {
+  return (
+    prev.page === next.page &&
+    prev.childrenByParent === next.childrenByParent &&
+    prev.isExpanded === next.isExpanded &&
+    prev.onToggle === next.onToggle &&
+    prev.onCreateChild === next.onCreateChild &&
+    prev.depth === next.depth
+    // `expanded` (the raw Set) is deliberately excluded: it's only read internally to compute each
+    // CHILD's own isExpanded prop, and it gets a new reference on every toggle anywhere in the
+    // tree. Comparing it here would re-render every node on every toggle, defeating the memo.
+  );
+}
+
+export const PageTreeNode = memo(PageTreeNodeImpl, arePageTreeNodePropsEqual);
+PageTreeNodeImpl.displayName = "PageTreeNode";

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ChevronsLeft, Plus } from "lucide-react";
@@ -39,26 +39,33 @@ export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
 
   const roots = childrenByParent.get(null) ?? [];
 
-  function toggle(pageId: string) {
+  const toggle = useCallback((pageId: string) => {
     setExpanded((prev) => {
       const next = new Set(prev);
       if (next.has(pageId)) next.delete(pageId);
       else next.add(pageId);
       return next;
     });
-  }
+  }, []);
 
-  function createChild(parentId: string | null) {
-    createPage.mutate(
-      { workspaceId, parentId },
-      {
-        onSuccess: (page) => {
-          if (parentId) setExpanded((prev) => new Set(prev).add(parentId));
-          router.push(`/workspace/${params.workspaceSlug}/p/${page.id}`);
+  const createChild = useCallback(
+    (parentId: string | null) => {
+      createPage.mutate(
+        { workspaceId, parentId },
+        {
+          onSuccess: (page) => {
+            if (parentId) setExpanded((prev) => new Set(prev).add(parentId));
+            router.push(`/workspace/${params.workspaceSlug}/p/${page.id}`);
+          },
         },
-      },
-    );
-  }
+      );
+    },
+    // createPage.mutate is a stable reference across renders (TanStack Query guarantee); the
+    // wrapping createPage object isn't, so depending on it instead would give this callback a new
+    // identity every render and defeat the memoization PageTreeNode relies on to skip re-rendering.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [workspaceId, params.workspaceSlug, router, createPage.mutate],
+  );
 
   function createNewCanvas() {
     createCanvas.mutate(
@@ -108,8 +115,9 @@ export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
               page={page}
               childrenByParent={childrenByParent}
               expanded={expanded}
+              isExpanded={expanded.has(page.id)}
               onToggle={toggle}
-              onCreateChild={(parentId) => createChild(parentId)}
+              onCreateChild={createChild}
               depth={0}
             />
           ))}
