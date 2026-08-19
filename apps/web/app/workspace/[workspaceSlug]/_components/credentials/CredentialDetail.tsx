@@ -15,6 +15,7 @@ import type {
   Credential,
   CredentialFolder,
   CredentialSecret,
+  CredentialType,
 } from "@delft/types";
 import {
   decryptSecret,
@@ -24,19 +25,19 @@ import {
   useDeleteCredential,
   useUpdateCredential,
 } from "@delft/shared";
+import { CREDENTIAL_TYPE_OPTIONS } from "./credentialTypeOptions";
 
-const EMPTY_SECRET: CredentialSecret = {
-  username: "",
-  password: "",
-  notes: "",
-};
+const EMPTY_SECRET: CredentialSecret = { notes: "" };
 
 interface FormState {
   folderId: string | null;
   title: string;
   url: string;
+  type: CredentialType;
   username: string;
   password: string;
+  apiKey: string;
+  pin: string;
   notes: string;
 }
 
@@ -44,16 +45,35 @@ function toFormState(
   folderId: string | null,
   title: string,
   url: string | null,
+  type: CredentialType,
   secret: CredentialSecret,
 ): FormState {
   return {
     folderId,
     title,
     url: url ?? "",
-    username: secret.username,
-    password: secret.password,
+    type,
+    username: secret.username ?? "",
+    password: secret.password ?? "",
+    apiKey: secret.apiKey ?? "",
+    pin: secret.pin ?? "",
     notes: secret.notes,
   };
+}
+
+// Only the fields relevant to `type` are ever encrypted — switching a credential's type and
+// re-saving doesn't carry a stale password/apiKey/pin from a previous type into the new ciphertext.
+function buildSecret(type: CredentialType, form: FormState): CredentialSecret {
+  switch (type) {
+    case "login":
+      return { username: form.username, password: form.password, notes: form.notes };
+    case "oauth":
+      return { username: form.username, notes: form.notes };
+    case "api_key":
+      return { apiKey: form.apiKey, notes: form.notes };
+    case "pin":
+      return { pin: form.pin, notes: form.notes };
+  }
 }
 
 // Flattened, depth-indented folder tree for the "Folder" <select> below — a plain native select is
@@ -106,22 +126,26 @@ export function CredentialDetail({
 
   const [editing, setEditing] = useState(isNew);
   const [form, setForm] = useState<FormState>(
-    toFormState(null, "", null, EMPTY_SECRET),
+    toFormState(null, "", null, "login", EMPTY_SECRET),
   );
-  const [showPassword, setShowPassword] = useState(false);
+  const [showSecret, setShowSecret] = useState(false);
   const [decryptError, setDecryptError] = useState<string | null>(null);
-  const [copied, setCopied] = useState<"username" | "password" | null>(null);
+  const [copied, setCopied] = useState<
+    "username" | "password" | "apiKey" | "pin" | null
+  >(null);
 
   const folderOptions = useMemo(() => flattenFolders(folders), [folders]);
 
   useEffect(() => {
     setDecryptError(null);
-    setShowPassword(false);
+    setShowSecret(false);
     setCopied(null);
 
     if (isNew || !credential) {
       setEditing(true);
-      setForm(toFormState(newCredentialFolderId, "", null, EMPTY_SECRET));
+      setForm(
+        toFormState(newCredentialFolderId, "", null, "login", EMPTY_SECRET),
+      );
       return;
     }
 
@@ -135,6 +159,7 @@ export function CredentialDetail({
               credential.folderId,
               credential.title,
               credential.url,
+              credential.type,
               secret,
             ),
           );
@@ -152,11 +177,7 @@ export function CredentialDetail({
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    const secret: CredentialSecret = {
-      username: form.username,
-      password: form.password,
-      notes: form.notes,
-    };
+    const secret = buildSecret(form.type, form);
     const { ciphertext, iv } = await encryptSecret(vaultKey, secret);
     const url = form.url.trim() || null;
 
@@ -167,6 +188,7 @@ export function CredentialDetail({
           folderId: form.folderId,
           title: form.title,
           url,
+          type: form.type,
           secretCiphertext: ciphertext,
           secretIv: iv,
         },
@@ -179,6 +201,7 @@ export function CredentialDetail({
           folderId: form.folderId,
           title: form.title,
           url,
+          type: form.type,
           secretCiphertext: ciphertext,
           secretIv: iv,
         },
@@ -197,7 +220,7 @@ export function CredentialDetail({
     );
   }
 
-  function handleGenerate() {
+  function handleGeneratePassword() {
     const password = generatePassword({
       length: 20,
       uppercase: true,
@@ -206,13 +229,30 @@ export function CredentialDetail({
       symbols: true,
     });
     setForm((prev) => ({ ...prev, password }));
-    setShowPassword(true);
+    setShowSecret(true);
   }
 
-  async function handleCopy(field: "username" | "password") {
-    await navigator.clipboard.writeText(
-      field === "username" ? form.username : form.password,
-    );
+  function handleGeneratePin() {
+    const pin = generatePassword({
+      length: 6,
+      uppercase: false,
+      lowercase: false,
+      digits: true,
+      symbols: false,
+    });
+    setForm((prev) => ({ ...prev, pin }));
+    setShowSecret(true);
+  }
+
+  const copyValues: Record<"username" | "password" | "apiKey" | "pin", string> = {
+    username: form.username,
+    password: form.password,
+    apiKey: form.apiKey,
+    pin: form.pin,
+  };
+
+  async function handleCopy(field: "username" | "password" | "apiKey" | "pin") {
+    await navigator.clipboard.writeText(copyValues[field]);
     setCopied(field);
     setTimeout(
       () => setCopied((current) => (current === field ? null : current)),
@@ -246,6 +286,35 @@ export function CredentialDetail({
           }
           className="rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
         />
+
+        <span className="text-xs font-medium uppercase tracking-wide text-ink-500">
+          Type
+        </span>
+        <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Type">
+          {CREDENTIAL_TYPE_OPTIONS.map((option) => {
+            const Icon = option.icon;
+            const active = form.type === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                onClick={() =>
+                  setForm((prev) => ({ ...prev, type: option.value }))
+                }
+                className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium ${
+                  active
+                    ? "border-accent-500 bg-accent-500 text-white"
+                    : "border-paper-200 text-ink-600 hover:bg-paper-100"
+                }`}
+              >
+                <Icon size={14} />
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
 
         <label
           htmlFor="folder"
@@ -287,56 +356,156 @@ export function CredentialDetail({
           className="rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
         />
 
-        <label
-          htmlFor="username"
-          className="text-xs font-medium uppercase tracking-wide text-ink-500"
-        >
-          Username
-        </label>
-        <input
-          id="username"
-          value={form.username}
-          onChange={(e) =>
-            setForm((prev) => ({ ...prev, username: e.target.value }))
-          }
-          className="rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
-        />
+        {form.type === "login" && (
+          <>
+            <label
+              htmlFor="username"
+              className="text-xs font-medium uppercase tracking-wide text-ink-500"
+            >
+              Username
+            </label>
+            <input
+              id="username"
+              value={form.username}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, username: e.target.value }))
+              }
+              className="rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
+            />
 
-        <label
-          htmlFor="password"
-          className="text-xs font-medium uppercase tracking-wide text-ink-500"
-        >
-          Password
-        </label>
-        <div className="flex gap-2">
-          <input
-            id="password"
-            type={showPassword ? "text" : "password"}
-            autoComplete="off"
-            value={form.password}
-            onChange={(e) =>
-              setForm((prev) => ({ ...prev, password: e.target.value }))
-            }
-            className="min-w-0 flex-1 rounded-md border border-paper-200 bg-paper-50 px-3 py-2 font-mono text-sm text-ink-800 outline-none focus:border-accent-500"
-          />
-          <button
-            type="button"
-            onClick={() => setShowPassword((v) => !v)}
-            aria-label={showPassword ? "Hide" : "Show"}
-            title={showPassword ? "Hide" : "Show"}
-            className="shrink-0 rounded-md p-2 text-ink-500 hover:bg-paper-100 hover:text-ink-800"
-          >
-            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-          </button>
-          <button
-            type="button"
-            onClick={handleGenerate}
-            className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1.5 text-xs text-ink-500 hover:bg-paper-100 hover:text-ink-800"
-          >
-            <RefreshCw size={13} />
-            Generate
-          </button>
-        </div>
+            <label
+              htmlFor="password"
+              className="text-xs font-medium uppercase tracking-wide text-ink-500"
+            >
+              Password
+            </label>
+            <div className="flex gap-2">
+              <input
+                id="password"
+                type={showSecret ? "text" : "password"}
+                autoComplete="off"
+                value={form.password}
+                onChange={(e) =>
+                  setForm((prev) => ({ ...prev, password: e.target.value }))
+                }
+                className="min-w-0 flex-1 rounded-md border border-paper-200 bg-paper-50 px-3 py-2 font-mono text-sm text-ink-800 outline-none focus:border-accent-500"
+              />
+              <button
+                type="button"
+                onClick={() => setShowSecret((v) => !v)}
+                aria-label={showSecret ? "Hide" : "Show"}
+                title={showSecret ? "Hide" : "Show"}
+                className="shrink-0 rounded-md p-2 text-ink-500 hover:bg-paper-100 hover:text-ink-800"
+              >
+                {showSecret ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+              <button
+                type="button"
+                onClick={handleGeneratePassword}
+                className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1.5 text-xs text-ink-500 hover:bg-paper-100 hover:text-ink-800"
+              >
+                <RefreshCw size={13} />
+                Generate
+              </button>
+            </div>
+          </>
+        )}
+
+        {form.type === "oauth" && (
+          <>
+            <label
+              htmlFor="username"
+              className="text-xs font-medium uppercase tracking-wide text-ink-500"
+            >
+              Account / Email
+            </label>
+            <input
+              id="username"
+              value={form.username}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, username: e.target.value }))
+              }
+              className="rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
+            />
+            <p className="text-xs text-ink-400">
+              No password stored — sign-in happens through the provider
+              (e.g. Google).
+            </p>
+          </>
+        )}
+
+        {form.type === "api_key" && (
+          <>
+            <label
+              htmlFor="apiKey"
+              className="text-xs font-medium uppercase tracking-wide text-ink-500"
+            >
+              API Key
+            </label>
+            <div className="flex gap-2">
+              <input
+                id="apiKey"
+                type={showSecret ? "text" : "password"}
+                autoComplete="off"
+                value={form.apiKey}
+                onChange={(e) =>
+                  setForm((prev) => ({ ...prev, apiKey: e.target.value }))
+                }
+                className="min-w-0 flex-1 rounded-md border border-paper-200 bg-paper-50 px-3 py-2 font-mono text-sm text-ink-800 outline-none focus:border-accent-500"
+              />
+              <button
+                type="button"
+                onClick={() => setShowSecret((v) => !v)}
+                aria-label={showSecret ? "Hide" : "Show"}
+                title={showSecret ? "Hide" : "Show"}
+                className="shrink-0 rounded-md p-2 text-ink-500 hover:bg-paper-100 hover:text-ink-800"
+              >
+                {showSecret ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+          </>
+        )}
+
+        {form.type === "pin" && (
+          <>
+            <label
+              htmlFor="pin"
+              className="text-xs font-medium uppercase tracking-wide text-ink-500"
+            >
+              PIN
+            </label>
+            <div className="flex gap-2">
+              <input
+                id="pin"
+                type={showSecret ? "text" : "password"}
+                inputMode="numeric"
+                autoComplete="off"
+                value={form.pin}
+                onChange={(e) =>
+                  setForm((prev) => ({ ...prev, pin: e.target.value }))
+                }
+                className="min-w-0 flex-1 rounded-md border border-paper-200 bg-paper-50 px-3 py-2 font-mono text-sm text-ink-800 outline-none focus:border-accent-500"
+              />
+              <button
+                type="button"
+                onClick={() => setShowSecret((v) => !v)}
+                aria-label={showSecret ? "Hide" : "Show"}
+                title={showSecret ? "Hide" : "Show"}
+                className="shrink-0 rounded-md p-2 text-ink-500 hover:bg-paper-100 hover:text-ink-800"
+              >
+                {showSecret ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+              <button
+                type="button"
+                onClick={handleGeneratePin}
+                className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1.5 text-xs text-ink-500 hover:bg-paper-100 hover:text-ink-800"
+              >
+                <RefreshCw size={13} />
+                Generate
+              </button>
+            </div>
+          </>
+        )}
 
         <label
           htmlFor="notes"
@@ -418,66 +587,117 @@ export function CredentialDetail({
         </a>
       )}
 
-      <div className="flex flex-col gap-1">
-        <span className="text-xs font-medium uppercase tracking-wide text-ink-500">
-          Username
-        </span>
-        <div className="flex items-center gap-2">
-          <span className="min-w-0 flex-1 truncate text-sm text-ink-800">
-            {form.username || "—"}
+      {(form.type === "login" || form.type === "oauth") && (
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-medium uppercase tracking-wide text-ink-500">
+            {form.type === "oauth" ? "Account / Email" : "Username"}
           </span>
-          <button
-            type="button"
-            onClick={() => handleCopy("username")}
-            aria-label="Copy username"
-            title="Copy username"
-            className={`inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs hover:bg-paper-100 ${
-              copied === "username"
-                ? "text-accent-500"
-                : "text-ink-500 hover:text-ink-800"
-            }`}
-          >
-            {copied === "username" ? <Check size={13} /> : <Copy size={13} />}
-            {copied === "username" ? "Copied" : "Copy"}
-          </button>
+          <div className="flex items-center gap-2">
+            <span className="min-w-0 flex-1 truncate text-sm text-ink-800">
+              {form.username || "—"}
+            </span>
+            <button
+              type="button"
+              onClick={() => handleCopy("username")}
+              aria-label="Copy username"
+              title="Copy username"
+              className={`inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs hover:bg-paper-100 ${
+                copied === "username"
+                  ? "text-accent-500"
+                  : "text-ink-500 hover:text-ink-800"
+              }`}
+            >
+              {copied === "username" ? <Check size={13} /> : <Copy size={13} />}
+              {copied === "username" ? "Copied" : "Copy"}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
-      <div className="flex flex-col gap-1">
-        <span className="text-xs font-medium uppercase tracking-wide text-ink-500">
-          Password
-        </span>
-        <div className="flex items-center gap-2">
-          <span className="min-w-0 flex-1 truncate font-mono text-sm text-ink-800">
-            {showPassword
-              ? form.password || "—"
-              : "•".repeat(Math.max(form.password.length, 8))}
+      {form.type === "login" && (
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-medium uppercase tracking-wide text-ink-500">
+            Password
           </span>
-          <button
-            type="button"
-            onClick={() => setShowPassword((v) => !v)}
-            aria-label={showPassword ? "Hide" : "Show"}
-            title={showPassword ? "Hide" : "Show"}
-            className="shrink-0 rounded-md p-1.5 text-ink-500 hover:bg-paper-100 hover:text-ink-800"
-          >
-            {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
-          </button>
-          <button
-            type="button"
-            onClick={() => handleCopy("password")}
-            aria-label="Copy password"
-            title="Copy password"
-            className={`inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs hover:bg-paper-100 ${
-              copied === "password"
-                ? "text-accent-500"
-                : "text-ink-500 hover:text-ink-800"
-            }`}
-          >
-            {copied === "password" ? <Check size={13} /> : <Copy size={13} />}
-            {copied === "password" ? "Copied" : "Copy"}
-          </button>
+          <div className="flex items-center gap-2">
+            <span className="min-w-0 flex-1 truncate font-mono text-sm text-ink-800">
+              {showSecret
+                ? form.password || "—"
+                : "•".repeat(Math.max(form.password.length, 8))}
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowSecret((v) => !v)}
+              aria-label={showSecret ? "Hide" : "Show"}
+              title={showSecret ? "Hide" : "Show"}
+              className="shrink-0 rounded-md p-1.5 text-ink-500 hover:bg-paper-100 hover:text-ink-800"
+            >
+              {showSecret ? <EyeOff size={14} /> : <Eye size={14} />}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleCopy("password")}
+              aria-label="Copy password"
+              title="Copy password"
+              className={`inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs hover:bg-paper-100 ${
+                copied === "password"
+                  ? "text-accent-500"
+                  : "text-ink-500 hover:text-ink-800"
+              }`}
+            >
+              {copied === "password" ? <Check size={13} /> : <Copy size={13} />}
+              {copied === "password" ? "Copied" : "Copy"}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
+
+      {(form.type === "api_key" || form.type === "pin") && (
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-medium uppercase tracking-wide text-ink-500">
+            {form.type === "api_key" ? "API Key" : "PIN"}
+          </span>
+          <div className="flex items-center gap-2">
+            <span className="min-w-0 flex-1 truncate font-mono text-sm text-ink-800">
+              {(() => {
+                const value = form.type === "api_key" ? form.apiKey : form.pin;
+                return showSecret
+                  ? value || "—"
+                  : "•".repeat(Math.max(value.length, 8));
+              })()}
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowSecret((v) => !v)}
+              aria-label={showSecret ? "Hide" : "Show"}
+              title={showSecret ? "Hide" : "Show"}
+              className="shrink-0 rounded-md p-1.5 text-ink-500 hover:bg-paper-100 hover:text-ink-800"
+            >
+              {showSecret ? <EyeOff size={14} /> : <Eye size={14} />}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleCopy(form.type === "api_key" ? "apiKey" : "pin")}
+              aria-label={`Copy ${form.type === "api_key" ? "API key" : "PIN"}`}
+              title={`Copy ${form.type === "api_key" ? "API key" : "PIN"}`}
+              className={`inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs hover:bg-paper-100 ${
+                copied === (form.type === "api_key" ? "apiKey" : "pin")
+                  ? "text-accent-500"
+                  : "text-ink-500 hover:text-ink-800"
+              }`}
+            >
+              {copied === (form.type === "api_key" ? "apiKey" : "pin") ? (
+                <Check size={13} />
+              ) : (
+                <Copy size={13} />
+              )}
+              {copied === (form.type === "api_key" ? "apiKey" : "pin")
+                ? "Copied"
+                : "Copy"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {form.notes && (
         <div className="flex flex-col gap-1">

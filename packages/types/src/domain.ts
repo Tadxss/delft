@@ -34,15 +34,23 @@ export interface Page {
 // full BlockNote document just to show a title in a list; see usePages.ts.
 export type PageSummary = Omit<Page, "content">;
 
+// Determines which fields the create/edit form shows and collects into CredentialSecret below —
+// "login" carries username+password, "oauth" only an account/email (no password stored, since
+// sign-in happens through the provider), "api_key" a single token, "pin" a single short code.
+export type CredentialType = "login" | "oauth" | "api_key" | "pin";
+
 // username/password/notes are never stored or transmitted as plaintext — secretCiphertext is a
-// base64 AES-GCM ciphertext of a {username, password, notes} JSON payload, secretIv its base64
-// 12-byte IV. Decryption happens entirely client-side via packages/shared/src/lib/vaultCrypto.ts.
+// base64 AES-GCM ciphertext of a CredentialSecret JSON payload (its exact shape depends on
+// `type`, see CredentialSecret below), secretIv its base64 12-byte IV. Decryption happens entirely
+// client-side via packages/shared/src/lib/vaultCrypto.ts. `type` itself is plaintext, unlike the
+// secret fields — the list view needs it for a per-row icon/filter without decrypting every row.
 export interface Credential {
   id: string;
   workspaceId: string;
   folderId: string | null;
   title: string;
   url: string | null;
+  type: CredentialType;
   secretCiphertext: string;
   secretIv: string;
   position: number;
@@ -50,9 +58,13 @@ export interface Credential {
   updatedAt: string;
 }
 
+// Only the fields relevant to a credential's `type` are ever populated — see CredentialType above
+// and CredentialDetail.tsx's buildSecret(). `notes` is the one field every type carries.
 export interface CredentialSecret {
-  username: string;
-  password: string;
+  username?: string;
+  password?: string;
+  apiKey?: string;
+  pin?: string;
   notes: string;
 }
 

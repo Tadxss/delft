@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Credential } from "@delft/types";
+import type { Credential, CredentialType } from "@delft/types";
 import { useSupabaseClient } from "../supabase/context";
 import { mapCredentialRow } from "../supabase/mappers";
 
@@ -8,6 +8,7 @@ export interface CreateCredentialInput {
   folderId?: string | null;
   title: string;
   url: string | null;
+  type: CredentialType;
   secretCiphertext: string;
   secretIv: string;
 }
@@ -24,6 +25,7 @@ export function useCreateCredential() {
       folderId = null,
       title,
       url,
+      type,
       secretCiphertext,
       secretIv,
     }) => {
@@ -34,6 +36,7 @@ export function useCreateCredential() {
           folder_id: folderId,
           title,
           url,
+          type,
           secret_ciphertext: secretCiphertext,
           secret_iv: secretIv,
         })
