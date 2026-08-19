@@ -22,7 +22,7 @@ export default function Error({
         Something went wrong.
       </h1>
       <p className="max-w-sm text-sm text-ink-500">
-        {error.message || "An unexpected error occurred."}
+        We hit an unexpected problem. Try again, or come back in a moment.
       </p>
       <button
         type="button"

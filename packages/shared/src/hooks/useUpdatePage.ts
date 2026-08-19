@@ -37,9 +37,18 @@ export function useUpdatePage() {
       if (error) throw error;
       return mapPageRow(data);
     },
-    onSuccess: (page) => {
+    onSuccess: (page, variables) => {
       queryClient.setQueryData<Page>(["page", page.id], page);
-      queryClient.invalidateQueries({ queryKey: ["pages", page.workspaceId] });
+      // The sidebar tree (usePages) only renders title/parentId/position — skip invalidating it
+      // on a content-only autosave, which can't have changed anything it shows. Editing runs this
+      // mutation on every debounced keystroke, so this avoids a full workspace-wide pages refetch
+      // that frequently.
+      const { title, parentId, position } = variables;
+      if (title !== undefined || parentId !== undefined || position !== undefined) {
+        queryClient.invalidateQueries({
+          queryKey: ["pages", page.workspaceId],
+        });
+      }
     },
   });
 }

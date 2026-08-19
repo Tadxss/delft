@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { ChevronDown, ChevronRight, MoreHorizontal, Plus } from "lucide-react";
-import type { Page } from "@delft/types";
+import type { PageSummary } from "@delft/types";
 import {
   parseWorkspaceSlug,
   useDeletePage,
@@ -14,8 +14,8 @@ import {
 import { ReorderStrip } from "./ReorderStrip";
 
 export interface PageTreeNodeProps {
-  page: Page;
-  childrenByParent: Map<string | null, Page[]>;
+  page: PageSummary;
+  childrenByParent: Map<string | null, PageSummary[]>;
   expanded: Set<string>;
   // Ids that can't be a valid drop target for whatever page is currently being dragged (its own id
   // plus every descendant) — computed once per drag session, see Sidebar.tsx. Empty when nothing is

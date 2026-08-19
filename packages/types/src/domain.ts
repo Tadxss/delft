@@ -29,6 +29,11 @@ export interface Page {
   updatedAt: string;
 }
 
+// Everything about a Page except its (potentially large) jsonb `content` — what the sidebar tree
+// actually needs to render. Fetching this instead of full Page[] avoids downloading every page's
+// full BlockNote document just to show a title in a list; see usePages.ts.
+export type PageSummary = Omit<Page, "content">;
+
 // username/password/notes are never stored or transmitted as plaintext — secretCiphertext is a
 // base64 AES-GCM ciphertext of a {username, password, notes} JSON payload, secretIv its base64
 // 12-byte IV. Decryption happens entirely client-side via packages/shared/src/lib/vaultCrypto.ts.
@@ -94,3 +99,7 @@ export interface Canvas {
   createdAt: string;
   updatedAt: string;
 }
+
+// Everything about a Canvas except its (potentially large) jsonb `scene` — same rationale as
+// PageSummary above; see useCanvases.ts.
+export type CanvasSummary = Omit<Canvas, "scene">;
