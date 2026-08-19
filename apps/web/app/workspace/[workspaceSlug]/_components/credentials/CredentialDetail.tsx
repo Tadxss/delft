@@ -312,6 +312,7 @@ export function CredentialDetail({
           <input
             id="password"
             type={showPassword ? "text" : "password"}
+            autoComplete="off"
             value={form.password}
             onChange={(e) =>
               setForm((prev) => ({ ...prev, password: e.target.value }))
