@@ -110,6 +110,51 @@ test("wrong vault passphrase is rejected at the unlock form, not after reaching 
   await expect(page.getByText("alice")).toBeVisible();
 });
 
+test("an API key credential shows only the API Key field, not Username/Password", async ({
+  page,
+}) => {
+  await signIn(page, uniqueEmail("credentials-api-key"));
+
+  await page.fill("#workspace-name", "Personal");
+  await page.click('button:has-text("Create")');
+  await page.waitForURL(/\/workspace\/[^/]+--[^/]+$/, { timeout: 15000 });
+
+  await page.getByRole("button", { name: "Credentials" }).click();
+  await page.fill("#passphrase", "correct-horse-battery-staple");
+  await page.fill("#confirm", "correct-horse-battery-staple");
+  await page.click('button:has-text("Create vault")');
+
+  await page.click('button[aria-label="New credential"]');
+  await page.getByRole("radio", { name: "API Key" }).click();
+  // Switching type away from the default "Login" must swap the field set, not just add to it.
+  await expect(page.locator("#username")).toHaveCount(0);
+  await expect(page.locator("#password")).toHaveCount(0);
+  await page.fill("#title", "Delft Project Token");
+  await page.fill("#apiKey", "sk_live_abcdef123456");
+  await page.click('button:has-text("Save")');
+
+  // View mode shows the API Key label/value, not Username/Password.
+  await expect(
+    page.getByRole("heading", { name: "Delft Project Token" }),
+  ).toBeVisible();
+  // Scoped to a <span> — "API Key" also appears as the type-filter chip's button label elsewhere
+  // on this page, which a plain getByText("API Key") would ambiguously match too.
+  await expect(page.locator("span", { hasText: "API Key" })).toBeVisible();
+  await expect(page.getByText("Username")).not.toBeVisible();
+  await expect(page.getByText("Password")).not.toBeVisible();
+  await page.getByRole("button", { name: "Show" }).click();
+  await expect(page.getByText("sk_live_abcdef123456")).toBeVisible();
+
+  // Round-trips through a reload + re-unlock, same as the plaintext-username case above.
+  await page.click('button[aria-label="Close"]');
+  await page.getByRole("button", { name: "Credentials" }).click();
+  await page.fill("#passphrase", "correct-horse-battery-staple");
+  await page.click('button:has-text("Unlock")');
+  await page.click('button:has-text("Delft Project Token")');
+  await page.getByRole("button", { name: "Show" }).click();
+  await expect(page.getByText("sk_live_abcdef123456")).toBeVisible();
+});
+
 test("wrong passphrase is rejected even on a brand-new vault with zero credentials", async ({
   page,
 }) => {

@@ -7,13 +7,13 @@ import {
   ChevronRight,
   Folder,
   FolderPlus,
-  KeyRound,
   Pencil,
   Plus,
   Trash2,
 } from "lucide-react";
 import type { Credential, CredentialFolder } from "@delft/types";
 import { ReorderStrip } from "../ReorderStrip";
+import { credentialTypeOption } from "./credentialTypeOptions";
 
 // Shared between this file's own nested credentials and CredentialList.tsx's root-level ones, so
 // a leaf row looks identical regardless of depth. Draggable (id prefixed "credential:" so
@@ -36,6 +36,7 @@ export function CredentialLeafRow({
     id: `credential:${credential.id}`,
   });
   const isSelected = selectedId === credential.id;
+  const TypeIcon = credentialTypeOption(credential.type).icon;
   return (
     <li>
       <button
@@ -50,7 +51,7 @@ export function CredentialLeafRow({
             : "border-transparent text-ink-700 hover:bg-paper-50"
         } ${isDragging ? "opacity-40" : ""}`}
       >
-        <KeyRound size={13} className="shrink-0 text-ink-400" />
+        <TypeIcon size={13} className="shrink-0 text-ink-400" />
         <span className="min-w-0 flex-1 truncate">
           {credential.title || "Untitled"}
         </span>

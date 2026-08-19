@@ -13,8 +13,8 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { Folder, FolderPlus, KeyRound, Plus, Search } from "lucide-react";
-import type { Credential, CredentialFolder } from "@delft/types";
+import { Folder, FolderPlus, Plus, Search } from "lucide-react";
+import type { Credential, CredentialFolder, CredentialType } from "@delft/types";
 import {
   useCreateCredentialFolder,
   useDeleteCredentialFolder,
@@ -28,6 +28,7 @@ import {
   CredentialFolderTreeNode,
   CredentialLeafRow,
 } from "./CredentialFolderTreeNode";
+import { CREDENTIAL_TYPE_OPTIONS, credentialTypeOption } from "./credentialTypeOptions";
 import { ReorderStrip } from "../ReorderStrip";
 import { offsetDragOverlay } from "../dragOverlayOffset";
 
@@ -102,6 +103,9 @@ export function CredentialList({
   onNewCredential: (folderId: string | null) => void;
 }) {
   const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState<Set<CredentialType>>(
+    new Set(),
+  );
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
@@ -151,16 +155,31 @@ export function CredentialList({
 
   const query = search.trim().toLowerCase();
   const searching = query.length > 0;
+  // A type filter reuses the same flattened "matched" list mode as a text search, rather than a
+  // second parallel UI — filtering the tree while preserving folder nesting for hidden items would
+  // add real complexity for a feature the search box's flat-list approach already handles well.
+  const filtering = searching || typeFilter.size > 0;
   const matchedFolders = searching
     ? folders.filter((f) => f.name.toLowerCase().includes(query))
     : [];
-  const matchedCredentials = searching
+  const matchedCredentials = filtering
     ? credentials.filter(
         (c) =>
-          c.title.toLowerCase().includes(query) ||
-          c.url?.toLowerCase().includes(query),
+          (!searching ||
+            c.title.toLowerCase().includes(query) ||
+            c.url?.toLowerCase().includes(query)) &&
+          (typeFilter.size === 0 || typeFilter.has(c.type)),
       )
     : [];
+
+  const toggleTypeFilter = useCallback((type: CredentialType) => {
+    setTypeFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(type)) next.delete(type);
+      else next.add(type);
+      return next;
+    });
+  }, []);
 
   const toggle = useCallback((folderId: string) => {
     setExpanded((prev) => {
@@ -489,6 +508,29 @@ export function CredentialList({
         </button>
       </div>
 
+      <div className="flex flex-wrap gap-1 border-b border-paper-200 p-2">
+        {CREDENTIAL_TYPE_OPTIONS.map((option) => {
+          const Icon = option.icon;
+          const active = typeFilter.has(option.value);
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => toggleTypeFilter(option.value)}
+              aria-pressed={active}
+              className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs ${
+                active
+                  ? "border-accent-500 bg-accent-500 text-white"
+                  : "border-paper-200 text-ink-500 hover:bg-paper-100"
+              }`}
+            >
+              <Icon size={12} />
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+
       <DndContext
         sensors={sensors}
         collisionDetection={pointerWithin}
@@ -502,8 +544,8 @@ export function CredentialList({
               Couldn&apos;t move: {dragError}
             </p>
           )}
-          {!searching && <RootDropStrip active={draggingId !== null} />}
-          {searching ? (
+          {!filtering && <RootDropStrip active={draggingId !== null} />}
+          {filtering ? (
             matchedFolders.length === 0 && matchedCredentials.length === 0 ? (
               <p className="p-3 text-sm text-ink-400">No matches.</p>
             ) : (
@@ -606,12 +648,21 @@ export function CredentialList({
                 {draggingFolder.name || "Untitled"}
               </div>
             )}
-            {draggingCredential && (
-              <div className="flex items-center gap-1.5 rounded-md border border-paper-200 bg-paper-50 px-2 py-1 text-sm text-ink-800 shadow-lg">
-                <KeyRound size={14} className="shrink-0 text-ink-400" />
-                {draggingCredential.title || "Untitled"}
-              </div>
-            )}
+            {draggingCredential &&
+              (() => {
+                const DraggingTypeIcon = credentialTypeOption(
+                  draggingCredential.type,
+                ).icon;
+                return (
+                  <div className="flex items-center gap-1.5 rounded-md border border-paper-200 bg-paper-50 px-2 py-1 text-sm text-ink-800 shadow-lg">
+                    <DraggingTypeIcon
+                      size={14}
+                      className="shrink-0 text-ink-400"
+                    />
+                    {draggingCredential.title || "Untitled"}
+                  </div>
+                );
+              })()}
           </DragOverlay>
         </div>
       </DndContext>

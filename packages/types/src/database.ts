@@ -126,6 +126,7 @@ export type Database = {
           secret_ciphertext: string
           secret_iv: string
           title: string
+          type: string
           updated_at: string
           url: string | null
           workspace_id: string
@@ -138,6 +139,7 @@ export type Database = {
           secret_ciphertext: string
           secret_iv: string
           title?: string
+          type?: string
           updated_at?: string
           url?: string | null
           workspace_id: string
@@ -150,6 +152,7 @@ export type Database = {
           secret_ciphertext?: string
           secret_iv?: string
           title?: string
+          type?: string
           updated_at?: string
           url?: string | null
           workspace_id?: string

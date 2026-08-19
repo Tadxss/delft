@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Credential, Database } from "@delft/types";
+import type { Credential, CredentialType, Database } from "@delft/types";
 import { useSupabaseClient } from "../supabase/context";
 import { mapCredentialRow } from "../supabase/mappers";
 
@@ -10,6 +10,7 @@ export interface UpdateCredentialInput {
   folderId?: string | null;
   title?: string;
   url?: string | null;
+  type?: CredentialType;
   secretCiphertext?: string;
   secretIv?: string;
   position?: number;
@@ -28,6 +29,7 @@ export function useUpdateCredential() {
       folderId,
       title,
       url,
+      type,
       secretCiphertext,
       secretIv,
       position,
@@ -36,6 +38,7 @@ export function useUpdateCredential() {
       if (folderId !== undefined) patch.folder_id = folderId;
       if (title !== undefined) patch.title = title;
       if (url !== undefined) patch.url = url;
+      if (type !== undefined) patch.type = type;
       if (secretCiphertext !== undefined)
         patch.secret_ciphertext = secretCiphertext;
       if (secretIv !== undefined) patch.secret_iv = secretIv;

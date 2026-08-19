@@ -34,10 +34,17 @@ BETA_READINESS closed out too, closed out as of Build Order steps 38-41 — chec
 re-auditing signup/RLS/security-header/input-limit territory. A follow-up UI/UX/performance audit
 (pragmatic, personal-scale lens — not scored against a production-SaaS bar) ran after that; its
 findings are closed out too, as of Build Order steps 42-49. Since then: the Credentials sidebar got
-a visual redesign (step 50), and both sidebar trees (Pages, Credentials) gained full drag-and-drop —
-reparenting (step 52) and sibling reordering (step 54). The one recurring (not one-time) item worth
-keeping an eye on regardless: the image-compression settings in `PageEditor.tsx` against real
-Storage usage as real data accumulates — Supabase Storage's free tier caps at 1GB.
+a visual redesign (step 50), both sidebar trees (Pages, Credentials) gained full drag-and-drop —
+reparenting (step 52) and sibling reordering (step 54) — and a pre-beta-testing hardening pass
+(autosave race/retry, sidebar over-fetch, image size cap, friendly error messages, a rate limit on
+the username-lookup RPC) closed out as step 56. Credentials also gained a `type` field (Login/
+Google-SSO/API Key/PIN) driving the form's fields and a list filter, as step 57. Two items from
+step 56 were deliberately deferred rather than left as accidental gaps — a signup allowlist/invite
+gate, and Sentry-style crash observability — revisit either if a wider, less-curated beta cohort is
+ever planned. The one recurring (not one-time) item worth keeping an eye on regardless: Storage
+usage against the 1GB free-tier cap as real data accumulates (step 56 added a `maxSizeMB` cap to
+`PageEditor.tsx`'s image compression, but it's still worth periodic monitoring, not a one-time
+fix).
 
 ## Data model
 
@@ -1573,3 +1580,73 @@ Storage usage — see **Next Up** above.
     for the production deploy. Free on the Hobby plan for one project up to 10,000 events/month —
     past that Vercel just pauses recording until the next day rather than billing, so this stays
     within the zero-cost constraint. Verified: `check-types`/`lint`/`build` clean.
+
+56. **Pre-beta-testing hardening pass.** ✅ *done*. A fresh audit (multi-tester readiness, perf/
+    reliability under real usage, and a regression check against the two closed-out audits above)
+    found several gaps that only mattered once the app moves from one trusted user to real beta
+    testers on real networks:
+    - **Autosave data-loss race**: `PageEditor.tsx`/`CanvasEditor.tsx`'s `scheduleSave` could have
+      two `updatePage`/`updateCanvas` mutations in flight at once with no server-side ordering
+      guarantee — on a real (non-localhost) network, an older save finishing after a newer one
+      could silently clobber it. Fixed by serializing saves through a `flush()`/`saving` ref guard
+      (at most one mutate in flight, the next queued patch sent from `onSettled`), and a failed
+      save now gets one bounded automatic retry (2s delay, not an unbounded loop) instead of being
+      dropped the instant `mutate()` was called.
+    - **Sidebar over-fetch**: `usePages`/`useCanvases` `select("*")`'d the full `content`/`scene`
+      jsonb for every row just to render a title in the tree, and `useUpdatePage`/`useUpdateCanvas`
+      invalidated that whole list on *every* autosave, including content-only ones. Fixed with new
+      `PageSummary`/`CanvasSummary` types (`Omit<Page, "content">`/`Omit<Canvas, "scene">`),
+      lightweight column-selecting queries, and list invalidation now skipped unless
+      `title`/`parentId`/`position` actually changed.
+    - **Image compression had no size cap**: `PageEditor.tsx`'s `imageCompression()` call omitted
+      `maxSizeMB`, so a detailed photo could still land at 1-3MB despite being "compressed" —
+      added `maxSizeMB: 0.5` to protect the 1GB Storage free-tier budget against N testers'
+      uploads.
+    - **Raw error messages**: `app/error.tsx`/`app/global-error.tsx` rendered `error.message`
+      (raw Postgres/JS text) straight to the user — replaced with a fixed friendly sentence,
+      `console.error` still keeps the technical detail for whoever's watching logs.
+    - **Username-enumeration RPC had no rate limit**: `get_email_for_username`
+      (`anon`-callable, step 38) had no throttle — new migration adds a simple global
+      sliding-window limiter (20 calls/60s) inside the function itself (a
+      `public.rpc_rate_limits` table, not exposed via PostgREST), returning `null` past the
+      threshold — same externally-visible shape as "username not found," so it doesn't leak that
+      throttling occurred. Verified against a real local Supabase session: legitimate lookups
+      succeed, rapid repeated calls past the threshold cleanly start returning `null`, no errors.
+    - Explicitly deferred (user's call, not a gap left by accident): a signup allowlist/invite
+      gate, and adding Sentry-style crash observability. Revisit either if a wider, less-curated
+      beta cohort is ever planned.
+
+    Verified: `check-types`/`lint` clean repo-wide; full e2e suite (60 tests,
+    chromium/webkit/mobile-safari) run twice, 58/60 passing both times — the 2 recurring failures
+    (both in `workspace-pages.spec.ts`, webkit/mobile-safari only) were confirmed as pre-existing
+    flakiness, not a regression, by re-running those exact specs in isolation and getting a clean
+    6/6.
+
+57. **Credential types: Login / Google-SSO / API Key / PIN.** ✅ *done*. The Credentials Manager
+    had one hardcoded shape (title/url/username/password/notes) — not every secret fits that (a
+    Google/SSO login has no password, an API key is a single token, a PIN is a short code, not a
+    username+password pair). Added a `credentials.type` column (`login`/`oauth`/`api_key`/`pin`,
+    `check`-constrained, defaults to `'login'` — no RLS/grant changes needed, existing policies
+    already cover every column). `secret_ciphertext`/`secret_iv` stays one opaque encrypted JSON
+    blob per row, so the new per-type fields (`apiKey`, `pin`, and a widened optional
+    `username`/`password`) needed no migration of their own, just a looser `CredentialSecret` TS
+    shape — old ciphertext still decrypts fine into it.
+
+    `CredentialDetail.tsx`'s form gained a Type selector (4 toggle buttons, not a `<select>`) that
+    swaps the field set below it: Login keeps today's Username+Password+Generate; OAuth/SSO shows
+    a single "Account / Email" field with a "no password stored" hint; API Key and PIN each show
+    one masked field (PIN also gets a "Generate" button reusing `generatePassword` with
+    digits-only options). Only the fields relevant to the selected type are ever encrypted —
+    switching a credential's type and re-saving drops the previous type's now-irrelevant field
+    from the new ciphertext. A new `credentialTypeOptions.ts` centralizes the type→icon/label map
+    (`KeyRound`/`LogIn`/`Code2`/`Hash`) shared by the form's selector, the list row icon
+    (`CredentialFolderTreeNode.tsx`), and a new type-filter chip row in `CredentialList.tsx` —
+    reuses the existing search box's "flattened matched list" mode rather than a second parallel
+    filter UI.
+
+    Verified: `check-types`/`lint` clean; manually walked all four types end-to-end in a real
+    local Supabase session via Playwright MCP (create → save → reload → re-unlock → decrypt
+    round-trip, including the PIN Generate button and the type-filter chips narrowing the list);
+    new e2e case in `credentials.spec.ts` locks in the API Key type's field-swap behavior; full
+    61/63 e2e suite passing (the 2 failures are the same pre-existing webkit/mobile-safari
+    flakiness noted in step 56, unrelated to this change).
