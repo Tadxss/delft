@@ -1,9 +1,11 @@
 import type { Database } from "@delft/types";
 import type {
   Canvas,
+  CanvasSummary,
   Credential,
   CredentialFolder,
   Page,
+  PageSummary,
   Profile,
   Workspace,
   WorkspaceMember,
@@ -60,6 +62,23 @@ export function mapPageRow(row: PageRow): Page {
   };
 }
 
+// Maps a pages row queried without the `content` column (see usePages.ts) — same shape as
+// mapPageRow minus content, kept as a separate function rather than reusing mapPageRow so this
+// never accidentally requires a column the caller didn't select.
+export function mapPageSummaryRow(row: Omit<PageRow, "content">): PageSummary {
+  return {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    parentId: row.parent_id,
+    title: row.title,
+    isPublished: row.is_published,
+    publishedSlug: row.published_slug,
+    position: row.position,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 export function mapCredentialRow(row: CredentialRow): Credential {
   return {
     id: row.id,
@@ -95,6 +114,21 @@ export function mapCanvasRow(row: CanvasRow): Canvas {
     workspaceId: row.workspace_id,
     title: row.title,
     scene: row.scene,
+    position: row.position,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+// Maps a canvases row queried without the `scene` column (see useCanvases.ts) — same rationale as
+// mapPageSummaryRow above.
+export function mapCanvasSummaryRow(
+  row: Omit<CanvasRow, "scene">,
+): CanvasSummary {
+  return {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    title: row.title,
     position: row.position,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

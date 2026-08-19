@@ -1,7 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
-import type { Page } from "@delft/types";
+import type { PageSummary } from "@delft/types";
 import { useSupabaseClient } from "../supabase/context";
-import { mapPageRow } from "../supabase/mappers";
+import { mapPageSummaryRow } from "../supabase/mappers";
+
+// Columns the sidebar tree actually renders (id/title/parentId/position) plus the rest of Page
+// minus its jsonb `content` — deliberately excludes `content` since a page's full BlockNote
+// document can be large and this list is refetched on every title/reparent/reorder across the
+// whole workspace (see useUpdatePage.ts's invalidation). Full content is only ever needed by
+// usePage.ts, for the one page currently open.
+const PAGE_SUMMARY_COLUMNS =
+  "id, workspace_id, parent_id, title, is_published, published_slug, position, created_at, updated_at";
 
 export interface UsePagesOptions {
   // Filter to direct children of a specific parent (including `null` for top-level pages). Leave
@@ -18,13 +26,13 @@ export function usePages(
   const supabase = useSupabaseClient();
   const { parentId } = options;
 
-  return useQuery<Page[]>({
+  return useQuery<PageSummary[]>({
     queryKey: ["pages", workspaceId, parentId],
     enabled: Boolean(workspaceId),
     queryFn: async () => {
       let query = supabase
         .from("pages")
-        .select("*")
+        .select(PAGE_SUMMARY_COLUMNS)
         .eq("workspace_id", workspaceId as string)
         .order("position", { ascending: true });
 
@@ -37,7 +45,7 @@ export function usePages(
 
       const { data, error } = await query;
       if (error) throw error;
-      return (data ?? []).map(mapPageRow);
+      return (data ?? []).map(mapPageSummaryRow);
     },
   });
 }

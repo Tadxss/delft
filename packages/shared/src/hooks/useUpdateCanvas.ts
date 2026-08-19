@@ -35,11 +35,16 @@ export function useUpdateCanvas() {
       if (error) throw error;
       return mapCanvasRow(data);
     },
-    onSuccess: (canvas) => {
+    onSuccess: (canvas, variables) => {
       queryClient.setQueryData<Canvas>(["canvas", canvas.id], canvas);
-      queryClient.invalidateQueries({
-        queryKey: ["canvases", canvas.workspaceId],
-      });
+      // Same rationale as useUpdatePage's onSuccess — useCanvases only renders title/position,
+      // so skip invalidating it on a scene-only autosave.
+      const { title, position } = variables;
+      if (title !== undefined || position !== undefined) {
+        queryClient.invalidateQueries({
+          queryKey: ["canvases", canvas.workspaceId],
+        });
+      }
     },
   });
 }

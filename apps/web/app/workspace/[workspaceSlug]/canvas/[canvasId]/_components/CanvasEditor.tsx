@@ -9,6 +9,7 @@ import { useDeleteCanvas, useUpdateCanvas } from "@delft/shared";
 import "@excalidraw/excalidraw/index.css";
 
 const AUTOSAVE_DEBOUNCE_MS = 800;
+const AUTOSAVE_RETRY_MS = 2000;
 
 // Excalidraw touches `window`/`document` at module load and cannot be server-rendered — the first
 // component in this codebase needing that treatment (BlockNote, the Pages editor, tolerates SSR
@@ -53,9 +54,14 @@ export function CanvasEditor({ canvas }: { canvas: Canvas }) {
 
   const [title, setTitle] = useState(canvas.title);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Same accumulate-don't-replace pattern as PageEditor's scheduleSave — title and scene changes
   // can both land within the debounce window and must not clobber each other.
   const pendingPatch = useRef<{ title?: string; scene?: unknown }>({});
+  // Same in-flight guard as PageEditor's flush() — see its comment for why: without this, two
+  // overlapping PATCH requests have no server-side ordering guarantee, so an older save could
+  // finish last and clobber a newer edit.
+  const saving = useRef(false);
 
   useEffect(() => {
     setTitle(canvas.title);
@@ -64,18 +70,38 @@ export function CanvasEditor({ canvas }: { canvas: Canvas }) {
   useEffect(() => {
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
+      if (retryTimer.current) clearTimeout(retryTimer.current);
       pendingPatch.current = {};
     };
   }, [canvas.id]);
 
+  function flush() {
+    if (saving.current) return;
+    const toSave = pendingPatch.current;
+    if (Object.keys(toSave).length === 0) return;
+    pendingPatch.current = {};
+    saving.current = true;
+    let hadError = false;
+    updateCanvas.mutate(
+      { id: canvas.id, ...toSave },
+      {
+        onError: () => {
+          hadError = true;
+          pendingPatch.current = { ...toSave, ...pendingPatch.current };
+          retryTimer.current = setTimeout(flush, AUTOSAVE_RETRY_MS);
+        },
+        onSettled: () => {
+          saving.current = false;
+          if (!hadError) flush();
+        },
+      },
+    );
+  }
+
   function scheduleSave(patch: { title?: string; scene?: unknown }) {
     pendingPatch.current = { ...pendingPatch.current, ...patch };
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      const toSave = pendingPatch.current;
-      pendingPatch.current = {};
-      updateCanvas.mutate({ id: canvas.id, ...toSave });
-    }, AUTOSAVE_DEBOUNCE_MS);
+    saveTimer.current = setTimeout(flush, AUTOSAVE_DEBOUNCE_MS);
   }
 
   function handleTitleChange(value: string) {

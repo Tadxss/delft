@@ -29,10 +29,12 @@ was available to set that up). See that doc's own "Fixed"/"Accepted risk" sectio
 on each, and this file's Build Order steps 30-37 for the how/why of each fix.
 
 No committed backlog beyond that audit exists right now — what to work on next is an open question
-for whoever picks this up. A follow-up UI/UX/performance audit (pragmatic, personal-scale lens —
-not scored against a production-SaaS bar) ran after BETA_READINESS closed out; its findings are
-closed out too, as of Build Order steps 42-49. Since then: the Credentials sidebar got a visual
-redesign (step 50), and both sidebar trees (Pages, Credentials) gained full drag-and-drop —
+for whoever picks this up. A separate auth/IDOR/security-headers/input-validation audit ran after
+BETA_READINESS closed out too, closed out as of Build Order steps 38-41 — check that before
+re-auditing signup/RLS/security-header/input-limit territory. A follow-up UI/UX/performance audit
+(pragmatic, personal-scale lens — not scored against a production-SaaS bar) ran after that; its
+findings are closed out too, as of Build Order steps 42-49. Since then: the Credentials sidebar got
+a visual redesign (step 50), and both sidebar trees (Pages, Credentials) gained full drag-and-drop —
 reparenting (step 52) and sibling reordering (step 54). The one recurring (not one-time) item worth
 keeping an eye on regardless: the image-compression settings in `PageEditor.tsx` against real
 Storage usage as real data accumulates — Supabase Storage's free tier caps at 1GB.

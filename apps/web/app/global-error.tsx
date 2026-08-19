@@ -45,7 +45,7 @@ export default function GlobalError({
             margin: 0,
           }}
         >
-          {error.message || "An unexpected error occurred."}
+          We hit an unexpected problem. Try again, or come back in a moment.
         </p>
         <button
           type="button"

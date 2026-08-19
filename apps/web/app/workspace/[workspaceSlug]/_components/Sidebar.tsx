@@ -17,7 +17,7 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { ChevronsLeft, Plus } from "lucide-react";
-import type { Canvas, Page } from "@delft/types";
+import type { CanvasSummary, PageSummary } from "@delft/types";
 import {
   useCreateCanvas,
   useCreatePage,
@@ -60,7 +60,7 @@ function CanvasRow({
   href,
   isActive,
 }: {
-  canvas: Canvas;
+  canvas: CanvasSummary;
   href: string;
   isActive: boolean;
 }) {
@@ -129,7 +129,7 @@ export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
   );
 
   const childrenByParent = useMemo(() => {
-    const map = new Map<string | null, Page[]>();
+    const map = new Map<string | null, PageSummary[]>();
     for (const page of pages ?? []) {
       const key = page.parentId;
       const list = map.get(key) ?? [];

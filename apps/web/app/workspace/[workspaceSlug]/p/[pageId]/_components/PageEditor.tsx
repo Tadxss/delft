@@ -21,6 +21,7 @@ import { resolveBlockNoteTheme } from "../../../../../_lib/blocknoteTheme";
 import { restrictedBlockSchema } from "../../../../../_lib/blocknoteSchema";
 
 const AUTOSAVE_DEBOUNCE_MS = 800;
+const AUTOSAVE_RETRY_MS = 2000;
 
 // `content` is stored as jsonb (default `[]`) — BlockNote's `initialContent` option requires a
 // non-empty array (it throws otherwise), so an empty/never-edited page falls back to `undefined`,
@@ -42,11 +43,18 @@ export function PageEditor({ page }: { page: Page }) {
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // scheduleSave can be called for title and content independently (e.g. typing the title, then
   // typing content, both within the debounce window) — accumulate into one pending patch rather
   // than letting the later call's fields silently replace the earlier call's, which would drop
   // whichever field was edited first.
   const pendingPatch = useRef<{ title?: string; content?: unknown }>({});
+  // Guards against overlapping in-flight saves: Postgres gives no ordering guarantee between two
+  // independent PATCH requests, so if a second save fired while the first was still in flight, the
+  // one that finishes last on the server wins — which could be the older edit clobbering the
+  // newer one. flush() only ever lets one mutate() be in flight at a time, chaining the next one
+  // (if edits piled up meanwhile) off its onSettled instead.
+  const saving = useRef(false);
 
   // Recreate the editor when navigating to a different page (deps: [page.id]) — BlockNote's
   // initialContent is read once at creation time only, it isn't reactive to prop changes.
@@ -62,6 +70,7 @@ export function PageEditor({ page }: { page: Page }) {
         // convention this feeds into.
         const compressed = await imageCompression(file, {
           maxWidthOrHeight: 1920,
+          maxSizeMB: 0.5,
           fileType: "image/webp",
           useWebWorker: true,
           exifOrientation: 1, // normalize orientation, then strip the EXIF block itself
@@ -98,18 +107,47 @@ export function PageEditor({ page }: { page: Page }) {
   useEffect(() => {
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
+      if (retryTimer.current) clearTimeout(retryTimer.current);
       pendingPatch.current = {};
     };
   }, [page.id]);
 
+  // Sends whatever's accumulated in pendingPatch, serialized so at most one mutate() is ever in
+  // flight — see the `saving` ref's comment above for why. On error, the failed patch is merged
+  // back (newer edits still win) and retried once after a short fixed delay rather than looping
+  // indefinitely against a possibly-offline connection; updatePage.isError still surfaces the
+  // failure below if that retry doesn't land either.
+  function flush() {
+    if (saving.current) return;
+    const toSave = pendingPatch.current;
+    if (Object.keys(toSave).length === 0) return;
+    pendingPatch.current = {};
+    saving.current = true;
+    let hadError = false;
+    updatePage.mutate(
+      { id: page.id, ...toSave },
+      {
+        onError: () => {
+          hadError = true;
+          pendingPatch.current = { ...toSave, ...pendingPatch.current };
+          retryTimer.current = setTimeout(flush, AUTOSAVE_RETRY_MS);
+        },
+        onSettled: () => {
+          saving.current = false;
+          // On success, more edits may have piled up in pendingPatch while this request was in
+          // flight — send them now instead of waiting for the next debounce, so writes reach the
+          // server strictly in order. On error, skip this: the retryTimer above already owns
+          // resending `toSave`, and flushing immediately here would race ahead of it.
+          if (!hadError) flush();
+        },
+      },
+    );
+  }
+
   function scheduleSave(patch: { title?: string; content?: unknown }) {
     pendingPatch.current = { ...pendingPatch.current, ...patch };
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      const toSave = pendingPatch.current;
-      pendingPatch.current = {};
-      updatePage.mutate({ id: page.id, ...toSave });
-    }, AUTOSAVE_DEBOUNCE_MS);
+    saveTimer.current = setTimeout(flush, AUTOSAVE_DEBOUNCE_MS);
   }
 
   function handleTitleChange(value: string) {
