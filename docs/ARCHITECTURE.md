@@ -49,6 +49,12 @@ fix). Most recently: a production vault-unlock incident led to a full vault reco
 **one follow-up still open**: once every existing workspace has confirmed `vault_wrapped_key is not
 null` (check via `npx supabase db query --linked`), write a follow-up migration dropping the now-dead
 `vault_verifier`/`vault_verifier_iv` columns and their `encryptVerifier`/`verifyVaultKey` code.
+Immediately after: a perceived-speed pass on Pages/Canvas (step 59) — BlockNote is now code-split
+the same way Excalidraw already was, sidebar rows prefetch content on hover/focus, cached sidebar
+summary data shows a page/canvas's title instantly instead of a "Loading…" flash, and summary-list
+queries got a longer staleTime/gcTime since only explicit mutations ever invalidate them. No open
+follow-up from this one — an `optimizePackageImports` attempt for `lucide-react` was tried, measured
+as a no-op, and reverted rather than left in place.
 
 ## Data model
 
@@ -1739,3 +1745,58 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
     non-extractable by default (`unwrapVaultMasterKey` now takes an opt-in `extractable` parameter,
     used only by the one caller that needs to re-wrap what it just unwrapped). `pnpm lint`,
     `pnpm check-types`, `pnpm build` all clean across the repo.
+
+59. **Perceived-speed pass on Pages/Canvas — no new features, purely navigation/load-time feel.**
+    ✅ _done_. Requested directly: existing features should feel faster, without adding anything
+    new. A read-only audit first confirmed several things already optimal or deliberate tradeoffs
+    (root layout/providers client-boundary size, the OS-font-stack choice, `<img>` for avatars given
+    the zero-cost constraint, `PageTreeNode`/`CredentialFolderTreeNode` memoization already tuned in
+    steps 43/44/51) — none of those were revisited. Four real, confirmed gaps were fixed:
+
+    **BlockNote code-split** — Excalidraw was already dynamically imported inside
+    `CanvasEditor.tsx` (since it can't SSR), but BlockNote (`PageEditor.tsx`) shipped in every page
+    route's bundle unconditionally. Since BlockNote is entangled with `PageEditor`'s own chrome
+    (undo/redo reads live editor state, autosave reads `editor.document`), the split happens at the
+    whole component, not just the library import — `p/[pageId]/page.tsx` now `next/dynamic()`-loads
+    `PageEditor` itself (no `ssr: false`, since BlockNote tolerates SSR fine, unlike Excalidraw).
+    Verified via the build's `react-loadable-manifest.json`: the ~1MB BlockNote chunk is referenced
+    only by the page route, not canvas or the workspace list, and its CSS is bundled into the same
+    loadable-manifest entry (no separate delayed fetch, no FOUC observed in a live production-build
+    walkthrough).
+
+    **Hover/focus prefetch** — sidebar rows for pages and canvases now call
+    `queryClient.prefetchQuery` on `onMouseEnter`/`onFocus`, using new `pageQueryOptions`/
+    `canvasQueryOptions` helpers exported from `usePage.ts`/`useCanvas.ts` (shared with the hooks
+    themselves, so the prefetch can never target a different query than what actually renders).
+    Confirmed live: hovering a sidebar row fires the full-content fetch before the click.
+
+    **Cached-summary route shells** — `p/[pageId]/page.tsx`/`canvas/[canvasId]/page.tsx` used to
+    show a blank "Loading…" on every navigation even though the sidebar's `usePages`/`useCanvases`
+    cache already has the clicked item's title. New `PageShell`/`CanvasShell` components read that
+    cached summary via `queryClient.getQueryData` and render matching chrome immediately, falling
+    back to the old behavior when nothing's cached (first load, deep link). Deliberately does _not_
+    feed the summary into `usePage`/`useCanvas` as `placeholderData` — `PageEditor.tsx`'s
+    `useCreateBlockNote(..., [page.id])` reads `initialContent` once at creation time only, so
+    mounting the real editor against fake placeholder content would risk losing real content, not
+    just flicker.
+
+    **Tiered `staleTime`/`gcTime`** — new `packages/shared/src/queryConfig.ts`. Summary lists
+    (`usePages`, `useCanvases`, `useWorkspace`, `useWorkspaces`) only ever go stale via mutations
+    that already `invalidateQueries` explicitly (confirmed in `useUpdatePage.ts`), so they got a
+    5-minute `staleTime`/10-minute `gcTime` — safe because nothing else can make them stale behind
+    the app's back, and it makes repeated hover-prefetches on the same row a no-op. Active
+    single-item content (`usePage`, `useCanvas`) got a smaller bump to 1 minute, since mutations
+    already keep it fresh via `setQueryData` on every save; this just avoids a redundant
+    refetch-and-flash on quick re-navigation. `providers.tsx`'s global 30s `staleTime` stays as the
+    fallback for every other hook (credentials, profile, etc.) — untouched.
+
+    **Tried and reverted**: `experimental.optimizePackageImports: ["lucide-react"]` in
+    `next.config.js`. Measured total `.next/static/chunks` bytes before/after a clean rebuild —
+    identical (15,629,431 bytes both times) — because `lucide-react` already ships per-icon ESM
+    modules (confirmed via `next experimental-analyze -o`'s module graph: each icon is its own
+    module, no barrel file to optimize away). Left out rather than keeping a demonstrated no-op.
+
+    Verified: `pnpm lint`/`check-types`/`build` clean; full 22-test chromium e2e suite passing
+    against the actual production build (`pnpm build && pnpm start`), not just dev; live Playwright
+    MCP walkthroughs of the hover-prefetch network timing, the no-FOUC BlockNote chunk load, and
+    autosave surviving a full reload.
