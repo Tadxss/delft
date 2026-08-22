@@ -9,7 +9,7 @@ audit findings (autosave error handling, mobile layout, modal accessibility, Sto
 work through before calling this BETA.
 
 This file's **Build Order** section below is the single source of truth for what has shipped, in
-what order, why, and what was deliberately deferred — update *it*, not the README's status line,
+what order, why, and what was deliberately deferred — update _it_, not the README's status line,
 when something ships. Entries accumulate; don't edit or delete old ones, append new ones instead.
 
 ## Next Up
@@ -44,30 +44,40 @@ gate, and Sentry-style crash observability — revisit either if a wider, less-c
 ever planned. The one recurring (not one-time) item worth keeping an eye on regardless: Storage
 usage against the 1GB free-tier cap as real data accumulates (step 56 added a `maxSizeMB` cap to
 `PageEditor.tsx`'s image compression, but it's still worth periodic monitoring, not a one-time
-fix).
+fix). Most recently: a production vault-unlock incident led to a full vault recovery-key feature
+(wrapped-master-key model, "forgot passphrase" recovery, and a last-resort reset) as step 58 —
+**one follow-up still open**: once every existing workspace has confirmed `vault_wrapped_key is not
+null` (check via `npx supabase db query --linked`), write a follow-up migration dropping the now-dead
+`vault_verifier`/`vault_verifier_iv` columns and their `encryptVerifier`/`verifyVaultKey` code.
 
 ## Data model
 
-- `workspaces (id, owner_id, name, vault_salt, vault_verifier, vault_verifier_iv, created_at)` —
+- `workspaces (id, owner_id, name, vault_salt, vault_verifier, vault_verifier_iv, vault_wrapped_key,
+  vault_wrapped_key_iv, vault_recovery_wrapped_key, vault_recovery_wrapped_key_iv, created_at)` —
   `vault_salt` is the Credentials Manager's per-workspace PBKDF2 salt (plaintext; salts aren't
   secret), null until that workspace's vault passphrase is first set up. `vault_verifier`/
-  `vault_verifier_iv` are a small AES-GCM ciphertext+iv pair, meaningless in content, used purely
-  to verify a typed passphrase is correct before ever granting vault access — see Build Order
-  step 22/23.
+  `vault_verifier_iv` are legacy (see Build Order step 22/23) — kept only until every vault has
+  migrated to `vault_wrapped_key`/`_iv` (the Vault Master Key wrapped under the passphrase-derived
+  key) and `vault_recovery_wrapped_key`/`_iv` (the same VMK wrapped under a one-time-shown recovery
+  key instead) — see Build Order step 58 for the wrapped-key model and why it replaced direct
+  passphrase-key encryption.
+- `vault_reset_requests (id, workspace_id, requested_by, token, expires_at, confirmed_at,
+  created_at)` — a single-use, owner-only, 1-hour-expiry token for the last-resort vault reset (both
+  passphrase and recovery key lost) — see Build Order step 58.
 - `workspace_members (workspace_id, user_id, role)` — every RLS policy keys off membership rather
   than `owner_id` directly, so extending to real multi-user sharing later is a data change, not a
   schema/policy rewrite.
 - `pages (id, workspace_id, parent_id, title, content jsonb, is_published, published_slug,
-  position, created_at, updated_at)` — `parent_id` self-references `pages` for the sidebar tree.
+position, created_at, updated_at)` — `parent_id` self-references `pages` for the sidebar tree.
   `position` (`double precision`) is a manually-settable sibling order — see Build Order step 54.
 - `credentials (id, workspace_id, folder_id, title, url, secret_ciphertext, secret_iv, position,
-  created_at, updated_at)` — `title`/`url` plaintext (list view + search); `secret_ciphertext`/`secret_iv` are
+created_at, updated_at)` — `title`/`url` plaintext (list view + search); `secret_ciphertext`/`secret_iv` are
   one AES-GCM ciphertext+iv pair encrypting a `{username, password, notes}` JSON payload per
   credential. See Build Order step 16. `folder_id` (nullable, `on delete set null`) places it in a
   `credential_folders` folder, or at root when null — see Build Order step 24. `position` (Build
   Order step 54) is scoped per `folder_id` group.
 - `credential_folders (id, workspace_id, parent_folder_id, name, position, created_at,
-  updated_at)` — pure containers (name only, no secret of their own), nesting arbitrarily deep via
+updated_at)` — pure containers (name only, no secret of their own), nesting arbitrarily deep via
   `parent_folder_id` (self-referencing, `on delete cascade` — unlike `credentials.folder_id`, which
   is deliberately `on delete set null` so deleting a folder never destroys the credentials inside
   it). Two triggers (`check_credential_folder_parent`, `check_credential_folder_workspace`) guard
@@ -84,7 +94,7 @@ fix).
   accepted as fine at this app's realistic write volume (see that step for the
   float-precision-exhaustion tradeoff this implies).
 - `profiles (id, username, first_name, middle_name, last_name, occupation, bio, avatar_url,
-  created_at, updated_at)` — the first **non-workspace-scoped** table; `id` is both PK and FK to
+created_at, updated_at)` — the first **non-workspace-scoped** table; `id` is both PK and FK to
   `auth.users`, one row per user. Auto-created blank on signup via an `AFTER INSERT` trigger on
   `auth.users` (not a `public` table); a pre-existing account (created before this shipped)
   self-heals its first row via the client's `upsert`, not a backfill script. `username` is
@@ -104,14 +114,14 @@ the full policy set and its inline reasoning.
 
 ## Build Order
 
-1. **Monorepo scaffold.** ✅ *done*. Turborepo + pnpm workspace mirroring the sibling project
+1. **Monorepo scaffold.** ✅ _done_. Turborepo + pnpm workspace mirroring the sibling project
    votero's shape (`packages/eslint-config`, `packages/typescript-config`, `packages/types`,
    `packages/shared`, `apps/web`), so a future `apps/mobile` addition is a low-friction addition
    rather than a restructure. Next.js 16.2.0 (App Router), React 19.2.3, TypeScript 5.9.2, ESLint 9
    flat config, Tailwind CSS v3 (plain utility classes, no component library). No `packages/ui` —
    deferred until a second app actually needs shared components.
 
-2. **Workspace + Pages schema, RLS, and grants.** ✅ *done*. `workspaces` / `workspace_members` /
+2. **Workspace + Pages schema, RLS, and grants.** ✅ _done_. `workspaces` / `workspace_members` /
    `pages` tables, RLS enabled on all three, explicit `GRANT`s in a companion migration (Supabase's
    `auto_expose_new_tables` is off by default — RLS alone does not expose a table via PostgREST).
    A `handle_new_workspace()` `SECURITY DEFINER` trigger auto-enrolls the creator as `role='owner'`
@@ -121,13 +131,13 @@ the full policy set and its inline reasoning.
    were written without `to authenticated`, so Postgres evaluated them for `anon` requests too —
    and since `anon` correctly has no grant on `workspace_members`, evaluating an unscoped
    member-check policy for an anon request threw a hard `permission denied for table
-   workspace_members` instead of just filtering to zero rows. Fixed by scoping every non-public
+workspace_members` instead of just filtering to zero rows. Fixed by scoping every non-public
    policy `to authenticated` explicitly.
 
    **Real bug found and fixed (INSERT ... RETURNING vs. AFTER trigger):** `workspaces_select_member`
    originally only checked `EXISTS (... workspace_members ...)`. Postgres evaluates a SELECT
    policy for `INSERT ... RETURNING` (what PostgREST/supabase-js's `.insert().select()` always
-   issues) against the statement's *original* snapshot, which cannot see a row an `AFTER INSERT`
+   issues) against the statement's _original_ snapshot, which cannot see a row an `AFTER INSERT`
    trigger wrote within that same statement — so creating a workspace failed with "new row
    violates row-level security policy" even though the insert and the trigger's own membership
    insert both succeeded. Fixed by adding an `owner_id = auth.uid()` branch to the policy, which
@@ -137,7 +147,7 @@ the full policy set and its inline reasoning.
    Verified via `supabase db reset` + direct `psql`/REST calls as both `anon` and `authenticated`
    roles, and end-to-end via the e2e suite (step 5).
 
-3. **Pages feature: BlockNote editor, autosave, image compression, publish/share.** ✅ *done*.
+3. **Pages feature: BlockNote editor, autosave, image compression, publish/share.** ✅ _done_.
    BlockNote (not raw Tiptap) for the block editor — it ships a ready-made Notion-style block UI
    (drag handles, slash-command menu) rather than requiring that UI to be built from scratch on top
    of Tiptap/ProseMirror, and its `uploadFile` callback is exactly where the compress/strip-EXIF
@@ -160,9 +170,9 @@ the full policy set and its inline reasoning.
    Verified end-to-end via the e2e suite (step 5): create/edit/reload persistence, nested sub-pages,
    publish → anonymous view → unpublish → 404.
 
-4. **Local dev environment: `allowedDevOrigins`.** ✅ *done*. Next.js 16 blocks dev-resource
+4. **Local dev environment: `allowedDevOrigins`.** ✅ _done_. Next.js 16 blocks dev-resource
    requests (including the Turbopack HMR WebSocket) from any origin not explicitly allow-listed,
-   and treats `127.0.0.1` as a *different* origin from `localhost` even on the same machine. Local
+   and treats `127.0.0.1` as a _different_ origin from `localhost` even on the same machine. Local
    Supabase's `site_url`/magic-link `redirect_to` defaults to `http://127.0.0.1:3000` (see
    `supabase/config.toml`), so visiting the app via `127.0.0.1` is the normal flow here — without
    `allowedDevOrigins: ["127.0.0.1", "localhost"]` in `apps/web/next.config.js`, every dev-resource
@@ -172,7 +182,7 @@ the full policy set and its inline reasoning.
    a Playwright script capturing full console/network output in a clean browser context, after
    manual browser testing (confounded by a wallet extension's console noise) couldn't isolate it.
 
-5. **e2e test suite (Playwright).** ✅ *done*. `apps/web/e2e/`, mirroring votero's Playwright setup
+5. **e2e test suite (Playwright).** ✅ _done_. `apps/web/e2e/`, mirroring votero's Playwright setup
    (`workers: 1`, `fullyParallel: false` — shared local Supabase state across specs caused spurious
    timeouts under concurrency; each spec self-contained with its own fresh `browser.newContext()`
    per simulated user, no shared fixtures/POM). `e2e/helpers.ts`'s `signIn()` polls Mailpit's REST
@@ -187,13 +197,13 @@ the full policy set and its inline reasoning.
    Verified: all 5 specs pass locally (`pnpm --filter web test:e2e`) against a freshly-reset local
    Supabase stack.
 
-6. **CI e2e job.** ✅ *done*. Added an `e2e` job to `.github/workflows/ci.yml` alongside the
+6. **CI e2e job.** ✅ _done_. Added an `e2e` job to `.github/workflows/ci.yml` alongside the
    existing `checks` job, mirroring votero's: install Playwright chromium, `supabase/setup-cli`,
    `supabase start`, run the suite, upload the HTML report as an artifact on failure. Not yet
    verified by an actual CI run — this project has no git remote yet, so nothing has been pushed to
    trigger the workflow.
 
-7. **Dark theme + light/dark toggle.** ✅ *done*. Added `next-themes` (MIT, ~1KB) rather than
+7. **Dark theme + light/dark toggle.** ✅ _done_. Added `next-themes` (MIT, ~1KB) rather than
    hand-rolling the class toggle/localStorage persistence/hydration-flash prevention. The key move:
    `paper`/`ink`/`accent` in `tailwind.config.cjs` resolve to CSS custom properties (defined per
    shade under `:root` for light, `:root.dark` for dark, in `globals.css`) instead of static hex —
@@ -203,7 +213,7 @@ the full policy set and its inline reasoning.
    `next-themes`' `resolvedTheme` and passes a matching theme into BlockNote — see step 9 below for
    why that needed more than just `theme="dark"`.
 
-8. **Notion-style visual pass.** ✅ *done*. Switched typography to Notion's actual default stack —
+8. **Notion-style visual pass.** ✅ _done_. Switched typography to Notion's actual default stack —
    `ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", ...` (each OS's native UI font,
    zero webfont files) — replacing an earlier Inter + Source Serif 4 `next/font/google` setup
    entirely, including the "Delft" wordmark (no more separate serif branding touch). Bumped title
@@ -213,7 +223,7 @@ the full policy set and its inline reasoning.
    Widened the editor's content column (`max-w-3xl` → `max-w-4xl`) and its top padding
    (`py-10` → `pt-20`) to read closer to Notion's spacing.
 
-9. **BlockNote editor visually separate from the page.** ✅ *done*, **real bug found**: passing the
+9. **BlockNote editor visually separate from the page.** ✅ _done_, **real bug found**: passing the
    literal `theme="dark"`/`"light"` string to `BlockNoteView` uses BlockNote's own **hardcoded**
    palette (`darkDefaultTheme.colors.editor.background` is `#1F1F1F`) — completely independent of
    this app's `--paper-50` variable (`#191919`), so the editor rendered as a visibly different dark
@@ -221,13 +231,13 @@ the full policy set and its inline reasoning.
    `@blocknote/mantine/src/defaultThemes.ts` directly. Fixed via a new
    `apps/web/app/_lib/blocknoteTheme.ts`: spreads BlockNote's own default theme (so menus/tooltips/
    selection colors still look like a real BlockNote theme) but overrides `colors.editor.
-   {background,text}` to `transparent`/`var(--foreground)`, and `fontFamily` to the same Notion
+{background,text}` to `transparent`/`var(--foreground)`, and `fontFamily` to the same Notion
    system stack as step 8, so the editable area has no color or font of its own. Separately,
    `@blocknote/core`'s `editor.css` hardcodes `.bn-editor { padding-inline: 54px; }` (space for a
    drag-handle gutter) — collapsed to `0` in `globals.css` so the content's left edge lines up with
    the title input above it instead of sitting ~54px further right.
 
-10. **Workspace URLs: `/w/{uuid}` → `/workspace/{slug}--{uuid}`.** ✅ *done*. New
+10. **Workspace URLs: `/w/{uuid}` → `/workspace/{slug}--{uuid}`.** ✅ _done_. New
     `packages/shared/src/lib/workspaceUrl.ts` (`slugifyWorkspaceName`, `buildWorkspaceHref`,
     `parseWorkspaceSlug`) centralizes what was previously 6 scattered template-literal call sites.
     Double-dash (`--`) separator, not single-dash — `slugify` collapses repeated dashes, so a slug
@@ -239,14 +249,14 @@ the full policy set and its inline reasoning.
     Verified via the e2e suite — all workspace-URL-asserting specs updated to the new regex pattern
     and still pass.
 
-11. **Collapsible sidebar.** ✅ *done*. `app/workspace/[workspaceSlug]/_components/SidebarShell.tsx`
+11. **Collapsible sidebar.** ✅ _done_. `app/workspace/[workspaceSlug]/_components/SidebarShell.tsx`
     owns a `collapsed` boolean persisted to `localStorage` (`delft-sidebar-collapsed`) — a plain
     manual read/write, not `next-themes`-style tooling, since a single boolean with no
     flash-of-wrong-content risk (the sidebar is always visible either way) doesn't need it.
     Collapsed state renders a thin rail with an expand button rather than hiding the sidebar
     outright, matching Notion's collapsed-rail behavior.
 
-12. **Restrict BlockNote to Image-only media blocks.** ✅ *done*. Video/Audio/File block types
+12. **Restrict BlockNote to Image-only media blocks.** ✅ _done_. Video/Audio/File block types
     deliberately held back for a future paid tier — not an access-control/role check (no such
     system exists in Delft), just not offered as insertable block types at all right now. New
     `apps/web/app/_lib/blocknoteSchema.ts` builds a `BlockNoteSchema.create({ blockSpecs })` with an
@@ -256,7 +266,7 @@ the full policy set and its inline reasoning.
     the schema (not just filtering the slash-menu UI) makes them unreachable via every insertion
     path: slash menu, the side "+" picker, drag-and-drop, and paste-to-embed.
 
-13. **Local-dev resilience: stale session after `supabase db reset`.** ✅ *done*, **real (dev-only)
+13. **Local-dev resilience: stale session after `supabase db reset`.** ✅ _done_, **real (dev-only)
     footgun documented and mitigated**: repeatedly running `supabase db reset` while a browser tab
     has an existing session wipes `auth.users`, but the tab's JWT stays cryptographically valid
     (same JWT secret) — so a workspace-creation insert fails with `23503 workspaces_owner_id_fkey`
@@ -266,8 +276,8 @@ the full policy set and its inline reasoning.
     `app/workspace/page.tsx`) instead of a raw Postgres error, and `AuthGate` naturally redirects to
     the login screen once signed out.
 
-14. **Password sign-in (add-on) + Google OAuth.** ✅ *done*. Magic link remains the only way to
-    *create* an account — this adds two more ways to sign into an existing one. New
+14. **Password sign-in (add-on) + Google OAuth.** ✅ _done_. Magic link remains the only way to
+    _create_ an account — this adds two more ways to sign into an existing one. New
     `packages/shared/src/hooks/`: `useSetPassword` (`supabase.auth.updateUser({ password })`,
     called from a new `/account` page, requires an active session — no current-password check,
     the session itself is the proof of identity), `useSignInWithPassword`
@@ -284,17 +294,17 @@ the full policy set and its inline reasoning.
     dev; client ID/secret are supplied via a gitignored root `.env` (see `.env.example`) — the
     Supabase CLI's `env()` substitution reads `.env` at the repo root, not `apps/web/.env.local`.
 
-15. **Login flow redesign, real Google branding, and popup-based Google OAuth.** ✅ *done*.
+15. **Login flow redesign, real Google branding, and popup-based Google OAuth.** ✅ _done_.
     Follow-ups to step 14, all in `apps/web/app/page.tsx` unless noted:
 
     - **Staged login UI.** Replaced "everything visible at once" (Google button + email + password
-      + magic-link button, all on screen together) with a `step: "email" | "password" | "sent"`
-      state machine: email + "Continue" first, then a password field + "Continue" with a
-      lower-emphasis "Email me a sign-in link instead" fallback once the password attempt fails or
-      was never set — no separate forgot-password flow, the magic link re-establishes a session
-      `/account` can then use to set a new password. Deliberately **no** server-side "does this
-      email have a password" check (would need the service-role key — the first server-side auth
-      code in an otherwise fully-client-side app — and could be used to enumerate accounts).
+      - magic-link button, all on screen together) with a `step: "email" | "password" | "sent"`
+        state machine: email + "Continue" first, then a password field + "Continue" with a
+        lower-emphasis "Email me a sign-in link instead" fallback once the password attempt fails or
+        was never set — no separate forgot-password flow, the magic link re-establishes a session
+        `/account` can then use to set a new password. Deliberately **no** server-side "does this
+        email have a password" check (would need the service-role key — the first server-side auth
+        code in an otherwise fully-client-side app — and could be used to enumerate accounts).
 
       **Real bug found (test-locator ambiguity, not app bug):** the e2e suite's
       `button:has-text("Continue")` matched **both** "Continue with Google" and the email step's
@@ -330,7 +340,7 @@ the full policy set and its inline reasoning.
     the Mailpit-based e2e setup can drive) plus a full `pnpm --filter web test:e2e` run (all 6
     specs) and `pnpm lint`/`check-types`/`build` after each change.
 
-16. **Credentials Manager.** ✅ *done*. Per-workspace encrypted vault (title, username, password,
+16. **Credentials Manager.** ✅ _done_. Per-workspace encrypted vault (title, username, password,
     URL, notes), matching the design already sketched under "Next Up" with the exact-shape
     decisions made at implementation time:
 
@@ -375,14 +385,14 @@ the full policy set and its inline reasoning.
     Plus the anon-grant REST check above, `pnpm lint`/`check-types`/`build`, and the full existing
     e2e suite (8 specs total) passing unmodified.
 
-17. **Excalidraw Canvas.** ✅ *done*. Standalone per-workspace canvases (`@excalidraw/excalidraw`
+17. **Excalidraw Canvas.** ✅ _done_. Standalone per-workspace canvases (`@excalidraw/excalidraw`
     0.18.1, MIT), own table, own flat sidebar section — not embedded in Pages, not nested (no
     `parent_id`), matching the "standalone workspace items" design already decided under "Next Up."
 
     - **First `next/dynamic(..., { ssr: false })` in this codebase.** Excalidraw touches
       `window`/`document` at module load and cannot be server-rendered at all — unlike BlockNote
       (the Pages editor), which tolerates SSR fine as a plain `"use client"` import. Since `ssr:
-      false` means the server renders nothing for it, there's no server/client HTML to diverge —
+false` means the server renders nothing for it, there's no server/client HTML to diverge —
       no hydration-mismatch risk the way the Google-button `resolvedTheme` bug was (step 15), so no
       `mounted`-guard was needed here; the canvas's `theme` prop reads `resolvedTheme` directly.
     - **No rendered image/binary, enforced two ways, not just documented.** `scene` (jsonb) stores
@@ -419,7 +429,7 @@ the full policy set and its inline reasoning.
     trusting a UI-only check. Plus title-persistence-after-reload and delete. All passed on the
     fixed attempt. Full suite (9 specs total) plus `pnpm lint`/`check-types`/`build` all green.
 
-18. **Hosted deployment.** ✅ *done*. `master` and `develop` were both pushed to `origin` for the
+18. **Hosted deployment.** ✅ _done_. `master` and `develop` were both pushed to `origin` for the
     first time this step (they'd only ever existed locally before) — `master` fast-forwarded cleanly
     to `develop`'s tip, merged with an existing GitHub-side PR merge commit that turned out to have
     identical content (confirmed via an empty `git diff` before merging, not assumed).
@@ -427,7 +437,7 @@ the full policy set and its inline reasoning.
     - **Supabase**: a hosted project named "delft" (ref `xxpesmgtnuzlhnlqyrje`, `ap-southeast-2`)
       already existed from a previous session — linked via `supabase link --project-ref ...`, then
       all 8 local migrations applied cleanly via `supabase db push` to what was an empty database.
-      Deliberately did **not** run `supabase config push` — it would push the *entire* resolved
+      Deliberately did **not** run `supabase config push` — it would push the _entire_ resolved
       `config.toml`, including `site_url = "http://127.0.0.1:3000"` (correct for local dev, wrong
       for production), silently breaking hosted auth redirects. The `[auth]` URL settings and the
       Google provider are hosted-only Dashboard configuration instead, kept deliberately decoupled
@@ -482,7 +492,7 @@ the full policy set and its inline reasoning.
     (`vault_verifier`, `credential_folders`, `credential_folders_rls`) were pending on hosted and
     had to be pushed, and the short alias was pinned to a 23-hour-old deployment.
 
-19. **Workspace deletion, and Credentials moved from a page to a modal.** ✅ *done*. Two gaps
+19. **Workspace deletion, and Credentials moved from a page to a modal.** ✅ _done_. Two gaps
     reported after using the deployed app for real.
 
     - **Workspace deletion had genuinely never been wired up** — confirmed by grepping the RLS/
@@ -525,7 +535,7 @@ the full policy set and its inline reasoning.
     pre-existing reload check) plus the full suite (10 specs total), `pnpm lint`/`check-types`/
     `build`, and the anon-DELETE REST check above.
 
-20. **Real bug found and fixed: Vercel Preview builds failing (missing env var scope).** ✅ *done*.
+20. **Real bug found and fixed: Vercel Preview builds failing (missing env var scope).** ✅ _done_.
     Pushing to `develop` opened a PR into `master`, and its Vercel check failed with
     `useSupabaseClient must be used within a SupabaseProvider` while statically prerendering `/`.
     Root cause, confirmed via `vercel env ls` before touching anything: `NEXT_PUBLIC_SUPABASE_URL`/
@@ -541,7 +551,7 @@ the full policy set and its inline reasoning.
     a direct `curl` of the resulting preview URL confirming real page content — not just a green
     build log.
 
-21. **Notion-style code block toolbar for Pages.** ✅ *done*. The editor's `codeBlock` had no
+21. **Notion-style code block toolbar for Pages.** ✅ _done_. The editor's `codeBlock` had no
     syntax highlighting or language picker at all (`defaultBlockSpecs.codeBlock` from
     `@blocknote/core`) — replaced end to end, in three passes as real problems surfaced.
 
@@ -556,7 +566,7 @@ the full policy set and its inline reasoning.
       confirmed reproducible with exactly three consecutive `Enter` presses. Neither is patchable
       in place: the picker and the keyboard-shortcuts extension that causes the Enter behavior are
       both internal, not part of `@blocknote/core`'s public API. Replaced the whole spec with a
-      custom one built from what *is* public — `createCodeBlockConfig`,
+      custom one built from what _is_ public — `createCodeBlockConfig`,
       `parsePreCode`/`parsePreCodeContent`, `createExtension` — new files under `apps/web/app/_lib/`:
       `customCodeBlockSpec.tsx` (assembly), `codeBlockKeyboardShortcuts.ts` (a local port of the
       internal shortcuts extension, with the auto-exit-on-blank-lines heuristic removed — `Enter`
@@ -590,13 +600,13 @@ the full policy set and its inline reasoning.
     suite (10 specs, unmodified) were re-run clean after every pass.
 
 22. **Real bug found and fixed: the vault's wrong-passphrase case wasn't rejected until one click
-    too late.** ✅ *done*. Reported as "I can access the passwords with an incorrect passphrase" —
+    too late.** ✅ _done_. Reported as "I can access the passwords with an incorrect passphrase" —
     investigated in full before touching anything; no secret was ever actually decrypted/shown with
     a wrong passphrase (AES-GCM's auth tag makes that cryptographically impossible, confirmed by
     tracing `CredentialDetail.tsx`'s decrypt-failure branch, which renders only the error, never
     stale/partial plaintext). The real gap was upstream of that: `VaultKeyContext.unlock()`
     (Build Order step 16) derives a PBKDF2 key and unconditionally marks the workspace "unlocked" —
-    PBKDF2 can't fail on a wrong passphrase, it just deterministically derives a *different* key —
+    PBKDF2 can't fail on a wrong passphrase, it just deterministically derives a _different_ key —
     so **any** passphrase, right or wrong, passed straight through the unlock screen to the
     credential list, with wrongness only surfacing later, quietly, the moment a specific credential
     was opened. That's a real gate-placement bug, not a crypto bug: the rejection belonged at the
@@ -606,24 +616,24 @@ the full policy set and its inline reasoning.
       test-decrypts an existing credential (`credentials[0]`, now fetched by
       `CredentialsModal.tsx` as soon as the modal opens rather than only after "unlock," since the
       row itself — still-encrypted `secretCiphertext`/`secretIv` plus the already-plaintext
-      `title`/`url` — is already RLS-scoped to workspace members regardless of vault state) *before*
+      `title`/`url` — is already RLS-scoped to workspace members regardless of vault state) _before_
       ever calling into `VaultKeyContext`. Only on success does it call a new
       `VaultKeyContext.setKey()` (added alongside `unlock()` specifically so a key that's already
       been derived-and-verified doesn't pay for a second, redundant 310,000-iteration PBKDF2 just to
       get stored). A failed verification shows "Wrong passphrase — please try again." right on the unlock form and
       never stores a key at all — `CredentialsModal` simply never leaves the unlock screen.
     - **One honestly-documented residual limitation, not fixed because it can't be**: a vault with
-      *zero* credentials yet has nothing anywhere to verify a passphrase against (the server never
+      _zero_ credentials yet has nothing anywhere to verify a passphrase against (the server never
       sees the passphrase, by design — there's no separate stored verifier). First unlock on an
       empty vault still has to proceed on trust, same as initial setup. Verified this doesn't error
       or hang (manual + ad-hoc script check), just genuinely can't distinguish right from wrong yet.
 
     Verified via a rewritten `e2e/credentials.spec.ts` wrong-passphrase case (now asserts rejection
-    *at the unlock form* — "Wrong passphrase — please try again.", credential list never reached — then confirms
+    _at the unlock form_ — "Wrong passphrase — please try again.", credential list never reached — then confirms
     the correct passphrase still works immediately after on the same form) plus the full suite
     (10 specs) and `pnpm lint`/`check-types`, all green.
 
-23. **Closed the empty-vault gap from step 22 with a dedicated passphrase verifier.** ✅ *done*.
+23. **Closed the empty-vault gap from step 22 with a dedicated passphrase verifier.** ✅ _done_.
     Step 22 fixed wrong-passphrase rejection for any vault that already has a credential to
     test-decrypt against, but explicitly documented one residual gap: a brand-new vault with zero
     credentials had nothing anywhere to verify a passphrase against, so it still proceeded on
@@ -643,12 +653,12 @@ the full policy set and its inline reasoning.
       and saves salt+verifier together in one `useSetVaultSalt` call (its mutation signature grew
       the two new required fields) — verified from the very first unlock, never trust-only.
     - **Legacy vaults** (created before this shipped) fall back to the step-22 credential-test
-      mechanism when `vault_verifier` is null, and *self-heal*: a successful unlock via that
+      mechanism when `vault_verifier` is null, and _self-heal_: a successful unlock via that
       fallback fires a best-effort, fire-and-forget `useSetVaultVerifier` (new hook) to backfill the
       verifier, so every unlock after the first uses the fast/universal verifier check instead. This
       backfill can silently no-op for a non-owner member (`workspaces_update_owner` is owner-only,
       same as the salt itself) — harmless, it just retries on the owner's next unlock.
-    - **The one truly unavoidable case**: a legacy vault with *zero* credentials AND no verifier yet
+    - **The one truly unavoidable case**: a legacy vault with _zero_ credentials AND no verifier yet
       still has nothing to check on its very first post-upgrade unlock — but that single unlock now
       immediately backfills the verifier too, so it's never trust-only a second time. Confirmed via
       an ad-hoc script directly manipulating Postgres (`docker exec ... psql`, since the local
@@ -661,7 +671,7 @@ the full policy set and its inline reasoning.
     credentials" — the exact scenario that used to be an open gap) plus the full suite (11 specs)
     and `pnpm lint`/`check-types`, all green.
 
-24. **Nested folders for the Credentials Manager.** ✅ *done*. Credentials were flat per-workspace
+24. **Nested folders for the Credentials Manager.** ✅ _done_. Credentials were flat per-workspace
     — no grouping. Added arbitrarily-deep nested folders (a folder holds both credentials and more
     sub-folders), plus the ability to move an existing credential or folder afterward, not just
     create-in-place. Researched Pages' existing `parent_id` tree first and mirrored it deliberately,
@@ -717,7 +727,7 @@ the full policy set and its inline reasoning.
       `currentFolderId`/`selectedId` back toward root if they ever stop resolving against a fresh
       fetch — needed for the real case of a folder or credential being deleted from another tab)
       would see the brand-new id "missing" from the still-stale cached list for one render and
-      incorrectly reset the selection. Caught by the *existing* `credentials.spec.ts` suite failing,
+      incorrectly reset the selection. Caught by the _existing_ `credentials.spec.ts` suite failing,
       not by new-feature testing — a good reminder that root-level regression coverage earns its
       keep. Fixed by having both create hooks merge the new row into the query cache synchronously
       (`setQueryData`) in addition to invalidating, so the id is always resolvable the instant a
@@ -727,13 +737,13 @@ the full policy set and its inline reasoning.
     controls visibility rather than drill-down navigation, moving a credential via the edit form and
     a folder via the move dialog, and — the single most important case given what's at stake —
     deleting a folder with a credential inside it and confirming the credential survives at root)
-    plus the *existing* `credentials.spec.ts` (confirms root-level/no-folder behavior wasn't
+    plus the _existing_ `credentials.spec.ts` (confirms root-level/no-folder behavior wasn't
     disturbed — this is what caught the cache-race bug above), the full suite (14 specs), `pnpm
-    lint`/`check-types`, direct `psql` trigger testing, and a live screenshot confirming the tree's
+lint`/`check-types`, direct `psql` trigger testing, and a live screenshot confirming the tree's
     indentation/icons visually match `Sidebar.tsx`'s.
 
 25. **Sidebar/header redesign: Notion-style hover affordances, `lucide-react` icons, and an
-    icon-only header.** ✅ *done*, merged to `master` and deployed. The sidebar read flat compared
+    icon-only header.** ✅ _done_, merged to `master` and deployed. The sidebar read flat compared
     to Notion (the page tree's chevron was permanently visible whenever a page had children, and
     every icon in the app — theme toggle, collapse, tree chevrons — was a plain Unicode glyph), and
     the header was busier than it needed to be (a text "Account" link, the raw email, and a
@@ -756,7 +766,7 @@ the full policy set and its inline reasoning.
       (ported the old standalone `/account` page's set-password form, which is now deleted), and
       Sign out. The Credentials button also moved from the sidebar into the header as a key icon —
       this required lifting `CredentialsModal`'s state up from `[workspaceSlug]/layout.tsx` into
-      the *parent* `workspace/layout.tsx`, even though the credentials button should only show
+      the _parent_ `workspace/layout.tsx`, even though the credentials button should only show
       inside an actual workspace (not on the bare `/workspace` switcher). Solved via
       `useParams<{ workspaceSlug?: string }>()` — confirmed Next.js's `useParams()` returns the
       dynamic segments of the full matched URL regardless of which layout in the tree calls it, so
@@ -779,7 +789,7 @@ the full policy set and its inline reasoning.
     those switched to `getByRole("button", { name })`, which also matches on `aria-label` and
     keeps working going forward), and Playwright screenshots in both light and dark mode.
 
-26. **Sidebar page-tree "⋯" menu wired up: Rename and Delete.** ✅ *done*, not yet merged to
+26. **Sidebar page-tree "⋯" menu wired up: Rename and Delete.** ✅ _done_, not yet merged to
     `master`. Step 25 added the hover-reveal "⋯" button as a deliberate stub
     (`console.log`-only, with a `TODO`) — the user noticed it did nothing and confirmed it should
     become a real menu. Wired up with the two actions the codebase already had hooks for, rather
@@ -799,19 +809,19 @@ the full policy set and its inline reasoning.
     plus the full 14-spec e2e suite, `pnpm check-types`/`lint`.
 
 27. **Page editor toolbar cleanup: removed the redundant Delete button, added Undo/Redo.** ✅
-    *done*, not yet merged to `master`. Two small, related changes to `PageEditor.tsx`'s toolbar:
+    _done_, not yet merged to `master`. Two small, related changes to `PageEditor.tsx`'s toolbar:
 
     - Removed its own "Delete" button — redundant now that the sidebar's "⋯" menu (step 26) has
       the same action.
     - Added visible Undo/Redo buttons for discoverability. **Real finding**: `editor.can(cb)` —
       documented in BlockNote's own source comments as `if (editor.can(editor.undo)) { ... }` — is
-      *not* actually public API on the installed `@blocknote/core@0.54.0`'s `BlockNoteEditor`
+      _not_ actually public API on the installed `@blocknote/core@0.54.0`'s `BlockNoteEditor`
       class; only `undo()`/`redo()` are (confirmed against the package's own `.d.ts`, and its
       compiled source: `undo() { return this._stateManager.undo(); }` — `can()` only exists on
       that internal, untyped `_stateManager`). The correct fix was reading undo/redo depth
       directly off the underlying ProseMirror state via `@tiptap/pm/history`'s
       `undoDepth`/`redoDepth` (confirmed a straight re-export of `prosemirror-history` — `export *
-      from 'prosemirror-history'` — so guaranteed to be the same module instance the editor
+from 'prosemirror-history'` — so guaranteed to be the same module instance the editor
       already uses internally, avoiding a dual-package-instance mismatch that importing the bare
       `prosemirror-history` package separately could have risked), applied to
       `editor._tiptapEditor.state` (a public readonly property on `BlockNoteEditor`). Required
@@ -826,7 +836,7 @@ the full policy set and its inline reasoning.
     reverted/reapplied content survives a reload (same autosave path, unchanged) — plus the full
     e2e suite, `pnpm check-types`/`lint`.
 
-28. **"Update profile" box in the Account modal: name, occupation, bio, avatar.** ✅ *done*, not
+28. **"Update profile" box in the Account modal: name, occupation, bio, avatar.** ✅ _done_, not
     yet merged to `master`. Added a second box (alongside "Password") to `AccountModal.tsx`'s
     list-of-settings + drill-down pattern established in step 25 — proof that pattern scales the
     way it was meant to. New fields: first/middle(optional)/last name, an occupation dropdown
@@ -873,12 +883,12 @@ the full policy set and its inline reasoning.
     all 3 packages), and an `rls-reviewer` pass on all three new migrations before ever applying
     them locally.
 
-29. **Username field + login-by-username.** ✅ *done*, not yet merged to `master`. Added an
+29. **Username field + login-by-username.** ✅ _done_, not yet merged to `master`. Added an
     optional `username` to the "Update profile" box (step 28), and let the sign-in page's single
     identifier field accept either an email or a username.
 
     - **The forcing constraint**: Supabase's `signInWithPassword` only ever accepts `{ email,
-      password }` or `{ phone, password }` — confirmed against `@supabase/auth-js`'s own types,
+password }` or `{ phone, password }` — confirmed against `@supabase/auth-js`'s own types,
       never a username. A username has to be resolved to an email client-side, before the user is
       authenticated. Since this app's auth is deliberately 100% client-side (`AuthGate.tsx` — no
       `@supabase/ssr`, no server auth routes), that resolution has to be a database function
@@ -891,10 +901,10 @@ the full policy set and its inline reasoning.
       column, `check (username is null or username ~ '^[a-z0-9_]{3,20}$')`, plain `unique`
       constraint — stored already-lowercased app-side so case-insensitive matching needs no
       `citext`/functional index) + `20260817000010_username_lookup_rpc.sql` (the `security
-      definer` lookup function). Reviewed by `rls-reviewer` before applying — no blocking issues;
+definer` lookup function). Reviewed by `rls-reviewer` before applying — no blocking issues;
       confirmed the join can never fan out (unique constraint from migration 1 is in place before
       the RPC in migration 2 can rely on it), confirmed the `revoke all from public` + `grant ...
-      to anon, authenticated` sequence is actually load-bearing here (unlike the existing trigger
+to anon, authenticated` sequence is actually load-bearing here (unlike the existing trigger
       functions, which return `trigger` and are never directly callable regardless of grants, this
       one returns `text` and would otherwise be silently callable by `PUBLIC` by Postgres's
       default), and confirmed the CHECK constraint — not just the app's pre-lowercasing — is what
@@ -906,7 +916,7 @@ the full policy set and its inline reasoning.
       was typed, what "Change" restores) and `email` (the resolved address auth calls actually
       use). Contains `"@"` → treated as an email directly, no RPC round-trip (keeps the common
       case exactly as fast as before). Otherwise resolved via the new `useEmailForUsername` hook;
-      a `null` result shows "No account found with that username." and does *not* advance to the
+      a `null` result shows "No account found with that username." and does _not_ advance to the
       password step, since the magic-link fallback there also needs a real email to send to.
     - **`e2e/helpers.ts`'s shared `signIn` and `password-sign-in.spec.ts` both broke** from the
       `input[type="email"]` → `#identifier` change — every spec funnels through the shared helper,
@@ -920,7 +930,7 @@ the full policy set and its inline reasoning.
     all. Full 16-spec e2e suite, `pnpm check-types`/`lint` (repo-wide), and the `rls-reviewer` pass
     above.
 
-30. **Fixed BETA_READINESS.md item 1: silent autosave failures in Pages and Canvas.** ✅ *done*.
+30. **Fixed BETA_READINESS.md item 1: silent autosave failures in Pages and Canvas.** ✅ _done_.
     `PageEditor.tsx`'s and `CanvasEditor.tsx`'s debounced `scheduleSave` called
     `updatePage.mutate(...)`/`updateCanvas.mutate(...)` with no `onError` and never read
     `.isError`/`.error`, so a failed autosave (expired session, RLS rejection, network drop) was
@@ -941,7 +951,7 @@ the full policy set and its inline reasoning.
     fail, and confirmed the inline error rendered correctly in both editors. Plus
     `pnpm check-types`/`lint` (repo-wide).
 
-31. **Fixed BETA_READINESS.md item 3: zero responsive/mobile layout.** ✅ *done*. No `sm:`/`md:`/
+31. **Fixed BETA_READINESS.md item 3: zero responsive/mobile layout.** ✅ _done_. No `sm:`/`md:`/
     `lg:`/`xl:`/`2xl:` breakpoints existed anywhere in `apps/web/app`, and no `@media` queries in
     `globals.css` — `Sidebar.tsx`'s hardcoded `w-64`, `PageEditor.tsx`'s fixed `px-8`/`pt-28`, and
     `CredentialsModal.tsx`'s side-by-side two-pane layout made the app effectively unusable at a
@@ -952,7 +962,7 @@ the full policy set and its inline reasoning.
       toggle button, a `bg-black/50` backdrop, and the same `Sidebar` component sliding in from the
       left (its own `onCollapse` prop repurposed as "close the drawer" in this context). The drawer
       closes automatically on navigation via a `usePathname()` effect, rather than needing every
-      nav link threaded with an explicit close callback. `mobileOpen` is deliberately *not*
+      nav link threaded with an explicit close callback. `mobileOpen` is deliberately _not_
       persisted to `localStorage` like the desktop `collapsed` flag — it's transient overlay state,
       not a layout preference.
     - **Editors**: `PageEditor.tsx`/`CanvasEditor.tsx` swapped their fixed padding for
@@ -980,7 +990,7 @@ the full policy set and its inline reasoning.
     screenshotting each step. Plus `pnpm check-types`/`lint` (repo-wide).
 
 32. **Fixed BETA_READINESS.md item 5: added a WebKit e2e project, and two real bugs it found.**
-    ✅ *done*. `playwright.config.ts` only ever configured `chromium` — no way to catch real
+    ✅ _done_. `playwright.config.ts` only ever configured `chromium` — no way to catch real
     Safari/WebKit-engine quirks in three dependencies with known iOS Safari history
     (`browser-image-compression`, `@excalidraw/excalidraw`, `@blocknote/mantine`). Added a
     `webkit` project (`devices["Desktop Safari"]`) and installed the browser binary
@@ -993,12 +1003,12 @@ the full policy set and its inline reasoning.
     - **Real bug found and fixed: `e2e/helpers.ts`'s `signIn()` used `page.fill()` immediately
       after `page.goto("/")`.** `fill()` sets the DOM value and returns without waiting for React
       to attach its event handlers. On WebKit specifically, `goto()`'s `load` event reliably
-      resolves *before* hydration finishes (confirmed: an identical instant `fill()` immediately
+      resolves _before_ hydration finishes (confirmed: an identical instant `fill()` immediately
       after `goto()` left the identifier input empty 3/3 times in an isolated repro script,
       chromium's timing apparently doesn't expose the same window) — the fill lands, then gets
       silently wiped when the controlled `<input value={identifierInput}>` hydrates against its
       still-empty initial state. Fixed by switching to `click()` + `pressSequentially(email, {
-      delay: 20 })`, which both closes the race (each keystroke lands well after hydration
+delay: 20 })`, which both closes the race (each keystroke lands well after hydration
       completes, confirmed 3/3 in the same repro) and is closer to how a real user actually types
       than an instantaneous fill.
     - **Real bug found and fixed: `AccountModal.tsx`'s `ProfileForm` could silently drop the first
@@ -1015,7 +1025,7 @@ the full policy set and its inline reasoning.
       (empty) the instant the form mounts, so a fast-enough first keystroke can still land before
       that one-time seed. Properly fixed by gating the form's fields out of the DOM entirely until
       `profile` has resolved (`if (profile === undefined) return <p>Loading…</p>`) — the seeding
-      effect and the `seededRef` guard both stay, now as defense against a *later* background
+      effect and the `seededRef` guard both stay, now as defense against a _later_ background
       refetch stomping on in-progress edits, but the initial race is closed by construction: a
       keystroke can't land in a field that doesn't exist yet.
 
@@ -1030,10 +1040,10 @@ the full policy set and its inline reasoning.
 
     Verified via the full 16-spec suite on both `chromium` and `webkit` (32/32 green), the two
     fixed specs repeated 3x standalone against `webkit` with no flakes, and `pnpm
-    check-types`/`lint` (repo-wide).
+check-types`/`lint` (repo-wide).
 
 33. **Closed step 32's mobile-viewport gap: added a `mobile-safari` (`devices["iPhone 13"]`)
-    project, and a real bug it found.** ✅ *done*. Step 32 tried this and abandoned it — 11 of 16
+    project, and a real bug it found.** ✅ _done_. Step 32 tried this and abandoned it — 11 of 16
     specs failed immediately since they assumed the desktop sidebar/credentials-modal panes are
     always visible, but below `md` they're gated behind step 31's drawer/single-pane-detail UX.
 
@@ -1047,14 +1057,14 @@ the full policy set and its inline reasoning.
       the risk is lower there since it's never called immediately after a fresh navigation), and
       `onlyVisible(locator)` (`.and(page.locator(":visible"))`) — needed because `SidebarShell.tsx`
       keeps the desktop sidebar mounted (just `hidden md:flex`) even when the drawer is open, so a
-      bare role/text locator matches *both* copies and Playwright's `.click()`/`expect()` default
+      bare role/text locator matches _both_ copies and Playwright's `.click()`/`expect()` default
       to the first (hidden) one in DOM order and hang. All three are no-ops on `chromium`/`webkit`
       (desktop viewports, single-pane-per-breakpoint) — existing desktop assertions needed no
       changes, only insertions at points that touch sidebar/credentials-list content.
     - Applied across `workspace-pages.spec.ts`, `canvas.spec.ts`, `publish-share.spec.ts`,
       `workspace-delete.spec.ts`, `workspace-isolation.spec.ts` (sidebar drawer) and
       `credential-folders.spec.ts` (credentials-modal single-pane) — one `openSidebar`/`backToList`
-      call at *every* touch point, not just the first, since both close again after any navigation
+      call at _every_ touch point, not just the first, since both close again after any navigation
       or (for the modal) returning to the list. `credentials.spec.ts`'s "Select a credential" check
       was replaced with checking the search input's visibility instead — that placeholder text is
       itself desktop-only (mobile shows the list directly rather than a side-by-side empty-state
@@ -1075,13 +1085,13 @@ the full policy set and its inline reasoning.
     (macOS runner + `safaridriver`/Appium) were both declined for now. The cheapest real coverage
     if it's ever wanted is manual: the live app at `https://delft.vercel.app` on an owned device.
 
-34. **Fixed BETA_READINESS.md item 2: every read-hook consumer swallows errors.** ✅ *done*, the
+34. **Fixed BETA_READINESS.md item 2: every read-hook consumer swallows errors.** ✅ _done_, the
     last remaining High-severity item in that doc. `useWorkspaces`, `usePages`, `useCredentials`,
     `useCanvases`, `usePage`, `useCanvas` were destructured as `{ data, isLoading }` only across
     all six consumer sites — a failed fetch (RLS error, network drop) looked identical to
     "genuinely empty" or "not found." Fixed by adding `isError`/`error` and an inline
     `text-red-700` branch alongside each site's existing loading/empty-state logic: `apps/web/app/
-    workspace/page.tsx`, `Sidebar.tsx` (twice — Pages and Canvas sections), `CredentialsModal.tsx`
+workspace/page.tsx`, `Sidebar.tsx` (twice — Pages and Canvas sections), `CredentialsModal.tsx`
     (a standalone banner, doesn't gate vault-unlock UI), and the page/canvas route files. No hook
     changes — `.isError`/`.error` were already standard `useQuery` return values, this was purely a
     UI-consumption gap.
@@ -1098,7 +1108,7 @@ the full policy set and its inline reasoning.
     (no fixed timeout) instead of a blind wait, and all six sites confirmed rendering correctly.
     Plus `pnpm check-types`/`lint` (repo-wide).
 
-35. **Fixed BETA_READINESS.md item 4: `Modal.tsx` has no dialog semantics.** ✅ *done*, closing out
+35. **Fixed BETA_READINESS.md item 4: `Modal.tsx` has no dialog semantics.** ✅ _done_, closing out
     Medium severity. Neither the backdrop nor the panel had real dialog semantics (both
     `role="presentation"`, the panel's wrong for a dialog container), no focus trap, no
     focus-in-on-open/focus-return-on-close — Tab could escape the modal into the page behind it.
@@ -1110,7 +1120,7 @@ the full policy set and its inline reasoning.
       a decorative click-to-close overlay, not part of the dialog).
     - Focus trap is a manual Tab/Shift+Tab handler on the existing `keydown` listener, not
       `inert`-ing siblings — considered and rejected, since `document.body`'s children include
-      *every* open modal's own portal (`MoveCredentialFolderModal` opens from inside
+      _every_ open modal's own portal (`MoveCredentialFolderModal` opens from inside
       `CredentialsModal`), and `inert`-ing "everything except this one" would need to specifically
       exclude every other currently-open portal too.
     - A `useEffect` keyed on `open` moves focus to the panel's first focusable element (or the
@@ -1118,9 +1128,9 @@ the full policy set and its inline reasoning.
       `document.activeElement` was beforehand on close.
     - **Real bug found and fixed during verification, not just eyeballing the diff**: the first
       pass guarded the Tab-wrap logic against the nested-modal case (`panel.contains
-      (document.activeElement)` before acting) but left Escape unguarded. Every open `Modal`
+(document.activeElement)` before acting) but left Escape unguarded. Every open `Modal`
       instance registers its own `window`-level `keydown` listener — native listeners have no
-      concept of nesting, so *all* open instances' listeners fire on every keydown regardless of
+      concept of nesting, so _all_ open instances' listeners fire on every keydown regardless of
       which modal actually has focus. One Escape press was closing both the inner
       `MoveCredentialFolderModal` and the outer `CredentialsModal` at once. Caught by an actual
       nested-modal Playwright script (open Credentials → create a folder → open its Move dialog →
@@ -1137,7 +1147,7 @@ the full policy set and its inline reasoning.
     green with no regressions, and `pnpm check-types`/`lint` (repo-wide).
 
 36. **Fixed BETA_READINESS.md's Low-severity batch: title `<label>`, favicon, `app/error.tsx`, OG/
-    viewport metadata.** ✅ *done*, closing out every High/Medium/Low item in that doc except
+    viewport metadata.** ✅ _done_, closing out every High/Medium/Low item in that doc except
     Storage orphaning. Four small, independent gaps fixed together in one pass:
 
     - `PageEditor.tsx`/`CanvasEditor.tsx`'s title inputs relied on `placeholder="Untitled"` alone —
@@ -1166,10 +1176,10 @@ the full policy set and its inline reasoning.
     title labels confirmed via `page.getByLabel("Title")` resolving to the actual input; the
     favicon confirmed by fetching `/icon` directly (200, `image/png`, visually inspected as the
     intended monogram — not just assumed from the route existing); both error boundaries confirmed
-    by *forcing a real render-time throw*, not just reading the code. The root one was
+    by _forcing a real render-time throw_, not just reading the code. The root one was
     straightforward (a temporary always-throwing route, no auth involved). The workspace-scoped
     one needed a different approach: a temporary throwing route at `app/workspace/test-error-
-    trigger/` redirected to the sign-in page instead of showing the error, traced to `AuthGate`
+trigger/` redirected to the sign-in page instead of showing the error, traced to `AuthGate`
     racing its own session-reestablishment against a full `page.goto()` reload — a real
     characteristic of this app's client-side-only auth, but not a bug in `error.tsx` itself, and
     not representative of how a real user would ever hit this (mid-session, not a cold load to a
@@ -1183,11 +1193,11 @@ the full policy set and its inline reasoning.
     actually compile, not just type-check), `pnpm check-types`/`lint`, and the full 48-test e2e
     suite (`chromium`/`webkit`/`mobile-safari`) green with no regressions.
 
-37. **Fixed BETA_READINESS.md's last item: Storage orphaning on page/workspace delete.** ✅ *done*
+37. **Fixed BETA_READINESS.md's last item: Storage orphaning on page/workspace delete.** ✅ _done_
     — this closes out every finding in that audit doc. `useDeletePage`/`useDeleteWorkspace`
     (`packages/shared/src/hooks/`) only ever deleted Postgres rows (`on delete cascade` handles the
     relational side for free); neither called `supabase.storage.from("page-images")
-    .remove(...)`, so any BlockNote-uploaded image became permanently orphaned once its page or
+.remove(...)`, so any BlockNote-uploaded image became permanently orphaned once its page or
     workspace was deleted — a slow, one-way leak against the 1GB free tier.
 
     - **New shared helper**: `packages/shared/src/lib/removePageImages.ts` (mirroring the existing
@@ -1199,12 +1209,12 @@ the full policy set and its inline reasoning.
       deleting a page/workspace they want gone over a transient Storage hiccup would be a worse
       tradeoff than occasionally leaving an object behind (the exact failure mode the audit finding
       itself already called "not catastrophic short-term").
-    - **Ordering matters and is easy to get backwards**: both hooks call the helper *before* their
+    - **Ordering matters and is easy to get backwards**: both hooks call the helper _before_ their
       row delete, not after. `page_images_delete_member`'s RLS
       (`supabase/migrations/20260812140030_storage.sql`) scopes `list()`/`remove()` on the caller
       still being a member of the workspace named by the object path's first segment — a completed
       `workspaces` row delete cascades `workspace_members` away too, so any Storage call attempted
-      *after* that point would already be locked out by RLS regardless of who's calling.
+      _after_ that point would already be locked out by RLS regardless of who's calling.
     - **`useDeletePage` needed the whole descendant subtree, not just the one page ID passed in**
       — deleting a page cascades every sub-page under it (`on delete cascade` on
       `pages.parent_id`, already documented in that hook's own pre-existing comment), and Storage
@@ -1217,8 +1227,8 @@ the full policy set and its inline reasoning.
 
     Verified against a real local Supabase session, not just written and assumed correct: uploaded
     fake images directly via the Storage REST API to a parent page and a child sub-page's exact
-    path convention, confirmed both existed via a direct `list()` call, deleted the *parent* page
-    through the UI (page-tree "⋯" menu, which cascades the child too), and confirmed *both*
+    path convention, confirmed both existed via a direct `list()` call, deleted the _parent_ page
+    through the UI (page-tree "⋯" menu, which cascades the child too), and confirmed _both_
     objects were gone — proving the subtree-cascade case specifically, not just a trivial
     single-page delete. Repeated the same shape for a whole-workspace delete (image in a page,
     delete the workspace from the switcher) and confirmed the object was gone there too. Along the
@@ -1233,7 +1243,7 @@ the full policy set and its inline reasoning.
 **Deferred, not started:** revisiting `PageEditor.tsx`'s image-compression settings against real
 Storage usage — see **Next Up** above.
 
-38. **Auth security audit.** ✅ *done*. Requested review of password hashing, session expiry, email
+38. **Auth security audit.** ✅ _done_. Requested review of password hashing, session expiry, email
     verification, password-reset token expiry, login rate limiting, and frontend secret exposure.
     Audited every hook in `packages/shared/src/hooks/` plus `AccountModal.tsx` and confirmed auth is
     100% delegated to Supabase/GoTrue — no custom password hashing, token generation, or session
@@ -1251,8 +1261,8 @@ Storage usage — see **Next Up** above.
     `jwt_expiry = 3600` with `enable_refresh_token_rotation = true` (session expiry), GoTrue's
     built-in `[auth.rate_limit]` block (login throttling — no custom app-level throttling exists or
     is needed on top of it), and `enable_confirmations = false` (email verification) — account
-    *creation* is magic-link-only (no `auth.signUp` call exists anywhere in the repo), so receiving
-    the magic link *is* the verification step, making this correct by design rather than a gap.
+    _creation_ is magic-link-only (no `auth.signUp` call exists anywhere in the repo), so receiving
+    the magic link _is_ the verification step, making this correct by design rather than a gap.
     Password reset likewise has no separate flow or custom token logic — a failed password attempt
     falls back to the same magic link (step 14), governed by the same `otp_expiry = 3600`.
 
@@ -1275,7 +1285,7 @@ Storage usage — see **Next Up** above.
     sign-in/sign-up forms — out of scope for a config-only pass.
 
 39. **IDOR audit of every RLS policy, then a deployment-security pass (HTTPS headers, secrets,
-    direct DB access, logging).** ✅ *done*, two separate requests handled back to back.
+    direct DB access, logging).** ✅ _done_, two separate requests handled back to back.
 
     **IDOR audit**: since there are no custom `app/api/**` routes at all — the browser talks
     straight to PostgREST/GoTrue/Storage with the anon key — the entire IDOR trust boundary here is
@@ -1300,7 +1310,7 @@ Storage usage — see **Next Up** above.
       closing the downgrade-on-first-request gap that a redirect-after-the-fact doesn't cover),
       `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` (safe — confirmed zero `<iframe>`
       usage anywhere in `apps/web`; Google sign-in is a popup, not an embed), `Referrer-Policy:
-      strict-origin-when-cross-origin`, and a `Permissions-Policy` denying camera/mic/geolocation
+strict-origin-when-cross-origin`, and a `Permissions-Policy` denying camera/mic/geolocation
       (unused by the app). Verified live: `curl -D -` against the dev server showed all five headers
       present, then the full `chromium` e2e suite (16/16, including sign-in flows) still passed with
       headers active, confirming nothing broke. A full CSP was considered and deliberately **not**
@@ -1327,7 +1337,7 @@ Storage usage — see **Next Up** above.
       `apps/web/app/error.tsx`'s existing `console.error` + fallback UI (step 36) was left as-is.
 
 40. **Abuse-protection scoping: no custom API/AI surface exists, so the work narrows to the one
-    public route.** ✅ *done*, scoped down with the user rather than built blind. The request asked
+    public route.** ✅ _done_, scoped down with the user rather than built blind. The request asked
     for rate limiting on "login attempts, API endpoints, account creation, and AI generation
     requests" — none of the last three exist in this app (no `app/api/**`, no AI feature anywhere),
     and login/account-creation rate limiting is already GoTrue's built-in `[auth.rate_limit]` (tuned
@@ -1357,7 +1367,7 @@ Storage usage — see **Next Up** above.
     `publish-share.spec.ts` still passes with the new metadata in place.
 
 41. **Input-validation audit: mapped every user-input entry point, then closed the two real gaps
-    found.** ✅ *done*. Asked for SQL/command/script-injection and unsafe-upload protection across
+    found.** ✅ _done_. Asked for SQL/command/script-injection and unsafe-upload protection across
     every form, upload, and query param. Found **no SQL injection surface** (zero raw SQL
     string-building anywhere — every DB call goes through the parameterized Supabase client, and
     the sole `.rpc()` call passes a typed args object), **no command injection surface** (zero
@@ -1400,14 +1410,14 @@ Storage usage — see **Next Up** above.
     suite (16/16, including `profile.spec.ts`'s real avatar upload) still passed with the new
     Storage restrictions live, confirming the happy path wasn't broken by the new limits.
 
-42. **QueryClient staleTime.** ✅ *done*. `apps/web/app/providers.tsx`'s shared `QueryClient` had no
+42. **QueryClient staleTime.** ✅ _done_. `apps/web/app/providers.tsx`'s shared `QueryClient` had no
     `staleTime`/`refetchOnWindowFocus` override, so all 34 hooks in `packages/shared/src/hooks/`
     refetched on every component remount and every window refocus — including the full unbounded
     page/canvas/credential list queries. Set `staleTime: 30_000` and `refetchOnWindowFocus: false`
     on the shared defaults; no per-hook changes needed since none override `staleTime` themselves.
     Verified: `pnpm check-types`/`lint` clean.
 
-43. **Sidebar/credentials tree re-render fan-out.** ✅ *done*. `PageTreeNode.tsx` and
+43. **Sidebar/credentials tree re-render fan-out.** ✅ _done_. `PageTreeNode.tsx` and
     `CredentialFolderTreeNode.tsx` re-rendered their entire visible subtree on every single
     expand/collapse click, because the `expanded` state is a `Set<string>` that gets a fresh
     reference every toggle (`new Set(prev)`), passed straight down through every recursive tree
@@ -1426,19 +1436,19 @@ Storage usage — see **Next Up** above.
     (`workspace-pages.spec.ts`, `credential-folders.spec.ts`) passing across
     Chromium/WebKit/Mobile Safari, confirming rename/create/delete/expand behavior is unchanged.
 
-44. **`VaultKeyContext` provider value memoization.** ✅ *done*. `packages/shared/src/vault/
-    VaultKeyContext.tsx`'s provider wraps the entire authenticated app (mounted in
+44. **`VaultKeyContext` provider value memoization.** ✅ _done_. `packages/shared/src/vault/
+VaultKeyContext.tsx`'s provider wraps the entire authenticated app (mounted in
     `apps/web/app/workspace/layout.tsx`), but its context value — `{ isUnlocked, getKey, unlock,
-    setKey, lock }` — was a fresh object literal every render even though the individual methods
+setKey, lock }` — was a fresh object literal every render even though the individual methods
     were already correctly wrapped in `useCallback`. That re-rendered every `useVaultKey()` consumer
     on any change to the provider, regardless of whether their own workspace's unlock state
     actually changed. Wrapped the value object itself in `useMemo`. No public API change —
     `useVaultKey`/`VaultKeyProvider`'s signatures are untouched, so `CredentialsModal.tsx`,
     `VaultUnlockPanel.tsx`, and `workspace/layout.tsx` needed no changes. Verified: `pnpm
-    check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-folders.spec.ts`)
+check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-folders.spec.ts`)
     passing across 3 browsers.
 
-45. **Share-page double-fetch dedup.** ✅ *done*. `/share/[slug]` — the app's one server-rendered
+45. **Share-page double-fetch dedup.** ✅ _done_. `/share/[slug]` — the app's one server-rendered
     route — ran two separate Supabase queries per hit for the same row: `generateMetadata()`
     (`select("title")`) and the page body (`select("title, content, updated_at")`). Next's request
     memoization doesn't dedupe across differing `.select()` column lists, so this was a real
@@ -1449,7 +1459,7 @@ Storage usage — see **Next Up** above.
     second, narrower query. Verified: `pnpm check-types`/`lint`/`build` clean; `publish-share.spec.ts`
     passing across 3 browsers.
 
-46. **Bundle-size visibility.** ✅ *done*, after a false start. Wired up `@next/bundle-analyzer` in
+46. **Bundle-size visibility.** ✅ _done_, after a false start. Wired up `@next/bundle-analyzer` in
     `next.config.js` per a standard recommendation, then discovered on testing that it only
     instruments webpack builds and is explicitly incompatible with Turbopack — which is this app's
     default builder in Next 16 for both `dev` and `build`. It silently printed "no report will be
@@ -1460,7 +1470,7 @@ Storage usage — see **Next Up** above.
     with a real run that it writes an analysis to `.next/diagnostics/analyze`.
 
 47. **Branch-discipline guardrail: a `PreToolUse` hook blocking `git commit`/`git push` on
-    `master`.** ✅ *done*. This repo's workflow is develop → PR → `master` (`master` auto-deploys to
+    `master`.** ✅ _done_. This repo's workflow is develop → PR → `master` (`master` auto-deploys to
     production on push), but this session committed 5 fixes directly to `master` by mistake before
     catching it and moving them to `develop` (stash + cherry-pick + reset — nothing had been pushed,
     so this was fully local). `.claude/hooks/block-master-git-writes.js` + `.claude/settings.json`
@@ -1469,7 +1479,7 @@ Storage usage — see **Next Up** above.
     input and a live sentinel-file test confirming it actually fires.
 
 48. **Touch/click target audit fix: `TopBar`, `ThemeToggle`, `Sidebar`, `PageTreeNode` icon
-    buttons.** ✅ *done*. Several buttons were well under the ~44px comfort floor (down to 16×16 for
+    buttons.** ✅ _done_. Several buttons were well under the ~44px comfort floor (down to 16×16 for
     the tree-row buttons). Added an invisible `before:absolute` pseudo-element to each, extending
     the clickable area past the visible edges with no layout shift — asymmetric per button, not a
     uniform inset, since several sit only 4-8px from another interactive neighbor (a sibling button,
@@ -1477,14 +1487,14 @@ Storage usage — see **Next Up** above.
     the two standalone `TopBar` buttons reach the full 44×44; every other button is capped short on
     at least one axis by a real neighbor, the correct outcome given the layout.
 
-49. **Route-level `loading.tsx` for the page and canvas editor routes.** ✅ *done*. Both routes are
+49. **Route-level `loading.tsx` for the page and canvas editor routes.** ✅ _done_. Both routes are
     client components that only showed a loading state once mounted and their own query had
     started, leaving a blank flash during the route-transition/hydration gap.
     `apps/web/app/workspace/[workspaceSlug]/p/[pageId]/loading.tsx` and the matching
     `canvas/[canvasId]/loading.tsx` fill that gap via Next's built-in Suspense convention, reusing
     each route's own already-existing loading markup.
 
-50. **Credentials vault modal redesign.** ✅ *done*. The sidebar tree and detail pane read as
+50. **Credentials vault modal redesign.** ✅ _done_. The sidebar tree and detail pane read as
     generic/unpolished against the rest of the app. Switched every hand-rolled inline SVG icon
     (including a bare unicode chevron glyph) to `lucide-react` — already used everywhere else in the
     app, the biggest single consistency gap — added a ghost icon-button pattern for utility actions
@@ -1496,9 +1506,9 @@ Storage usage — see **Next Up** above.
     accessible name — going icon-only without that would have silently broken the test.
 
 51. **Fix: broken expand/collapse on nested sidebar/folder-tree rows — a regression from step 43.**
-    ✅ *done*. Step 43's re-render optimization excluded the raw `expanded: Set<string>` from each
+    ✅ _done_. Step 43's re-render optimization excluded the raw `expanded: Set<string>` from each
     node's memo comparator, relying instead on a separately-passed `isExpanded` boolean computed by
-    each node's *parent* during the parent's own render — so whenever the parent's own `isExpanded`
+    each node's _parent_ during the parent's own render — so whenever the parent's own `isExpanded`
     looked unchanged, its memo check skipped re-rendering it, which also skipped recomputing
     `isExpanded` for any of its children (only ever done inside the parent's render). Toggling
     anything below the root level silently did nothing unless some unrelated change happened to
@@ -1512,7 +1522,7 @@ Storage usage — see **Next Up** above.
     exercised, which is how this shipped unnoticed. Verified by temporarily reintroducing the bug:
     the new test fails immediately, and passes again once reverted.
 
-52. **Drag-and-drop reparenting: pages sidebar + credentials folder tree.** ✅ *done*. Pages and
+52. **Drag-and-drop reparenting: pages sidebar + credentials folder tree.** ✅ _done_. Pages and
     credential folders can now be dragged onto another item to reparent them, or onto a root drop
     target to move back to the top level — requested directly ("should be drag and drop only if we
     want to move folders on credentials and pages... part on sidebar"). `CredentialsModal`'s old
@@ -1532,7 +1542,7 @@ Storage usage — see **Next Up** above.
     deleted modal's own exclusion logic) backs both trees' "can't drop onto my own descendant" UI
     guard.
 
-53. **Fix: drag-and-drop never activated for real mouse users.** ✅ *done*. Step 52 shipped both
+53. **Fix: drag-and-drop never activated for real mouse users.** ✅ _done_. Step 52 shipped both
     trees on a single `PointerSensor` with a 200ms-delay + 8px-tolerance activation constraint
     (chosen so touch-scrolling inside the credentials list's `overflow-y-auto` container kept
     working) — that constraint requires holding the pointer still for the full delay before any
@@ -1546,7 +1556,7 @@ Storage usage — see **Next Up** above.
     keeping the original delay (still needed there). Re-verified the full drag-and-drop e2e suite
     across chromium/webkit/mobile-safari.
 
-54. **Drag-to-reorder siblings: pages, credential folders, credentials, canvases.** ✅ *done*. Step
+54. **Drag-to-reorder siblings: pages, credential folders, credentials, canvases.** ✅ _done_. Step
     52 covered reparenting only — no way to drop an item at a specific position among its siblings,
     reported directly against a screenshot of three sibling root pages ("one thing I can't do is
     drag and drop it for them to re-order there positions"). Added a `position` (`double precision`)
@@ -1558,7 +1568,7 @@ Storage usage — see **Next Up** above.
     given this app's realistic (not high-volume) write pattern; see the Data model section above for
     the float-precision tradeoff this implies. New `ReorderStrip.tsx` — a thin, always-mounted,
     zero-height drop target rendered between every pair of siblings (and before/after the group) —
-    gives a "drop a line between two rows" interaction distinct from dropping *onto* a row (still
+    gives a "drop a line between two rows" interaction distinct from dropping _onto_ a row (still
     reparents, appended at the end). Extended to credentials and canvases, which had no drag support
     at all before this (the user explicitly asked for full symmetry, not just pages/folders).
     Two real bugs found and fixed during testing, not just test artifacts: (1) reading the DOM
@@ -1575,13 +1585,13 @@ Storage usage — see **Next Up** above.
     (root + nested pages, folders + credentials with reparent, canvases with reload-persistence
     check).
 
-55. **Add Vercel Speed Insights.** ✅ *done*. Installed `@vercel/speed-insights` and mounted
+55. **Add Vercel Speed Insights.** ✅ _done_. Installed `@vercel/speed-insights` and mounted
     `<SpeedInsights />` in the root layout (`app/layout.tsx`) to collect real-user Core Web Vitals
     for the production deploy. Free on the Hobby plan for one project up to 10,000 events/month —
     past that Vercel just pauses recording until the next day rather than billing, so this stays
     within the zero-cost constraint. Verified: `check-types`/`lint`/`build` clean.
 
-56. **Pre-beta-testing hardening pass.** ✅ *done*. A fresh audit (multi-tester readiness, perf/
+56. **Pre-beta-testing hardening pass.** ✅ _done_. A fresh audit (multi-tester readiness, perf/
     reliability under real usage, and a regression check against the two closed-out audits above)
     found several gaps that only mattered once the app moves from one trusted user to real beta
     testers on real networks:
@@ -1594,7 +1604,7 @@ Storage usage — see **Next Up** above.
       dropped the instant `mutate()` was called.
     - **Sidebar over-fetch**: `usePages`/`useCanvases` `select("*")`'d the full `content`/`scene`
       jsonb for every row just to render a title in the tree, and `useUpdatePage`/`useUpdateCanvas`
-      invalidated that whole list on *every* autosave, including content-only ones. Fixed with new
+      invalidated that whole list on _every_ autosave, including content-only ones. Fixed with new
       `PageSummary`/`CanvasSummary` types (`Omit<Page, "content">`/`Omit<Canvas, "scene">`),
       lightweight column-selecting queries, and list invalidation now skipped unless
       `title`/`parentId`/`position` actually changed.
@@ -1622,7 +1632,7 @@ Storage usage — see **Next Up** above.
     flakiness, not a regression, by re-running those exact specs in isolation and getting a clean
     6/6.
 
-57. **Credential types: Login / Google-SSO / API Key / PIN.** ✅ *done*. The Credentials Manager
+57. **Credential types: Login / Google-SSO / API Key / PIN.** ✅ _done_. The Credentials Manager
     had one hardcoded shape (title/url/username/password/notes) — not every secret fits that (a
     Google/SSO login has no password, an API key is a single token, a PIN is a short code, not a
     username+password pair). Added a `credentials.type` column (`login`/`oauth`/`api_key`/`pin`,
@@ -1650,3 +1660,82 @@ Storage usage — see **Next Up** above.
     new e2e case in `credentials.spec.ts` locks in the API Key type's field-swap behavior; full
     61/63 e2e suite passing (the 2 failures are the same pre-existing webkit/mobile-safari
     flakiness noted in step 56, unrelated to this change).
+
+58. **Vault recovery key — reverses the "forgotten passphrase = permanent data loss, by design"
+    decision from step 16/22-23.** ✅ _done_. Triggered by a real incident: Instamo's production
+    vault rejected its own correct passphrase. Investigation found the workspace genuinely had zero
+    credential rows (the vault had been set up but never used), so the immediate fix was a one-line
+    data change — null out `vault_salt`/`vault_verifier(_iv)` on that one row so it re-runs
+    first-time setup — with no code change needed. But it surfaced the deeper problem: because
+    `deriveVaultKey(passphrase, salt)` directly encrypted every credential, there was no shared
+    secret two different unlock paths could ever both reach, so a forgotten passphrase had no
+    recoverable path even in principle.
+
+    **Fix: a wrapped-master-key (DEK) model, same shape Bitwarden/1Password use.** A random
+    per-workspace Vault Master Key (VMK) now directly encrypts every credential (`vaultCrypto.ts`'s
+    `generateVaultMasterKey`); the VMK itself is AES-GCM _wrapped_ under two independent factors —
+    the passphrase-derived key, and a new one-time-shown recovery key
+    (`wrapVaultMasterKey`/`unwrapVaultMasterKey`, `generateRecoveryKey` — 32 random bytes, a
+    hand-written base32 bit-packing codec, no PBKDF2/salt needed since it's already full-entropy).
+    Either factor alone unwraps the VMK; an unwrap failure (AES-GCM auth-tag mismatch) _is_ the
+    "wrong passphrase"/"wrong recovery key" check, replacing `vault_verifier` for any vault on this
+    model. New `workspaces` columns: `vault_wrapped_key(_iv)`, `vault_recovery_wrapped_key(_iv)`
+    (`20260822154426_vault_wrapped_key.sql`). `vault_verifier`/`_iv` are deliberately **not**
+    dropped yet — they're still required for a legacy vault's old unlock path, the prerequisite
+    before it can migrate; drop them in a follow-up once every known workspace has
+    `vault_wrapped_key` set (confirmed via `npx supabase db query --linked` against production, not
+    just an assumption).
+
+    **First-time setup** now generates a VMK + recovery key at once, wraps the VMK under both, and
+    shows the recovery key exactly once in a non-dismissable `RecoveryKeyDisplay.tsx` panel (an
+    explicit "I've saved this" checkbox gates the Continue button) before anything is persisted
+    (`useSetVaultWrappedKey.ts`, one write, salt + both wrapped-key pairs together — never a
+    half-written state). **Legacy vaults** (Instamo, CIO1 at the time this shipped — has
+    `vault_salt`, no `vault_wrapped_key`) migrate on next successful unlock: `VaultUnlockPanel.tsx`
+    authenticates exactly as before (verifier-or-test-decrypt), then hands off to
+    `VaultMigrationPanel.tsx`, which re-encrypts every existing credential under a fresh VMK,
+    generates that vault's first-ever recovery key (mandatory, not skippable — it's the one chance
+    to get one for pre-existing data), and persists all of it through a single atomic RPC,
+    `migrate_vault_to_wrapped_key` (`20260822154438_...sql`) — one Postgres transaction, so a
+    concurrency check (credential set changed mid-migration) or an ownership check (invoker-rights,
+    relies on `workspaces_update_owner` — a non-owner member's attempt rolls back cleanly with a
+    clear message) failing rolls back every credential re-encryption too, never leaving some rows
+    migrated and others not.
+
+    **"Forgot passphrase?"** (`ForgotPassphrasePanel.tsx`, linked from the unlock screen once a
+    vault has a wrapped key): recovery key → unwrap the VMK → set a brand-new passphrase → re-wrap
+    the _same_ VMK under it (`useRotateVaultPassphrase.ts`, touches only `vault_salt`/
+    `vault_wrapped_key(_iv)`, never the recovery-wrapped columns, so the original recovery key keeps
+    working afterward). Zero data loss, zero server/email involvement — the recovery key itself is
+    the second factor.
+
+    **Last resort** (`vault-reset/page.tsx` + `vault-reset/confirm/page.tsx`, real routes not modal
+    state, reachable only from ForgotPassphrasePanel's "lost your recovery key too?" link): reuses
+    the app's only existing email mechanism (`signInWithOtp`, same as login) to send a confirmation
+    link; a new owner-only `vault_reset_requests` table (RLS: insert requires
+    `workspaces.owner_id = auth.uid()`) tracks a single-use, 1-hour-expiry token. Landing on the
+    confirm page _is_ "active session AND clicked email link" as one mechanism, since clicking the
+    magic link is what establishes the session; one more explicit button click (never auto-fired on
+    load, so an email client's link-prefetcher can't silently burn the token) calls `reset_vault`
+    (`20260822160105_...sql`), which deletes every credential/folder in the vault and nulls every
+    vault column — genuinely destructive, no orphaned-ciphertext option offered, the confirm page's
+    own copy says so plainly. Caught and fixed during testing: the RPC is invoker-rights (mirrors
+    `migrate_vault_to_wrapped_key`'s reasoning — let RLS do the ownership work rather than
+    re-implementing it under `security definer`), which means it needs a real `update` grant on
+    `vault_reset_requests` to mark a request confirmed; the first migration only granted
+    `select, insert`, which surfaced immediately as a 403 in manual testing, not a design gap left
+    for later.
+
+    Verified end-to-end via Playwright MCP against a real local Supabase session, three full
+    passes: (1) fresh setup → recovery key shown/confirmed → lock → unlock → forgot-passphrase with
+    a wrong recovery key (rejected) then the right one → new passphrase → original credential still
+    decrypts correctly; (2) a seeded legacy vault (direct-key-encrypted credential, no wrapped key,
+    reproducing Instamo/CIO1's actual pre-migration shape) → unlock → forced migration → recovery
+    key shown → credential decrypts correctly post-migration; (3) the last-resort reset end to end
+    including a replayed (already-used) token correctly rejected. Two real bugs found and fixed
+    only by actually clicking through the flows, not just from reading the code: the Close button
+    stayed permanently disabled after setup completed (the busy-state effect had no unmount
+    cleanup); recovering via the recovery key threw on re-wrap because the recovered VMK was
+    non-extractable by default (`unwrapVaultMasterKey` now takes an opt-in `extractable` parameter,
+    used only by the one caller that needs to re-wrap what it just unwrapped). `pnpm lint`,
+    `pnpm check-types`, `pnpm build` all clean across the repo.

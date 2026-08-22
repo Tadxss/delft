@@ -120,6 +120,156 @@ export async function verifyVaultKey(
   );
 }
 
+// Wrapped-master-key primitives: instead of the passphrase-derived key directly encrypting every
+// credential, a random Vault Master Key (VMK) does that, and the VMK itself is wrapped (AES-GCM
+// encrypted) under two independent factors — the passphrase-derived key, and a recovery key.
+// Either factor alone can unwrap the VMK, which is what makes a "forgot passphrase" flow possible
+// without losing data: there's now a shared secret (the VMK) two different unlock paths can both
+// reach, where before the passphrase-derived key WAS the only key, with nothing else able to open
+// what it encrypted.
+
+// `extractable: true` is deliberate and narrow — the only reason this file ever creates an
+// extractable key. The raw bytes need to be exportable exactly once, to wrap them under Kp/Kr
+// below; they're never logged or handed to anything but wrapVaultMasterKey. Every *working* key
+// this file hands back to a caller (this function's own generated key never is one) stays
+// non-extractable, same as deriveVaultKey/unwrapVaultMasterKey.
+export async function generateVaultMasterKey(): Promise<CryptoKey> {
+  return crypto.subtle.generateKey(
+    { name: "AES-GCM", length: AES_KEY_LENGTH },
+    true,
+    ["encrypt", "decrypt"],
+  );
+}
+
+// Encrypts the VMK's raw bytes under a wrapping key (either a passphrase-derived Kp or a
+// recovery-key-derived Kr) — reuses the same AES-GCM primitive as encryptSecret rather than
+// WebCrypto's separate wrapKey/unwrapKey APIs, so this file has one crypto primitive family, not
+// two.
+export async function wrapVaultMasterKey(
+  vmk: CryptoKey,
+  wrappingKey: CryptoKey,
+): Promise<{ ciphertext: string; iv: string }> {
+  const raw = await crypto.subtle.exportKey("raw", vmk);
+  const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES));
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    wrappingKey,
+    raw,
+  );
+  return { ciphertext: toBase64(ciphertext), iv: toBase64(iv) };
+}
+
+// Throws (AES-GCM auth-tag failure) if `wrappingKey` doesn't match the key the VMK was wrapped
+// with — this failure IS the "wrong passphrase"/"wrong recovery key" check going forward,
+// replacing verifyVaultKey for any vault that has a wrapped key.
+//
+// `extractable` defaults to false, restoring the invariant that the key actually held in
+// VaultKeyContext for the rest of a normal unlock session can never have its raw bytes read back
+// out. ForgotPassphrasePanel.tsx is the one caller that passes `true`: it recovers the VMK via the
+// recovery key specifically in order to immediately re-wrap it (wrapVaultMasterKey, which needs
+// exportKey) under a freshly chosen passphrase — a non-extractable key would make that re-wrap
+// throw. That session's in-memory key stays extractable for the rest of that unlock; the next
+// normal passphrase unlock goes through the default (non-extractable) path again.
+export async function unwrapVaultMasterKey(
+  ciphertextB64: string,
+  ivB64: string,
+  wrappingKey: CryptoKey,
+  extractable = false,
+): Promise<CryptoKey> {
+  const raw = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: fromBase64(ivB64) as BufferSource },
+    wrappingKey,
+    fromBase64(ciphertextB64) as BufferSource,
+  );
+  return crypto.subtle.importKey("raw", raw, "AES-GCM", extractable, [
+    "encrypt",
+    "decrypt",
+  ]);
+}
+
+// Crockford's Base32 alphabet — no I/L/O/U, avoids confusion with 1/0 and reduces accidental
+// profanity, the same reasoning generatePassword's CHARSETS already applies to its own alphabets.
+const RECOVERY_KEY_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+// 32 bytes so the decoded key material is exactly a valid AES-256 raw key length (16/24/32 are the
+// only lengths WebCrypto's AES-GCM importKey accepts) — no separate "is this a usable key length"
+// step needed anywhere this gets consumed.
+const RECOVERY_KEY_BYTES = 32;
+const RECOVERY_KEY_GROUP_SIZE = 5;
+
+// Real base32 bit-packing (5 bits per character, spanning byte boundaries) — NOT "one character
+// per byte", which would only ever encode 5 of each byte's 8 bits and silently truncate/corrupt
+// the key. Mirrors toBase64/fromBase64's role for base64 elsewhere in this file.
+function bytesToBase32(bytes: Uint8Array): string {
+  let bitBuffer = 0;
+  let bitCount = 0;
+  let output = "";
+  for (const byte of bytes) {
+    bitBuffer = (bitBuffer << 8) | byte;
+    bitCount += 8;
+    while (bitCount >= 5) {
+      bitCount -= 5;
+      output += RECOVERY_KEY_ALPHABET[(bitBuffer >>> bitCount) & 0x1f];
+    }
+  }
+  if (bitCount > 0) {
+    output += RECOVERY_KEY_ALPHABET[(bitBuffer << (5 - bitCount)) & 0x1f];
+  }
+  return output;
+}
+
+function base32ToBytes(str: string): Uint8Array {
+  let bitBuffer = 0;
+  let bitCount = 0;
+  const bytes: number[] = [];
+  for (const char of str) {
+    const value = RECOVERY_KEY_ALPHABET.indexOf(char);
+    if (value === -1) continue;
+    bitBuffer = (bitBuffer << 5) | value;
+    bitCount += 5;
+    if (bitCount >= 8) {
+      bitCount -= 8;
+      bytes.push((bitBuffer >>> bitCount) & 0xff);
+    }
+  }
+  return new Uint8Array(bytes);
+}
+
+// A high-entropy, one-time-shown recovery key, formatted for a human to transcribe/store — e.g.
+// `XXXXX-XXXXX-XXXXX-XXXXX-XXXXX-XXXXX-XXXXX-XXXXX-XXXXX-XXXXX-XX`. Unlike a passphrase, this is
+// already random, so it's used directly as key material via deriveRecoveryKeyMaterial below
+// rather than run through PBKDF2 — iterated slow-hashing only defends against guessing a
+// low-entropy human secret, and would just need yet another salt column for no benefit here.
+export function generateRecoveryKey(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(RECOVERY_KEY_BYTES));
+  const encoded = bytesToBase32(bytes);
+  const groups: string[] = [];
+  for (let i = 0; i < encoded.length; i += RECOVERY_KEY_GROUP_SIZE) {
+    groups.push(encoded.slice(i, i + RECOVERY_KEY_GROUP_SIZE));
+  }
+  return groups.join("-");
+}
+
+// Normalizes user-entered recovery key text (strips whitespace/dashes, uppercases, decodes) and
+// imports the recovered 32 bytes directly as an AES-GCM key — no PBKDF2/salt, see
+// generateRecoveryKey's comment above. Any input deterministically produces *some* key (the
+// trailing partial-byte padding bits base32 encoding leaves are simply dropped by base32ToBytes,
+// same on encode and decode, so a correctly-typed key round-trips exactly); a mismatched recovery
+// key is caught the same way a wrong passphrase is, by unwrapVaultMasterKey's decrypt failing its
+// auth-tag check, not by anything in this function.
+export async function deriveRecoveryKeyMaterial(
+  recoveryKeyString: string,
+): Promise<CryptoKey> {
+  const normalized = recoveryKeyString.toUpperCase().replace(/[^0-9A-Z]/g, "");
+  const bytes = base32ToBytes(normalized);
+  return crypto.subtle.importKey(
+    "raw",
+    bytes as BufferSource,
+    "AES-GCM",
+    false,
+    ["encrypt", "decrypt"],
+  );
+}
+
 export interface GeneratePasswordOptions {
   length: number;
   uppercase: boolean;
