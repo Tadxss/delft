@@ -53,7 +53,7 @@ null` (check via `npx supabase db query --linked`), write a follow-up migration 
 ## Data model
 
 - `workspaces (id, owner_id, name, vault_salt, vault_verifier, vault_verifier_iv, vault_wrapped_key,
-vault_wrapped_key_iv, vault_recovery_wrapped_key, vault_recovery_wrapped_key_iv, created_at)` —
+  vault_wrapped_key_iv, vault_recovery_wrapped_key, vault_recovery_wrapped_key_iv, created_at)` —
   `vault_salt` is the Credentials Manager's per-workspace PBKDF2 salt (plaintext; salts aren't
   secret), null until that workspace's vault passphrase is first set up. `vault_verifier`/
   `vault_verifier_iv` are legacy (see Build Order step 22/23) — kept only until every vault has
@@ -62,7 +62,7 @@ vault_wrapped_key_iv, vault_recovery_wrapped_key, vault_recovery_wrapped_key_iv,
   key instead) — see Build Order step 58 for the wrapped-key model and why it replaced direct
   passphrase-key encryption.
 - `vault_reset_requests (id, workspace_id, requested_by, token, expires_at, confirmed_at,
-created_at)` — a single-use, owner-only, 1-hour-expiry token for the last-resort vault reset (both
+  created_at)` — a single-use, owner-only, 1-hour-expiry token for the last-resort vault reset (both
   passphrase and recovery key lost) — see Build Order step 58.
 - `workspace_members (workspace_id, user_id, role)` — every RLS policy keys off membership rather
   than `owner_id` directly, so extending to real multi-user sharing later is a data change, not a
