@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { CanvasSummary } from "@delft/types";
 import { useSupabaseClient } from "../supabase/context";
 import { mapCanvasSummaryRow } from "../supabase/mappers";
+import { GC_TIME_SUMMARY_LIST, STALE_TIME_SUMMARY_LIST } from "../queryConfig";
 
 // Columns the sidebar list actually renders (id/title), plus the rest of Canvas minus its jsonb
 // `scene` — same rationale as usePages.ts's PAGE_SUMMARY_COLUMNS. Full scene is only ever needed
@@ -17,6 +18,10 @@ export function useCanvases(workspaceId: string | undefined) {
   return useQuery<CanvasSummary[]>({
     queryKey: ["canvases", workspaceId],
     enabled: Boolean(workspaceId),
+    // Only changes via explicit mutations that already invalidateQueries on this key (rename/
+    // reorder/create/delete) — see queryConfig.ts.
+    staleTime: STALE_TIME_SUMMARY_LIST,
+    gcTime: GC_TIME_SUMMARY_LIST,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("canvases")

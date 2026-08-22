@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { PageSummary } from "@delft/types";
 import { useSupabaseClient } from "../supabase/context";
 import { mapPageSummaryRow } from "../supabase/mappers";
+import { GC_TIME_SUMMARY_LIST, STALE_TIME_SUMMARY_LIST } from "../queryConfig";
 
 // Columns the sidebar tree actually renders (id/title/parentId/position) plus the rest of Page
 // minus its jsonb `content` — deliberately excludes `content` since a page's full BlockNote
@@ -29,6 +30,10 @@ export function usePages(
   return useQuery<PageSummary[]>({
     queryKey: ["pages", workspaceId, parentId],
     enabled: Boolean(workspaceId),
+    // Only changes via explicit mutations that already invalidateQueries on this key (rename/
+    // reparent/reorder/create/delete, see useUpdatePage.ts) — see queryConfig.ts.
+    staleTime: STALE_TIME_SUMMARY_LIST,
+    gcTime: GC_TIME_SUMMARY_LIST,
     queryFn: async () => {
       let query = supabase
         .from("pages")

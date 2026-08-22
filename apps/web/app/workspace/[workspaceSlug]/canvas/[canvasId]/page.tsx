@@ -1,11 +1,16 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useCanvas } from "@delft/shared";
+import { useQueryClient } from "@tanstack/react-query";
+import type { CanvasSummary } from "@delft/types";
+import { parseWorkspaceSlug, useCanvas } from "@delft/shared";
 import { CanvasEditor } from "./_components/CanvasEditor";
+import { CanvasShell } from "./_components/CanvasShell";
 
 export default function CanvasRoute() {
-  const params = useParams<{ canvasId: string }>();
+  const params = useParams<{ workspaceSlug: string; canvasId: string }>();
+  const workspaceId = parseWorkspaceSlug(params.workspaceSlug);
+  const queryClient = useQueryClient();
   const {
     data: canvas,
     isLoading,
@@ -14,6 +19,15 @@ export default function CanvasRoute() {
   } = useCanvas(params.canvasId);
 
   if (isLoading) {
+    // Same rationale as p/[pageId]/page.tsx — show the sidebar's already-cached title instead of a
+    // blank "Loading…" flash when navigation came from a sidebar click.
+    const cachedCanvases = queryClient.getQueryData<CanvasSummary[]>([
+      "canvases",
+      workspaceId,
+    ]);
+    const summary = cachedCanvases?.find((c) => c.id === params.canvasId);
+    if (summary) return <CanvasShell title={summary.title} />;
+
     return (
       <div className="flex h-full items-center justify-center text-sm text-ink-500">
         Loading…

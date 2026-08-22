@@ -3,12 +3,15 @@
 import { Fragment, memo, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { ChevronDown, ChevronRight, MoreHorizontal, Plus } from "lucide-react";
 import type { PageSummary } from "@delft/types";
 import {
+  pageQueryOptions,
   parseWorkspaceSlug,
   useDeletePage,
+  useSupabaseClient,
   useUpdatePage,
 } from "@delft/shared";
 import { ReorderStrip } from "./ReorderStrip";
@@ -45,6 +48,16 @@ function PageTreeNodeImpl({
   const workspaceId = parseWorkspaceSlug(params.workspaceSlug);
   const updatePage = useUpdatePage();
   const deletePage = useDeletePage();
+  const queryClient = useQueryClient();
+  const supabase = useSupabaseClient();
+  // Warms the TanStack Query cache for this page's full content on hover/focus, before the click —
+  // Next's own automatic <Link> prefetch only warms the route's JS/RSC chunk, not this data. A
+  // no-op when already cached and within staleTime (see queryConfig.ts's STALE_TIME_ACTIVE_ITEM),
+  // so a fast mouse sweep across rows doesn't fire a fetch per row. Scoped to this row's own
+  // useCallback rather than a new prop, so it never affects PageTreeNode's memo comparator below.
+  const prefetch = useCallback(() => {
+    queryClient.prefetchQuery(pageQueryOptions(supabase, page.id));
+  }, [queryClient, supabase, page.id]);
   const children = childrenByParent.get(page.id) ?? [];
   const hasChildren = children.length > 0;
   const isExpanded = expanded.has(page.id);
@@ -182,6 +195,8 @@ function PageTreeNodeImpl({
         ) : (
           <Link
             href={`/workspace/${params.workspaceSlug}/p/${page.id}`}
+            onMouseEnter={prefetch}
+            onFocus={prefetch}
             className="min-w-0 flex-1 truncate"
           >
             {page.title || "Untitled"}

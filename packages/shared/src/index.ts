@@ -2,6 +2,7 @@ export * from "./supabase/client";
 export * from "./supabase/storage";
 export * from "./supabase/context";
 export * from "./supabase/mappers";
+export * from "./queryConfig";
 export * from "./lib/workspaceUrl";
 export * from "./lib/vaultCrypto";
 export * from "./lib/treeUtils";

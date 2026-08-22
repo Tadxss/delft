@@ -3,6 +3,7 @@
 import { Fragment, useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   DndContext,
   DragOverlay,
@@ -19,10 +20,12 @@ import {
 import { ChevronsLeft, Plus } from "lucide-react";
 import type { CanvasSummary, PageSummary } from "@delft/types";
 import {
+  canvasQueryOptions,
   useCreateCanvas,
   useCreatePage,
   useCanvases,
   usePages,
+  useSupabaseClient,
   useUpdateCanvas,
   useUpdatePage,
   parseWorkspaceSlug,
@@ -67,11 +70,20 @@ function CanvasRow({
   const { listeners, setNodeRef, isDragging } = useDraggable({
     id: canvas.id,
   });
+  const queryClient = useQueryClient();
+  const supabase = useSupabaseClient();
+  // Same rationale as PageTreeNode.tsx's prefetch — warms the canvas content cache on hover/focus,
+  // before the click, so opening it feels instant.
+  const prefetch = useCallback(() => {
+    queryClient.prefetchQuery(canvasQueryOptions(supabase, canvas.id));
+  }, [queryClient, supabase, canvas.id]);
   return (
     <li>
       <div ref={setNodeRef} {...listeners} className={isDragging ? "opacity-40" : ""}>
         <Link
           href={href}
+          onMouseEnter={prefetch}
+          onFocus={prefetch}
           className={`block truncate rounded-md px-1 py-1 text-sm hover:bg-paper-100 ${
             isActive ? "bg-paper-100 font-medium text-ink-800" : "text-ink-600"
           }`}
