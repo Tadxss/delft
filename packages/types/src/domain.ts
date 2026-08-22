@@ -5,6 +5,14 @@ export interface Workspace {
   vaultSalt: string | null;
   vaultVerifier: string | null;
   vaultVerifierIv: string | null;
+  // The Vault Master Key (VMK), AES-GCM wrapped under the passphrase-derived key and, separately,
+  // under a one-time-shown recovery key — see packages/shared/src/lib/vaultCrypto.ts. A workspace
+  // has these once its owner has run (or migrated through) vault setup under the wrapped-key
+  // model; vault_salt/vault_verifier alone (no wrapped key) means a legacy, pre-migration vault.
+  vaultWrappedKey: string | null;
+  vaultWrappedKeyIv: string | null;
+  vaultRecoveryWrappedKey: string | null;
+  vaultRecoveryWrappedKeyIv: string | null;
   createdAt: string;
 }
 

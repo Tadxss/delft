@@ -47,6 +47,11 @@ export function CredentialsModal({
   const [newCredentialFolderId, setNewCredentialFolderId] = useState<
     string | null
   >(null);
+  // Set by VaultUnlockPanel while an unsaved, one-time-shown recovery key exists in memory (first
+  // setup, or a legacy vault's migration) — closing the modal in that window would silently lose
+  // the user's only chance to save it, so both the backdrop/Escape close and the × button are
+  // disabled until it clears.
+  const [vaultBusy, setVaultBusy] = useState(false);
 
   // Reset per-open state (selection) and guarantee the key is gone whenever the modal isn't
   // visible, not just when the user explicitly clicks a lock button.
@@ -55,6 +60,7 @@ export function CredentialsModal({
       vaultKey.lock();
       setSelectedId(null);
       setNewCredentialFolderId(null);
+      setVaultBusy(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-run on open/close, not on every vaultKey identity change
   }, [open]);
@@ -73,6 +79,7 @@ export function CredentialsModal({
   }, [credentials, selectedId]);
 
   function handleClose() {
+    if (vaultBusy) return;
     vaultKey.lock();
     setSelectedId(null);
     setNewCredentialFolderId(null);
@@ -101,8 +108,9 @@ export function CredentialsModal({
         <button
           type="button"
           onClick={handleClose}
+          disabled={vaultBusy}
           aria-label="Close"
-          className="rounded px-2 py-1 text-sm text-ink-500 hover:bg-paper-100 hover:text-ink-800"
+          className="rounded px-2 py-1 text-sm text-ink-500 hover:bg-paper-100 hover:text-ink-800 disabled:pointer-events-none disabled:opacity-40"
         >
           <X size={16} />
         </button>
@@ -124,11 +132,9 @@ export function CredentialsModal({
           </p>
         ) : !vaultKey.isUnlocked || !vaultKey.key ? (
           <VaultUnlockPanel
-            workspaceId={workspaceId}
-            vaultSalt={workspace.vaultSalt}
-            vaultVerifier={workspace.vaultVerifier}
-            vaultVerifierIv={workspace.vaultVerifierIv}
+            workspace={workspace}
             credentials={credentials}
+            onBusyChange={setVaultBusy}
           />
         ) : (
           // Below `md`, only one pane is shown at a time (list, or detail with a "Back" row) —

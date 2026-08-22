@@ -16,6 +16,14 @@ async function setUpVault(page: Page) {
   await page.fill("#passphrase", "the-real-passphrase");
   await page.fill("#confirm", "the-real-passphrase");
   await page.click('button:has-text("Create vault")');
+
+  // First-time setup now shows a one-time, non-dismissable recovery key screen before the vault
+  // is usable (Build Order step 58) — click through it to reach the unlocked view.
+  await expect(page.getByText("Save your recovery key")).toBeVisible();
+  await page
+    .getByRole("checkbox", { name: "I've saved this recovery key" })
+    .check();
+  await page.getByRole("button", { name: "Continue" }).click();
 }
 
 // Creates a root-level folder via the toolbar "+ folder" button and commits its inline rename.
@@ -165,7 +173,11 @@ test("move a credential between folders via the edit form, and a folder via drag
 
   // Create a second root folder, drag "Work" onto it to reparent.
   await createRootFolder(page, "Personal");
-  await dragElementOnto(page, folderRow(page, "Work"), folderRow(page, "Personal"));
+  await dragElementOnto(
+    page,
+    folderRow(page, "Work"),
+    folderRow(page, "Personal"),
+  );
 
   // "Work" is now nested under the (collapsed) "Personal" folder, so it's not visible at root...
   await expect(page.locator("button", { hasText: "Work" })).not.toBeVisible();
@@ -188,13 +200,17 @@ test("move a credential between folders via the edit form, and a folder via drag
   const workRow = folderRow(page, "Work");
   const workBox = await workRow.boundingBox();
   if (!workBox) throw new Error('Could not find bounding box for "Work"');
-  await page.mouse.move(workBox.x + workBox.width / 2, workBox.y + workBox.height / 2);
+  await page.mouse.move(
+    workBox.x + workBox.width / 2,
+    workBox.y + workBox.height / 2,
+  );
   await page.mouse.down();
   await page.waitForTimeout(500);
   const rootStrip = page.getByText("Move to root");
   await expect(rootStrip).toBeVisible();
   const rootStripBox = await rootStrip.boundingBox();
-  if (!rootStripBox) throw new Error('Could not find bounding box for "Move to root"');
+  if (!rootStripBox)
+    throw new Error('Could not find bounding box for "Move to root"');
   // Explicit discrete moves with small waits between them, not a single batched
   // mouse.move(..., { steps }) call — WebKit/mobile Safari's synthetic pointer-event dispatch
   // appeared to let dnd-kit's collision detection go stale across a second drag in the same test
@@ -273,7 +289,10 @@ test("drag-and-drop reorders sibling folders, and reorders/reparents a credentia
 
   const alphaButton = page.getByRole("button", { name: "Alpha", exact: true });
   const bravoButton = page.getByRole("button", { name: "Bravo", exact: true });
-  const charlieButton = page.getByRole("button", { name: "Charlie", exact: true });
+  const charlieButton = page.getByRole("button", {
+    name: "Charlie",
+    exact: true,
+  });
   await expect(alphaButton).toBeVisible();
   await expect(bravoButton).toBeVisible();
   await expect(charlieButton).toBeVisible();
@@ -301,7 +320,9 @@ test("drag-and-drop reorders sibling folders, and reorders/reparents a credentia
   const afterBravo = await bravoButton.boundingBox();
   const afterCharlie = await charlieButton.boundingBox();
   if (!afterAlpha || !afterBravo || !afterCharlie) {
-    throw new Error("Could not find bounding boxes for root folders after drag");
+    throw new Error(
+      "Could not find bounding boxes for root folders after drag",
+    );
   }
   expect(afterCharlie.y).toBeLessThan(afterAlpha.y);
   expect(afterAlpha.y).toBeLessThan(afterBravo.y);
@@ -343,7 +364,9 @@ test("drag-and-drop reorders sibling folders, and reorders/reparents a credentia
   const afterDelta = await deltaButton.boundingBox();
   const afterEcho = await echoButton.boundingBox();
   if (!afterDelta || !afterEcho) {
-    throw new Error("Could not find bounding boxes for root credentials after reorder");
+    throw new Error(
+      "Could not find bounding boxes for root credentials after reorder",
+    );
   }
   expect(afterEcho.y).toBeLessThan(afterDelta.y);
 

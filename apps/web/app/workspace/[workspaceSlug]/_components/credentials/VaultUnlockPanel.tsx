@@ -1,62 +1,103 @@
 "use client";
 
-import { useState } from "react";
-import type { Credential } from "@delft/types";
+import { useEffect, useState } from "react";
+import type { Credential, Workspace } from "@delft/types";
 import {
   decryptSecret,
   deriveVaultKey,
   encryptVerifier,
+  generateRecoveryKey,
   generateSalt,
-  useSetVaultSalt,
+  generateVaultMasterKey,
+  deriveRecoveryKeyMaterial,
+  unwrapVaultMasterKey,
   useSetVaultVerifier,
+  useSetVaultWrappedKey,
   useVaultKey,
   verifyVaultKey,
+  wrapVaultMasterKey,
 } from "@delft/shared";
+import { ForgotPassphrasePanel } from "./ForgotPassphrasePanel";
+import { RecoveryKeyDisplay } from "./RecoveryKeyDisplay";
+import { VaultMigrationPanel } from "./VaultMigrationPanel";
 
 const MIN_PASSPHRASE_LENGTH = 8;
 
-// Two modes depending on whether this workspace has ever had a vault passphrase set:
-// - `vaultSalt` is null: first-time setup — generate a salt, derive the key, and save an encrypted
-//   verifier (vaultCrypto.ts's encryptVerifier()) alongside the salt, so this vault can have its
-//   passphrase verified from the very first unlock, even before it has a single credential.
-// - `vaultSalt` is set: prompt for the existing passphrase. PBKDF2 itself can't fail on a wrong
-//   passphrase (see vaultCrypto.ts) — it just deterministically derives a *different* key — so
-//   correctness has to be actively verified before ever granting access:
-//     1. `vaultVerifier` present (the normal case for any vault created after this existed, or a
-//        legacy vault that's already been backfilled) — test-decrypt it directly.
-//     2. No verifier yet, but the vault has a credential — fall back to test-decrypting that
-//        instead (the original mechanism), and opportunistically backfill the verifier on success
-//        so every unlock from here on uses path 1 instead.
-//     3. No verifier and no credentials — a legacy vault, never yet unlocked since this shipped,
-//        with nothing added to it. Nothing anywhere to verify a passphrase against (the server
-//        never sees it, by design) — proceeds on trust exactly once, same bootstrap assumption as
-//        setup, and immediately backfills the verifier so it's never trust-only again.
+interface PreparedSetup {
+  saltB64: string;
+  vmk: CryptoKey;
+  recoveryKeyString: string;
+  wrappedKey: { ciphertext: string; iv: string };
+  recoveryWrappedKey: { ciphertext: string; iv: string };
+}
+
+type Phase =
+  | { kind: "form" }
+  | { kind: "setupRecoveryKey"; setup: PreparedSetup }
+  | { kind: "legacyMigration"; oldDirectKey: CryptoKey }
+  | { kind: "forgot" };
+
+// Four things this panel can show, depending on the workspace's vault state and what the user just
+// did:
+// - `vaultWrappedKey` set (the normal case for any vault created after the wrapped-key model
+//   shipped, or a legacy vault that's completed its one-time migration): passphrase → derive Kp →
+//   unwrap the Vault Master Key. Unwrap failure IS "wrong passphrase" (an AES-GCM auth-tag check),
+//   same failure semantics every check in this vault uses.
+// - `vaultSalt` set but no `vaultWrappedKey` (a legacy vault): verify the passphrase exactly as
+//   before this feature existed (vaultVerifier, or test-decrypting a real credential for a vault
+//   that predates even the verifier), then hand off into VaultMigrationPanel to re-encrypt
+//   everything under a new VMK and (mandatorily) generate this vault's first recovery key.
+// - `vaultSalt` null: first-time setup — generate salt + VMK + recovery key, wrap the VMK under
+//   both, and require the user to confirm they've saved the recovery key (RecoveryKeyDisplay)
+//   before any of it is persisted.
+// - "Forgot passphrase?" (only shown once a wrapped key exists): ForgotPassphrasePanel recovers via
+//   the saved recovery key and lets the user set a new passphrase, with zero data loss.
 export function VaultUnlockPanel({
-  workspaceId,
-  vaultSalt,
-  vaultVerifier,
-  vaultVerifierIv,
+  workspace,
   credentials,
+  onBusyChange,
 }: {
-  workspaceId: string;
-  vaultSalt: string | null;
-  vaultVerifier: string | null;
-  vaultVerifierIv: string | null;
+  workspace: Workspace;
   credentials: Credential[] | undefined;
+  onBusyChange?: (busy: boolean) => void;
 }) {
+  const {
+    id: workspaceId,
+    vaultSalt,
+    vaultVerifier,
+    vaultVerifierIv,
+    vaultWrappedKey,
+    vaultWrappedKeyIv,
+  } = workspace;
   const vaultKey = useVaultKey(workspaceId);
-  const setVaultSalt = useSetVaultSalt();
   const setVaultVerifier = useSetVaultVerifier();
+  const setVaultWrappedKey = useSetVaultWrappedKey();
+  const [phase, setPhase] = useState<Phase>({ kind: "form" });
   const [passphrase, setPassphrase] = useState("");
   const [confirm, setConfirm] = useState("");
   const [mismatch, setMismatch] = useState(false);
   const [unlocking, setUnlocking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [persistingSetup, setPersistingSetup] = useState(false);
 
   const isSetup = !vaultSalt;
+  const hasWrappedKey = Boolean(vaultWrappedKey && vaultWrappedKeyIv);
   const hasVerifier = Boolean(vaultVerifier && vaultVerifierIv);
   const credentialsLoading =
-    !isSetup && !hasVerifier && credentials === undefined;
+    !isSetup && !hasWrappedKey && !hasVerifier && credentials === undefined;
+
+  // Unsaved recovery-key material exists in memory during these two phases — block the modal from
+  // being closed out from under them (see CredentialsModal's onBusyChange usage). The cleanup is
+  // required, not just tidy: once setup/migration succeeds, this whole component unmounts (the
+  // vault is now unlocked, so CredentialsModal swaps to rendering the credential list instead) —
+  // without it, onBusyChange(false) would never fire and the modal's close button would stay
+  // disabled forever.
+  useEffect(() => {
+    onBusyChange?.(
+      phase.kind === "setupRecoveryKey" || phase.kind === "legacyMigration",
+    );
+    return () => onBusyChange?.(false);
+  }, [phase.kind, onBusyChange]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -70,38 +111,62 @@ export function VaultUnlockPanel({
     try {
       if (isSetup) {
         const saltB64 = generateSalt();
-        const key = await deriveVaultKey(passphrase, saltB64);
-        const verifier = await encryptVerifier(key);
-        await setVaultSalt.mutateAsync({
-          workspaceId,
-          saltB64,
-          verifierCiphertext: verifier.ciphertext,
-          verifierIv: verifier.iv,
+        const kp = await deriveVaultKey(passphrase, saltB64);
+        const vmk = await generateVaultMasterKey();
+        const recoveryKeyString = generateRecoveryKey();
+        const kr = await deriveRecoveryKeyMaterial(recoveryKeyString);
+        const wrappedKey = await wrapVaultMasterKey(vmk, kp);
+        const recoveryWrappedKey = await wrapVaultMasterKey(vmk, kr);
+        setPhase({
+          kind: "setupRecoveryKey",
+          setup: {
+            saltB64,
+            vmk,
+            recoveryKeyString,
+            wrappedKey,
+            recoveryWrappedKey,
+          },
         });
-        vaultKey.setKey(key);
         return;
       }
 
-      const key = await deriveVaultKey(passphrase, vaultSalt);
+      const kp = await deriveVaultKey(passphrase, vaultSalt);
 
-      if (vaultVerifier && vaultVerifierIv) {
+      if (hasWrappedKey && vaultWrappedKey && vaultWrappedKeyIv) {
         try {
-          await verifyVaultKey(key, vaultVerifier, vaultVerifierIv);
+          const vmk = await unwrapVaultMasterKey(
+            vaultWrappedKey,
+            vaultWrappedKeyIv,
+            kp,
+          );
+          vaultKey.setKey(vmk);
+        } catch {
+          setError("Wrong passphrase — please try again.");
+          setPassphrase("");
+        }
+        return;
+      }
+
+      // Legacy vault (no wrapped key yet) — authenticate exactly as before this feature existed,
+      // then hand off to VaultMigrationPanel rather than unlocking directly.
+      if (hasVerifier && vaultVerifier && vaultVerifierIv) {
+        try {
+          await verifyVaultKey(kp, vaultVerifier, vaultVerifierIv);
         } catch {
           setError("Wrong passphrase — please try again.");
           setPassphrase("");
           return;
         }
-        vaultKey.setKey(key);
+        setPhase({ kind: "legacyMigration", oldDirectKey: kp });
         return;
       }
 
-      // Legacy vault with no verifier yet — fall back to test-decrypting an existing credential.
+      // Legacy vault that predates even the verifier — test-decrypt a real credential instead.
       const testCredential = credentials?.[0];
       if (testCredential) {
         try {
           await decryptSecret(
-            key,
+            kp,
             testCredential.secretCiphertext,
             testCredential.secretIv,
           );
@@ -111,22 +176,74 @@ export function VaultUnlockPanel({
           return;
         }
       }
-      // Either verified via a credential, or nothing anywhere to verify against yet — proceed.
-      vaultKey.setKey(key);
-      // Best-effort backfill (fire-and-forget, not awaited): may silently fail for a non-owner
-      // member per workspaces_update_owner — harmless, it just tries again on the owner's next
-      // unlock instead.
-      const verifier = await encryptVerifier(key);
-      setVaultVerifier.mutate({
-        workspaceId,
-        verifierCiphertext: verifier.ciphertext,
-        verifierIv: verifier.iv,
-      });
+      // Either verified via a credential, or nothing anywhere to verify against yet (an empty,
+      // never-migrated vault) — proceed straight to migration either way.
+      setPhase({ kind: "legacyMigration", oldDirectKey: kp });
+      // Best-effort backfill so a retried/failed migration attempt still gets a faster verifier
+      // check next time, exactly as before this feature existed.
+      if (!hasVerifier) {
+        const verifier = await encryptVerifier(kp);
+        setVaultVerifier.mutate({
+          workspaceId,
+          verifierCiphertext: verifier.ciphertext,
+          verifierIv: verifier.iv,
+        });
+      }
     } catch {
       setError("Couldn't unlock the vault. Try again.");
     } finally {
       setUnlocking(false);
     }
+  }
+
+  async function handleSetupContinue() {
+    if (phase.kind !== "setupRecoveryKey") return;
+    const { setup } = phase;
+    setPersistingSetup(true);
+    try {
+      await setVaultWrappedKey.mutateAsync({
+        workspaceId,
+        saltB64: setup.saltB64,
+        wrappedKey: setup.wrappedKey.ciphertext,
+        wrappedKeyIv: setup.wrappedKey.iv,
+        recoveryWrappedKey: setup.recoveryWrappedKey.ciphertext,
+        recoveryWrappedKeyIv: setup.recoveryWrappedKey.iv,
+      });
+      vaultKey.setKey(setup.vmk);
+    } finally {
+      setPersistingSetup(false);
+    }
+  }
+
+  if (phase.kind === "setupRecoveryKey") {
+    return (
+      <RecoveryKeyDisplay
+        recoveryKey={phase.setup.recoveryKeyString}
+        onContinue={handleSetupContinue}
+        continuing={persistingSetup}
+      />
+    );
+  }
+
+  if (phase.kind === "legacyMigration") {
+    return (
+      <VaultMigrationPanel
+        workspaceId={workspaceId}
+        oldDirectKey={phase.oldDirectKey}
+        credentials={credentials ?? []}
+        onMigrated={() => setPhase({ kind: "form" })}
+      />
+    );
+  }
+
+  if (phase.kind === "forgot") {
+    return (
+      <ForgotPassphrasePanel
+        workspace={workspace}
+        onRecovered={() => setPhase({ kind: "form" })}
+        onCancel={() => setPhase({ kind: "form" })}
+      />
+    );
   }
 
   return (
@@ -137,7 +254,7 @@ export function VaultUnlockPanel({
         </h2>
         <p className="mt-1 text-xs text-ink-500">
           {isSetup
-            ? "This passphrase is separate from your login and is never sent to the server — only you can decrypt what you store here. There's no way to recover it if you forget it."
+            ? "This passphrase is separate from your login and is never sent to the server — only you can decrypt what you store here. You'll get a recovery key next in case you ever forget it."
             : "Enter your vault passphrase to view and manage this workspace's credentials."}
         </p>
         <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-3">
@@ -197,6 +314,15 @@ export function VaultUnlockPanel({
           )}
           {error && <p className="text-xs text-red-700">{error}</p>}
         </form>
+        {!isSetup && hasWrappedKey && (
+          <button
+            type="button"
+            onClick={() => setPhase({ kind: "forgot" })}
+            className="mt-3 text-xs font-medium text-ink-500 hover:text-ink-800"
+          >
+            Forgot passphrase?
+          </button>
+        )}
       </div>
     </div>
   );

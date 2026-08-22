@@ -1,5 +1,16 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { signIn, uniqueEmail } from "./helpers";
+
+// First-time vault setup now shows a one-time, non-dismissable recovery key screen before the
+// vault is usable (Build Order step 58) — every test that creates a vault needs to click through
+// it (confirm the "I've saved this" checkbox, then Continue) to reach the unlocked view.
+async function confirmRecoveryKey(page: Page): Promise<void> {
+  await expect(page.getByText("Save your recovery key")).toBeVisible();
+  await page
+    .getByRole("checkbox", { name: "I've saved this recovery key" })
+    .check();
+  await page.getByRole("button", { name: "Continue" }).click();
+}
 
 test("set up a vault, add a credential, and confirm it re-prompts every time the modal reopens", async ({
   page,
@@ -17,6 +28,7 @@ test("set up a vault, add a credential, and confirm it re-prompts every time the
   await page.fill("#passphrase", "correct-horse-battery-staple");
   await page.fill("#confirm", "correct-horse-battery-staple");
   await page.click('button:has-text("Create vault")');
+  await confirmRecoveryKey(page);
 
   // Add a credential with every field filled in.
   await page.click('button[aria-label="New credential"]');
@@ -74,6 +86,7 @@ test("wrong vault passphrase is rejected at the unlock form, not after reaching 
   await page.fill("#passphrase", "the-real-passphrase");
   await page.fill("#confirm", "the-real-passphrase");
   await page.click('button:has-text("Create vault")');
+  await confirmRecoveryKey(page);
 
   await page.click('button[aria-label="New credential"]');
   await page.fill("#title", "Example Site");
@@ -123,6 +136,7 @@ test("an API key credential shows only the API Key field, not Username/Password"
   await page.fill("#passphrase", "correct-horse-battery-staple");
   await page.fill("#confirm", "correct-horse-battery-staple");
   await page.click('button:has-text("Create vault")');
+  await confirmRecoveryKey(page);
 
   await page.click('button[aria-label="New credential"]');
   await page.getByRole("radio", { name: "API Key" }).click();
@@ -171,6 +185,7 @@ test("wrong passphrase is rejected even on a brand-new vault with zero credentia
   await page.fill("#passphrase", "the-real-passphrase");
   await page.fill("#confirm", "the-real-passphrase");
   await page.click('button:has-text("Create vault")');
+  await confirmRecoveryKey(page);
   // "Select a credential" (the empty-detail-pane placeholder) is desktop-only — below `md`,
   // CredentialsModal shows the (empty) list directly instead of a side-by-side placeholder pane,
   // so it's never rendered there at all. The search input is the viewport-agnostic signal of "the
