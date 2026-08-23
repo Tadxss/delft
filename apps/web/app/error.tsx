@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import * as Sentry from "@sentry/nextjs";
 
 // Next.js's file-based error boundary — catches a render-time throw anywhere under this segment
 // and replaces just that segment with this, leaving parent layouts (e.g. the workspace TopBar)
@@ -14,6 +15,7 @@ export default function Error({
 }) {
   useEffect(() => {
     console.error(error);
+    Sentry.captureException(error);
   }, [error]);
 
   return (
