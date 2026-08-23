@@ -1834,3 +1834,52 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
     zero-credential-vault wrong-passphrase case — confirmed that now rejects via the wrapped-key
     unwrap's AES-GCM auth-tag check rather than the removed verifier, since every vault created
     since step 58 gets a wrapped key immediately at setup, never a bare verifier-only state.
+
+61. **Add Sentry error observability, and a real bug it caught on its first day.** ✅ _done_. Closes
+    the other deliberately-deferred item from step 56 — until now, a bug only surfaced if a user
+    happened to report it, which is exactly how the step-58 incidents were first noticed. User
+    already had a free-tier Sentry account/project; scope is basic error capture only (no
+    performance tracing, no session replay) to stay comfortably within the free-tier event quota.
+
+    `@sentry/nextjs` installed; `instrumentation.ts` (registers `sentry.server.config.ts`/
+    `sentry.edge.config.ts` by `NEXT_RUNTIME`, exports `onRequestError` for Server
+    Component/Route Handler errors) and `instrumentation-client.ts` (client init, plus the
+    required `onRouterTransitionStart` export — its absence otherwise logs an "action required"
+    build warning even with tracing disabled) follow the current App Router SDK convention.
+    `next.config.js` wrapped with `withSentryConfig`, no org/project/authToken (those are only
+    needed for source-map upload, explicitly out of scope — Sentry shows minified traces instead,
+    still actionable via error type/message/breadcrumbs). All three `useEffect(() =>
+    console.error(error))` error boundaries (`app/error.tsx`, `app/global-error.tsx`, and
+    `app/workspace/error.tsx` — the last one missed by the original pre-beta hardening pass, step
+    56, since that pass only touched the two root-level files) now also call
+    `Sentry.captureException(error)`, and `app/workspace/error.tsx` picked up the same
+    friendly-message fix (was still showing raw `error.message`) the other two got in step 56.
+    `NEXT_PUBLIC_SENTRY_DSN` env var, documented in `.env.local.example`; the real value needs
+    adding as a Vercel Production env var (the one step this session couldn't do directly).
+
+    **Immediately caught a real, previously-invisible bug**: a forced test error confirmed the
+    pipeline end-to-end (event landed in Sentry, full stack trace/tags/release SHA), and within
+    minutes of that, a genuine `ReferenceError: window is not defined` showed up from
+    `GET /share/[slug]` — `SharedPageView.tsx`'s `useCreateBlockNote()` touches `window` during
+    its initial render (not just an effect), which breaks server rendering specifically on a cold,
+    unauthenticated visit — precisely how every real share-link visitor arrives, since they've
+    never hydrated the app before. Next.js silently recovered from it rather than showing a broken
+    page (confirmed non-fatal: the full e2e suite's `publish-share.spec.ts` was passing even with
+    this happening), which is exactly why it went unnoticed until there was finally something
+    watching for it.
+
+    Fixed the same way `CanvasEditor.tsx` handles Excalidraw's identical constraint: a new
+    `SharedPageViewLazy.tsx` (`"use client"`, since `dynamic(..., { ssr: false })` isn't allowed
+    directly inside `share/[slug]/page.tsx`'s Server Component) dynamically imports the real
+    `SharedPageView` with `ssr: false` — no server-rendered HTML for it to diverge from, so no
+    hydration-mismatch risk either. `page.tsx` now imports from the lazy wrapper instead of the
+    component directly.
+
+    Verified: `pnpm check-types`/`lint`/`build` clean; forced-error test confirmed via 4 successful
+    (200) requests to Sentry's ingest endpoint and the resulting issue in the user's own Sentry
+    project (temporary throw fully removed afterward, confirmed via `git diff`); the SSR fix
+    confirmed via a genuinely cold Playwright MCP tab (not a client-side navigation) hitting a
+    freshly-published share link — zero console errors, zero server-side stack traces, versus the
+    error appearing on every prior load; full e2e suite (66 tests) passing at its normal baseline
+    (the only 2 failures being the long-standing webkit/mobile-safari drag-and-drop flakiness noted
+    since step 56, unrelated to this change).

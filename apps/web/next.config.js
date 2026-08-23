@@ -1,3 +1,5 @@
+import { withSentryConfig } from "@sentry/nextjs";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // @delft/shared and @delft/types are raw TS source (no build step) — Next needs to transpile
@@ -34,4 +36,10 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+// No org/project/authToken — those are only needed for source-map upload, which is out of scope
+// here (Sentry's UI shows minified stack traces instead, still actionable via error type/message/
+// breadcrumbs). This wrapper still adds Sentry's request-tracing instrumentation without it.
+export default withSentryConfig(nextConfig, {
+  silent: true,
+  webpack: { treeshake: { removeDebugLogging: true } },
+});

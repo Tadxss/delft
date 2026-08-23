@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import * as Sentry from "@sentry/nextjs";
 
 // Next.js's root-layout error boundary — catches a crash inside the root layout itself
 // (e.g. ThemeProvider/Providers in app/layout.tsx), which app/error.tsx can't catch since
@@ -15,6 +16,7 @@ export default function GlobalError({
 }) {
   useEffect(() => {
     console.error(error);
+    Sentry.captureException(error);
   }, [error]);
 
   return (

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { SharedPageView } from "./_components/SharedPageView";
+import { SharedPageView } from "./_components/SharedPageViewLazy";
 import { getSharedPage } from "./_lib/getSharedPage";
 
 export const dynamic = "force-dynamic";
