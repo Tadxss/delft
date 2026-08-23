@@ -7,8 +7,8 @@ import { mapWorkspaceRow } from "../supabase/mappers";
 // model (see vaultCrypto.ts's generateVaultMasterKey/wrapVaultMasterKey) — persists the salt and
 // both wrapped copies of the Vault Master Key (under the passphrase-derived key, and under the
 // one-time-shown recovery key) in a single write, so there's never a moment where vault_salt is
-// set without the wrapped-key columns alongside it. Replaces useSetVaultSalt for first-time setup;
-// useSetVaultSalt itself stays only for the legacy verifier-backfill path in VaultUnlockPanel.
+// set without the wrapped-key columns alongside it. The sole first-time-setup write now — every
+// vault created after this model shipped goes through here, never a bare vault_salt-only write.
 // RLS-gated by workspaces_update_owner, same as every other workspace-level vault write.
 export function useSetVaultWrappedKey() {
   const supabase = useSupabaseClient();

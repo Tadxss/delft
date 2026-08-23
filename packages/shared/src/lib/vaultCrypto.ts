@@ -87,39 +87,6 @@ export async function decryptSecret(
   return JSON.parse(new TextDecoder().decode(plaintext)) as CredentialSecret;
 }
 
-// A fixed marker, not a secret — its plaintext content never matters, only whether decrypting it
-// with a given key succeeds. Lets a passphrase be verified (workspaces.vault_verifier/_iv) even
-// when the vault has zero credentials yet to test-decrypt against instead.
-const VERIFIER_PLAINTEXT = "delft-vault-verifier";
-
-export async function encryptVerifier(
-  key: CryptoKey,
-): Promise<{ ciphertext: string; iv: string }> {
-  const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES));
-  const plaintext = new TextEncoder().encode(VERIFIER_PLAINTEXT);
-  const ciphertext = await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv },
-    key,
-    plaintext,
-  );
-  return { ciphertext: toBase64(ciphertext), iv: toBase64(iv) };
-}
-
-// Throws (same AES-GCM auth-tag failure as decryptSecret) if `key` doesn't match the key the
-// verifier was encrypted with. The decrypted plaintext itself is discarded on success — a
-// successful decrypt is sufficient proof the passphrase is correct.
-export async function verifyVaultKey(
-  key: CryptoKey,
-  ciphertextB64: string,
-  ivB64: string,
-): Promise<void> {
-  await crypto.subtle.decrypt(
-    { name: "AES-GCM", iv: fromBase64(ivB64) as BufferSource },
-    key,
-    fromBase64(ciphertextB64) as BufferSource,
-  );
-}
-
 // Wrapped-master-key primitives: instead of the passphrase-derived key directly encrypting every
 // credential, a random Vault Master Key (VMK) does that, and the VMK itself is wrapped (AES-GCM
 // encrypted) under two independent factors — the passphrase-derived key, and a recovery key.
@@ -160,8 +127,8 @@ export async function wrapVaultMasterKey(
 }
 
 // Throws (AES-GCM auth-tag failure) if `wrappingKey` doesn't match the key the VMK was wrapped
-// with — this failure IS the "wrong passphrase"/"wrong recovery key" check going forward,
-// replacing verifyVaultKey for any vault that has a wrapped key.
+// with — this failure IS the "wrong passphrase"/"wrong recovery key" check for any vault that has
+// a wrapped key.
 //
 // `extractable` defaults to false, restoring the invariant that the key actually held in
 // VaultKeyContext for the rest of a normal unlock session can never have its raw bytes read back

@@ -38,13 +38,20 @@ a visual redesign (step 50), both sidebar trees (Pages, Credentials) gained full
 reparenting (step 52) and sibling reordering (step 54) — and a pre-beta-testing hardening pass
 (autosave race/retry, sidebar over-fetch, image size cap, friendly error messages, a rate limit on
 the username-lookup RPC) closed out as step 56. Credentials also gained a `type` field (Login/
-Google-SSO/API Key/PIN) driving the form's fields and a list filter, as step 57. Two items from
-step 56 were deliberately deferred rather than left as accidental gaps — a signup allowlist/invite
-gate, and Sentry-style crash observability — revisit either if a wider, less-curated beta cohort is
-ever planned. The one recurring (not one-time) item worth keeping an eye on regardless: Storage
-usage against the 1GB free-tier cap as real data accumulates (step 56 added a `maxSizeMB` cap to
-`PageEditor.tsx`'s image compression, but it's still worth periodic monitoring, not a one-time
-fix). Most recently: a production vault-unlock incident led to a full vault recovery-key feature
+Google-SSO/API Key/PIN) driving the form's fields and a list filter, as step 57. Two real
+production vault-unlock incidents led to a full vault recovery-key system (wrapped-master-key
+model, forgot-passphrase recovery, last-resort reset) as step 58 — the old `vault_verifier`/
+`vault_verifier_iv` columns and code path that step deliberately left in place got removed as step
+60, once a production query confirmed no workspace still needed them. A perceived-speed pass on
+Pages/Canvas navigation (BlockNote code-split, hover-prefetch, cached-summary shells, tiered
+`staleTime`) shipped as step 59, no new features, purely load-time feel. Two items from step 56 are
+still deliberately deferred rather than left as accidental gaps — a signup allowlist/invite gate,
+and Sentry-style crash observability — worth revisiting given step 58's incidents were both first
+noticed by chance rather than any alerting, and are exactly the kind of thing observability would
+have caught immediately. The one recurring (not one-time) item worth keeping an eye on regardless:
+Storage usage against the 1GB free-tier cap as real data accumulates (step 56 added a `maxSizeMB`
+cap to `PageEditor.tsx`'s image compression, but it's still worth periodic monitoring, not a
+one-time fix). Most recently: a production vault-unlock incident led to a full vault recovery-key feature
 (wrapped-master-key model, "forgot passphrase" recovery, and a last-resort reset) as step 58 —
 **one follow-up still open**: once every existing workspace has confirmed `vault_wrapped_key is not
 null` (check via `npx supabase db query --linked`), write a follow-up migration dropping the now-dead
@@ -1800,3 +1807,30 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
     against the actual production build (`pnpm build && pnpm start`), not just dev; live Playwright
     MCP walkthroughs of the hover-prefetch network timing, the no-FOUC BlockNote chunk load, and
     autosave surviving a full reload.
+
+60. **Drop legacy `workspaces.vault_verifier`/`vault_verifier_iv`, deferred in step 58.** ✅ _done_.
+    Step 58 deliberately kept these two columns (and the code path reading them) rather than
+    dropping them immediately, pending confirmation that no production workspace still needed the
+    old verifier-based legacy-unlock check. Confirmed via `npx supabase db query --linked`: `select
+    count(*) filter (where vault_salt is not null and vault_wrapped_key is null) from workspaces`
+    returned 0 of 2 production workspaces — every known workspace has already migrated to the
+    wrapped-key model, so the verifier check (and everything only it needed) is genuinely dead.
+
+    Removed together, not just the column: `encryptVerifier`/`verifyVaultKey`
+    (`vaultCrypto.ts`), `useSetVaultVerifier` (its one caller), and `useSetVaultSalt` (found to
+    already be fully unused — zero call sites — via a repo-wide grep before removing it, unrelated
+    dead code from the same area). `VaultUnlockPanel.tsx`'s `handleSubmit` loses the `hasVerifier`
+    branch entirely; the remaining legacy-vault path (test-decrypt against a real credential, or
+    proceed unverified for a legacy vault with zero credentials) is untouched and still the only
+    legacy-auth mechanism — it never depended on the verifier columns. `reset_vault`
+    (`20260822160105_reset_vault_rpc.sql`) had to be `create or replace`'d in the same migration
+    (`20260823141028_drop_vault_verifier.sql`) since its `UPDATE` explicitly nulled both columns —
+    replacing it before the `drop column` statements, not after, so the function body is never
+    briefly invalid against the live schema.
+
+    Verified: `pnpm check-types`/`lint` clean repo-wide; `npx supabase db reset` applies the new
+    migration cleanly on top of full history; the full `credentials.spec.ts` +
+    `credential-folders.spec.ts` suite (8 tests) passes on chromium, including the
+    zero-credential-vault wrong-passphrase case — confirmed that now rejects via the wrapped-key
+    unwrap's AES-GCM auth-tag check rather than the removed verifier, since every vault created
+    since step 58 gets a wrapped key immediately at setup, never a bare verifier-only state.
