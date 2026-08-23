@@ -5,16 +5,13 @@ import type { Credential, Workspace } from "@delft/types";
 import {
   decryptSecret,
   deriveVaultKey,
-  encryptVerifier,
   generateRecoveryKey,
   generateSalt,
   generateVaultMasterKey,
   deriveRecoveryKeyMaterial,
   unwrapVaultMasterKey,
-  useSetVaultVerifier,
   useSetVaultWrappedKey,
   useVaultKey,
-  verifyVaultKey,
   wrapVaultMasterKey,
 } from "@delft/shared";
 import { ForgotPassphrasePanel } from "./ForgotPassphrasePanel";
@@ -43,10 +40,11 @@ type Phase =
 //   shipped, or a legacy vault that's completed its one-time migration): passphrase → derive Kp →
 //   unwrap the Vault Master Key. Unwrap failure IS "wrong passphrase" (an AES-GCM auth-tag check),
 //   same failure semantics every check in this vault uses.
-// - `vaultSalt` set but no `vaultWrappedKey` (a legacy vault): verify the passphrase exactly as
-//   before this feature existed (vaultVerifier, or test-decrypting a real credential for a vault
-//   that predates even the verifier), then hand off into VaultMigrationPanel to re-encrypt
-//   everything under a new VMK and (mandatorily) generate this vault's first recovery key.
+// - `vaultSalt` set but no `vaultWrappedKey` (a legacy vault): verify the passphrase by
+//   test-decrypting a real credential (or, for an empty legacy vault with nothing to test-decrypt,
+//   proceed unverified — there's nothing to check against), then hand off into VaultMigrationPanel
+//   to re-encrypt everything under a new VMK and (mandatorily) generate this vault's first recovery
+//   key.
 // - `vaultSalt` null: first-time setup — generate salt + VMK + recovery key, wrap the VMK under
 //   both, and require the user to confirm they've saved the recovery key (RecoveryKeyDisplay)
 //   before any of it is persisted.
@@ -61,16 +59,9 @@ export function VaultUnlockPanel({
   credentials: Credential[] | undefined;
   onBusyChange?: (busy: boolean) => void;
 }) {
-  const {
-    id: workspaceId,
-    vaultSalt,
-    vaultVerifier,
-    vaultVerifierIv,
-    vaultWrappedKey,
-    vaultWrappedKeyIv,
-  } = workspace;
+  const { id: workspaceId, vaultSalt, vaultWrappedKey, vaultWrappedKeyIv } =
+    workspace;
   const vaultKey = useVaultKey(workspaceId);
-  const setVaultVerifier = useSetVaultVerifier();
   const setVaultWrappedKey = useSetVaultWrappedKey();
   const [phase, setPhase] = useState<Phase>({ kind: "form" });
   const [passphrase, setPassphrase] = useState("");
@@ -82,9 +73,8 @@ export function VaultUnlockPanel({
 
   const isSetup = !vaultSalt;
   const hasWrappedKey = Boolean(vaultWrappedKey && vaultWrappedKeyIv);
-  const hasVerifier = Boolean(vaultVerifier && vaultVerifierIv);
   const credentialsLoading =
-    !isSetup && !hasWrappedKey && !hasVerifier && credentials === undefined;
+    !isSetup && !hasWrappedKey && credentials === undefined;
 
   // Unsaved recovery-key material exists in memory during these two phases — block the modal from
   // being closed out from under them (see CredentialsModal's onBusyChange usage). The cleanup is
@@ -147,21 +137,8 @@ export function VaultUnlockPanel({
         return;
       }
 
-      // Legacy vault (no wrapped key yet) — authenticate exactly as before this feature existed,
+      // Legacy vault (no wrapped key yet) — authenticate by test-decrypting a real credential,
       // then hand off to VaultMigrationPanel rather than unlocking directly.
-      if (hasVerifier && vaultVerifier && vaultVerifierIv) {
-        try {
-          await verifyVaultKey(kp, vaultVerifier, vaultVerifierIv);
-        } catch {
-          setError("Wrong passphrase — please try again.");
-          setPassphrase("");
-          return;
-        }
-        setPhase({ kind: "legacyMigration", oldDirectKey: kp });
-        return;
-      }
-
-      // Legacy vault that predates even the verifier — test-decrypt a real credential instead.
       const testCredential = credentials?.[0];
       if (testCredential) {
         try {
@@ -179,16 +156,6 @@ export function VaultUnlockPanel({
       // Either verified via a credential, or nothing anywhere to verify against yet (an empty,
       // never-migrated vault) — proceed straight to migration either way.
       setPhase({ kind: "legacyMigration", oldDirectKey: kp });
-      // Best-effort backfill so a retried/failed migration attempt still gets a faster verifier
-      // check next time, exactly as before this feature existed.
-      if (!hasVerifier) {
-        const verifier = await encryptVerifier(kp);
-        setVaultVerifier.mutate({
-          workspaceId,
-          verifierCiphertext: verifier.ciphertext,
-          verifierIv: verifier.iv,
-        });
-      }
     } catch {
       setError("Couldn't unlock the vault. Try again.");
     } finally {

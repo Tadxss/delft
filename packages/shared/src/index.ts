@@ -34,8 +34,6 @@ export * from "./hooks/useCredentialFolders";
 export * from "./hooks/useCreateCredentialFolder";
 export * from "./hooks/useUpdateCredentialFolder";
 export * from "./hooks/useDeleteCredentialFolder";
-export * from "./hooks/useSetVaultSalt";
-export * from "./hooks/useSetVaultVerifier";
 export * from "./hooks/useSetVaultWrappedKey";
 export * from "./hooks/useMigrateVaultToWrappedKey";
 export * from "./hooks/useRotateVaultPassphrase";
