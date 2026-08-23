@@ -1,7 +1,7 @@
-# Delft
+# CrowScribe
 
-A personal, zero-cost records and notes workspace — careful records, quiet craft, one private
-place. Built on Next.js + Supabase + Vercel free tiers, isolated per-workspace via RLS.
+A private, intelligent workspace for notes and ideas — where ideas take flight. Built on Next.js +
+Supabase + Vercel free tiers, isolated per-workspace via RLS.
 
 ## What's inside
 

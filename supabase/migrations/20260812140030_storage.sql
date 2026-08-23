@@ -11,7 +11,7 @@
 -- (not enumerable), this is a personal single-owner tool rather than a multi-tenant SaaS with
 -- untrusted workspaces, and a private bucket would also require a signed-URL refresh path in the
 -- BlockNote editor for every image render. Public-read + workspace-scoped writes is the simpler
--- correct tradeoff for v1; revisit if Delft ever gets untrusted collaborators.
+-- correct tradeoff for v1; revisit if CrowScribe ever gets untrusted collaborators.
 insert into storage.buckets (id, name, public)
 values ('page-images', 'page-images', true)
 on conflict (id) do nothing;

@@ -76,13 +76,13 @@ implementation time, not a permanent spec.
    (compare file size/metadata against the original).
 4. Publish a page, open the share link, and actually run the browser's print-to-PDF — confirm it
    reads cleanly with no editor chrome, matching the intent that this is the project's PDF export
-   path (Delft deliberately has no PDF generation of its own — see the root README's zero-cost
+   path (CrowScribe deliberately has no PDF generation of its own — see the root README's zero-cost
    constraints).
 5. Approach Supabase Storage's free-tier limit (1GB) with real usage and confirm the compression
    settings in `PageEditor.tsx`'s `uploadFile` are still appropriate — this was flagged as a
    zero-cost risk to revisit once there's real data, not a one-time check.
 6. Click "Continue with Google" with real OAuth credentials configured: confirm a small centered
-   popup opens (not a full-tab navigation away from Delft), completes Google's consent screen, then
+   popup opens (not a full-tab navigation away from CrowScribe), completes Google's consent screen, then
    self-closes with the main tab landing signed in on `/workspace`. Separately, block popups for
    `localhost`/`127.0.0.1` in the browser and confirm it falls back to a full-page redirect instead
    of silently doing nothing.
