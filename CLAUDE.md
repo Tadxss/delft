@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## What this is
 
-Delft — a personal, zero-cost records/notes/credentials/canvas workspace, shipping web-only for
+CrowScribe — a personal, zero-cost records/notes/credentials/canvas workspace, shipping web-only for
 now from a Turborepo monorepo shaped so a future mobile app is a low-friction addition rather than
 a restructure. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the schema/RLS design and the
 numbered Build Order (what shipped, why, and real bugs found along the way — that file, not this
@@ -18,7 +18,8 @@ implementing anything that would realistically require a paid service.
 **Status**: every originally-planned feature has shipped — Pages, auth (password + Google),
 Credentials Manager (with nested folders), Excalidraw Canvas, and a Notion-style hover-affordance
 UI (icon-only header, hover-reveal sidebar), all covered by an e2e suite, live at
-`https://delft.vercel.app` (auto-deploys on push to `master`). See
+`https://delft.vercel.app` (deployed under its pre-rebrand project name — Vercel project rename is
+a tracked follow-up, not yet done; auto-deploys on push to `master`). See
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)'s **Next Up** section for current focus — the
 [docs/BETA_READINESS.md](docs/BETA_READINESS.md) audit is now fully closed out (every finding
 fixed or explicitly accepted, see that doc's own status line) — and the numbered Build Order for

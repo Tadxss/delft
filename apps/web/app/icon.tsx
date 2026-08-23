@@ -5,7 +5,7 @@ export const contentType = "image/png";
 
 // Next.js's file-based icon convention — no static asset needed, generated at request time via
 // `next/og`'s built-in ImageResponse (zero-cost, no external service). A simple monogram matching
-// the app's ink-800/paper-50 palette rather than a designed logo, since there isn't one yet.
+// the app's ink-900/paper-50 palette rather than a designed logo, since there isn't one yet.
 export default function Icon() {
   return new ImageResponse(
     <div
@@ -15,14 +15,14 @@ export default function Icon() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "#28251f",
-        color: "#faf9f7",
+        background: "#1a1a1a",
+        color: "#fafafa",
         fontSize: 20,
         fontWeight: 700,
         fontFamily: "sans-serif",
       }}
     >
-      D
+      C
     </div>,
     { ...size },
   );

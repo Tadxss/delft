@@ -117,7 +117,7 @@ export default function WorkspaceSwitcherPage() {
           <button
             type="submit"
             disabled={createWorkspace.isPending}
-            className="rounded-md bg-ink-800 px-4 py-2 text-sm font-medium text-paper-50 hover:bg-ink-700 disabled:opacity-60"
+            className="rounded-md bg-accent-500 px-4 py-2 text-sm font-medium text-paper-50 hover:bg-accent-600 disabled:opacity-60"
           >
             Create
           </button>

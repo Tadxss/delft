@@ -3,18 +3,18 @@
 @tailwind utilities;
 
 :root {
-  --paper-50: #faf9f7;
-  --paper-100: #f3f1ed;
-  --paper-200: #e6e2da;
-  --paper-300: #d3ccc0;
-  --ink-400: #8a8478;
-  --ink-500: #6b655a;
-  --ink-600: #524d44;
-  --ink-700: #3a362f;
-  --ink-800: #28251f;
-  --ink-900: #1a1815;
-  --accent-500: #6b7f6e;
-  --accent-600: #566a59;
+  --paper-50: #fafafa;
+  --paper-100: #f1efec;
+  --paper-200: #e3dfda;
+  --paper-300: #cbc4bb;
+  --ink-400: #8f8b86;
+  --ink-500: #6f6a63;
+  --ink-600: #524d47;
+  --ink-700: #3a3632;
+  --ink-800: #24211e;
+  --ink-900: #1a1a1a;
+  --accent-500: #4f7288;
+  --accent-600: #3f5c6d;
 
   --background: var(--paper-50);
   --surface: #ffffff;
@@ -24,9 +24,9 @@
 }
 
 /* Notion-dark-inspired, not a literal copy — a cooler, more technical palette than the light
-   theme's warm paper tones, with a muted indigo accent in place of light mode's sage green. */
+   theme's warm paper tones, sharing the same twilight-blue accent as light mode. */
 :root.dark {
-  --paper-50: #191919;
+  --paper-50: #1a1a1a;
   --paper-100: #202020;
   --paper-200: #2b2b2b;
   --paper-300: #3a3a3a;
@@ -36,8 +36,8 @@
   --ink-700: #d4d4d2;
   --ink-800: #e9e9e7;
   --ink-900: #f5f5f4;
-  --accent-500: #7c8cf5;
-  --accent-600: #94a1f7;
+  --accent-500: #8fb0c2;
+  --accent-600: #a8c4d3;
 
   --background: var(--paper-50);
   --surface: #232323;

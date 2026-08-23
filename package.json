@@ -1,5 +1,5 @@
 {
-  "name": "delft",
+  "name": "crowscribe",
   "private": true,
   "scripts": {
     "build": "turbo run build",

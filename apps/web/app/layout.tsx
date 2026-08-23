@@ -7,16 +7,16 @@ import { Providers } from "./providers";
 const DESCRIPTION = "A private, personal records and notes workspace.";
 
 export const metadata: Metadata = {
-  title: "Delft",
+  title: "CrowScribe",
   description: DESCRIPTION,
   openGraph: {
-    title: "Delft",
+    title: "CrowScribe",
     description: DESCRIPTION,
     type: "website",
   },
   twitter: {
     card: "summary",
-    title: "Delft",
+    title: "CrowScribe",
     description: DESCRIPTION,
   },
 };
