@@ -4,9 +4,10 @@ Delft is a personal, zero-cost management platform (Pages, Credentials Manager, 
 Canvas) built on Next.js + Supabase + Vercel free tiers, with every feature scoped per-workspace
 and isolated via Postgres Row Level Security. See the root [README.md](../README.md) for the
 elevator pitch and local dev setup, [docs/TESTING.md](TESTING.md) for how the e2e suite maps
-to manual test scenarios, and [docs/BETA_READINESS.md](BETA_READINESS.md) for the outstanding
-audit findings (autosave error handling, mobile layout, modal accessibility, Storage cleanup) to
-work through before calling this BETA.
+to manual test scenarios, and [docs/BETA_READINESS.md](BETA_READINESS.md) for the original
+pre-beta audit (fully closed out as of Build Order step 37 — kept as a historical record, not an
+open checklist). The app is live and in active beta use now — see this file's "Next Up" section
+below for current status.
 
 This file's **Build Order** section below is the single source of truth for what has shipped, in
 what order, why, and what was deliberately deferred — update _it_, not the README's status line,
@@ -40,40 +41,40 @@ reparenting (step 52) and sibling reordering (step 54) — and a pre-beta-testin
 the username-lookup RPC) closed out as step 56. Credentials also gained a `type` field (Login/
 Google-SSO/API Key/PIN) driving the form's fields and a list filter, as step 57. Two real
 production vault-unlock incidents led to a full vault recovery-key system (wrapped-master-key
-model, forgot-passphrase recovery, last-resort reset) as step 58 — the old `vault_verifier`/
-`vault_verifier_iv` columns and code path that step deliberately left in place got removed as step
-60, once a production query confirmed no workspace still needed them. A perceived-speed pass on
-Pages/Canvas navigation (BlockNote code-split, hover-prefetch, cached-summary shells, tiered
-`staleTime`) shipped as step 59, no new features, purely load-time feel. Two items from step 56 are
-still deliberately deferred rather than left as accidental gaps — a signup allowlist/invite gate,
-and Sentry-style crash observability — worth revisiting given step 58's incidents were both first
-noticed by chance rather than any alerting, and are exactly the kind of thing observability would
-have caught immediately. The one recurring (not one-time) item worth keeping an eye on regardless:
-Storage usage against the 1GB free-tier cap as real data accumulates (step 56 added a `maxSizeMB`
-cap to `PageEditor.tsx`'s image compression, but it's still worth periodic monitoring, not a
-one-time fix). Most recently: a production vault-unlock incident led to a full vault recovery-key feature
-(wrapped-master-key model, "forgot passphrase" recovery, and a last-resort reset) as step 58 —
-**one follow-up still open**: once every existing workspace has confirmed `vault_wrapped_key is not
-null` (check via `npx supabase db query --linked`), write a follow-up migration dropping the now-dead
-`vault_verifier`/`vault_verifier_iv` columns and their `encryptVerifier`/`verifyVaultKey` code.
-Immediately after: a perceived-speed pass on Pages/Canvas (step 59) — BlockNote is now code-split
-the same way Excalidraw already was, sidebar rows prefetch content on hover/focus, cached sidebar
-summary data shows a page/canvas's title instantly instead of a "Loading…" flash, and summary-list
-queries got a longer staleTime/gcTime since only explicit mutations ever invalidate them. No open
-follow-up from this one — an `optimizePackageImports` attempt for `lucide-react` was tried, measured
-as a no-op, and reverted rather than left in place.
+model, forgot-passphrase recovery, last-resort reset) as step 58; the old `vault_verifier`/
+`vault_verifier_iv` columns and code path that step deliberately left in place were removed as
+step 60, once a production query confirmed no workspace still needed them (the columns no longer
+exist — see the Data model section below). A perceived-speed pass on Pages/Canvas navigation
+(BlockNote code-split, hover-prefetch, cached-summary shells, tiered `staleTime`) shipped as
+step 59, no new features, purely load-time feel.
+
+**Both items flagged as deferred in step 56 have since been resolved, one shipped and one
+deliberately declined:**
+- **Sentry error observability shipped as step 61** — basic error capture (no performance
+  tracing/session replay, to stay within the free tier), wired into all three error boundaries.
+  It caught a real bug on day one (see step 61) — proof this was worth doing, given step 58's two
+  incidents were both first noticed by chance rather than any alerting.
+- **A signup allowlist/invite gate was explicitly declined**, not just left undone — the owner's
+  intent is a wider, more open beta, so unrestricted signup is the deliberate choice here, not a
+  gap.
+
+The one recurring (not one-time) item worth keeping an eye on regardless: Storage usage against
+the 1GB free-tier cap as real data accumulates (step 56 added a `maxSizeMB` cap to
+`PageEditor.tsx`'s image compression, but it's still worth periodic monitoring, not a one-time
+fix).
 
 ## Data model
 
-- `workspaces (id, owner_id, name, vault_salt, vault_verifier, vault_verifier_iv, vault_wrapped_key,
-  vault_wrapped_key_iv, vault_recovery_wrapped_key, vault_recovery_wrapped_key_iv, created_at)` —
-  `vault_salt` is the Credentials Manager's per-workspace PBKDF2 salt (plaintext; salts aren't
-  secret), null until that workspace's vault passphrase is first set up. `vault_verifier`/
-  `vault_verifier_iv` are legacy (see Build Order step 22/23) — kept only until every vault has
-  migrated to `vault_wrapped_key`/`_iv` (the Vault Master Key wrapped under the passphrase-derived
-  key) and `vault_recovery_wrapped_key`/`_iv` (the same VMK wrapped under a one-time-shown recovery
-  key instead) — see Build Order step 58 for the wrapped-key model and why it replaced direct
-  passphrase-key encryption.
+- `workspaces (id, owner_id, name, vault_salt, vault_wrapped_key, vault_wrapped_key_iv,
+  vault_recovery_wrapped_key, vault_recovery_wrapped_key_iv, created_at)` — `vault_salt` is the
+  Credentials Manager's per-workspace PBKDF2 salt (plaintext; salts aren't secret), null until that
+  workspace's vault passphrase is first set up. `vault_wrapped_key`/`_iv` is the Vault Master Key
+  wrapped under the passphrase-derived key; `vault_recovery_wrapped_key`/`_iv` is the same VMK
+  wrapped under a one-time-shown recovery key instead — see Build Order step 58 for the
+  wrapped-key model and why it replaced direct passphrase-key encryption. The original
+  `vault_verifier`/`vault_verifier_iv` columns (Build Order step 22/23) that model temporarily kept
+  alongside it for legacy-vault migration no longer exist — dropped in step 60, once every
+  workspace had migrated.
 - `vault_reset_requests (id, workspace_id, requested_by, token, expires_at, confirmed_at,
   created_at)` — a single-use, owner-only, 1-hour-expiry token for the last-resort vault reset (both
   passphrase and recovery key lost) — see Build Order step 58.
