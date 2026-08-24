@@ -4,7 +4,7 @@ import { useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthUser } from "@delft/shared";
 
-// Every authenticated-only route (app/workspace/) uses this. Delft's auth is fully
+// Every authenticated-only route (app/workspace/) uses this. CrowScribe's auth is fully
 // client-side (session lives in localStorage via the SupabaseStorageAdapter in app/providers.tsx,
 // same pattern as votero) rather than using @supabase/ssr for server-checked routes — acceptable
 // for a single-user personal tool where "flash of redirect before the client resolves the

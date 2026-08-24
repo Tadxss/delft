@@ -24,7 +24,7 @@ function TopBar() {
         href="/workspace"
         className="text-base font-semibold tracking-tight text-ink-800"
       >
-        Delft
+        CrowScribe
       </Link>
       <div className="flex items-center gap-1">
         {workspaceId && (

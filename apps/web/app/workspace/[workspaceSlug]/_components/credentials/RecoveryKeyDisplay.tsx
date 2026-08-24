@@ -63,7 +63,7 @@ export function RecoveryKeyDisplay({
           type="button"
           disabled={!saved || continuing}
           onClick={onContinue}
-          className="mt-3 w-full rounded-md bg-ink-800 px-3 py-2 text-sm font-medium text-paper-50 transition-colors hover:bg-ink-700 disabled:opacity-60"
+          className="mt-3 w-full rounded-md bg-accent-500 px-3 py-2 text-sm font-medium text-paper-50 transition-colors hover:bg-accent-600 disabled:opacity-60"
         >
           {continuing ? "Saving…" : "Continue"}
         </button>

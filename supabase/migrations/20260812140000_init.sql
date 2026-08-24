@@ -1,4 +1,4 @@
--- Core schema for Delft (see C:\Users\Daryl\.claude\plans\check-votero-tech-stack-linear-aurora.md).
+-- Core schema for CrowScribe (see C:\Users\Daryl\.claude\plans\check-votero-tech-stack-linear-aurora.md).
 --
 -- Every table below is workspace-scoped. `workspace_members` exists even though v1 is
 -- single-user-per-workspace so every RLS policy can key off membership rather than `owner_id`

@@ -1,6 +1,6 @@
 # Architecture
 
-Delft is a personal, zero-cost management platform (Pages, Credentials Manager, Excalidraw
+CrowScribe is a personal, zero-cost management platform (Pages, Credentials Manager, Excalidraw
 Canvas) built on Next.js + Supabase + Vercel free tiers, with every feature scoped per-workspace
 and isolated via Postgres Row Level Security. See the root [README.md](../README.md) for the
 elevator pitch and local dev setup, [docs/TESTING.md](TESTING.md) for how the e2e suite maps
@@ -57,6 +57,13 @@ deliberately declined:**
 - **A signup allowlist/invite gate was explicitly declined**, not just left undone — the owner's
   intent is a wider, more open beta, so unrestricted signup is the deliberate choice here, not a
   gap.
+
+**Since then: a rebrand from Delft to CrowScribe shipped as step 62** — name/metadata, hero/
+tagline, Tailwind palette, and primary CTA color, per a brand handoff doc. Deliberately incomplete:
+the `@delft/*` workspace package scopes, empty-state copy (needs a nest/treasure metaphor pass),
+domain registration, and the Vercel/Supabase project rename are all still open — the hosted app is
+still `https://delft.vercel.app` under its pre-rebrand project name. See step 62 for the full
+scope and what was explicitly deferred.
 
 The one recurring (not one-time) item worth keeping an eye on regardless: Storage usage against
 the 1GB free-tier cap as real data accumulates (step 56 added a `maxSizeMB` cap to
@@ -272,7 +279,7 @@ workspace_members` instead of just filtering to zero rows. Fixed by scoping ever
 
 12. **Restrict BlockNote to Image-only media blocks.** ✅ _done_. Video/Audio/File block types
     deliberately held back for a future paid tier — not an access-control/role check (no such
-    system exists in Delft), just not offered as insertable block types at all right now. New
+    system exists in CrowScribe), just not offered as insertable block types at all right now. New
     `apps/web/app/_lib/blocknoteSchema.ts` builds a `BlockNoteSchema.create({ blockSpecs })` with an
     **explicit allow-list** (paragraph/heading/quote/lists/code/table/divider/image) rather than
     destructuring the three unwanted ones out of `defaultBlockSpecs` — so a future BlockNote upgrade
@@ -1884,3 +1891,47 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
     error appearing on every prior load; full e2e suite (66 tests) passing at its normal baseline
     (the only 2 failures being the long-standing webkit/mobile-safari drag-and-drop flakiness noted
     since step 56, unrelated to this change).
+
+62. **Rebrand: Delft → CrowScribe.** ✅ _done_, name/identity only — no schema, RLS, or
+    feature-behavior changes. Driven by a brand handoff doc; scope deliberately limited to what the
+    doc called P0 (name/metadata, hero/tagline) and P1 (Tailwind palette, primary CTA color) —
+    docs/comment cleanup (this entry) was treated as a light P2 pass. Explicitly deferred: the
+    `@delft/*` workspace package scopes (dozens of import sites — a separate mechanical pass),
+    empty-state copy (the brand doc's proposed wording depends on a nest/treasure metaphor pass
+    that isn't happening yet), domain registration, and the Vercel/Supabase project rename — the
+    hosted app is still `https://delft.vercel.app` under its pre-rebrand project name.
+
+    App identity: `apps/web/app/layout.tsx` metadata (title/OG/Twitter), `apps/web/app/icon.tsx`'s
+    dynamic favicon monogram (`D` → `C`), `apps/web/app/page.tsx`'s hero heading and tagline (now
+    "Where ideas take flight."), the workspace top-bar link, the `/share/[slug]` page's OG/Twitter
+    description, and root `package.json`'s name.
+
+    Palette: reworked `apps/web/app/globals.css`'s `paper-*`/`ink-*`/`accent-*` CSS variables (same
+    token structure and `tailwind.config.cjs` mapping, only the hex values changed) — iterated live
+    with the user through several rounds rather than landing in one shot. Settled state: `ink-*`
+    keyed off Deep Charcoal/Soft Black; `paper-*` a cool-toned neutral gray with a slight warm
+    "nest" tan-gray cast (`#F1EFEC`/`#E3DFDA`/`#CBC4BB`) rather than the brand doc's literal Warm
+    Parchment tan, which read too strongly tan/parchment in practice; `accent-*` ended on Twilight
+    Blue rather than the brand doc's Amber Gold — gold's contrast against light-mode surfaces was
+    poor once tried against real UI (buttons, focus rings, and especially `text-accent-500` link
+    text), so blue replaced it in both light and dark mode, each shifted off the doc's literal hex
+    for contrast (light darkened to `#4F7288`, dark lightened to `#8FB0C2`) the same way the
+    now-abandoned amber had been.
+
+    Primary CTAs: all 13 `bg-ink-800`/`hover:bg-ink-700` filled-button instances across 10 files
+    (login/account/workspace/credentials primary actions, plus the shared error/not-found pages)
+    switched to `bg-accent-500`/`hover:bg-accent-600`; `text-paper-50` label color untouched since
+    it already resolves to the correct contrast extreme per theme. Secondary/outline buttons
+    (no fill) were left alone — only filled primary CTAs were in scope.
+
+    Docs/comments: `README.md` title + description, this file's opening line and one current-state
+    reference (the historical Build Order line above describing the old "Delft" wordmark's removal
+    was deliberately left as-is — Build Order entries are historical record, not live copy, per
+    this section's own don't-edit-old-entries rule), `docs/TESTING.md`'s two prose mentions, and
+    both `supabase/migrations/*.sql` header comments.
+
+    Verified: `pnpm check-types`/`build` clean after each functional round (metadata/copy, palette,
+    CTA buttons); grepped for residual `"Delft"` after each pass. Visual check via the dev server
+    (`curl`-fetched rendered HTML for the metadata/copy round, since a Playwright MCP browser
+    instance was locked by another session for parts of this work) plus direct user review/iteration
+    of the live palette and accent color in-browser.

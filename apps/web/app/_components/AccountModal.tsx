@@ -176,7 +176,7 @@ export function AccountModal({
             <button
               type="submit"
               disabled={setPassword.isPending}
-              className="mt-1 rounded-md bg-ink-800 px-3 py-2 text-sm font-medium text-paper-50 transition-colors hover:bg-ink-700 disabled:opacity-60"
+              className="mt-1 rounded-md bg-accent-500 px-3 py-2 text-sm font-medium text-paper-50 transition-colors hover:bg-accent-600 disabled:opacity-60"
             >
               {setPassword.isPending ? "Saving…" : "Save password"}
             </button>
@@ -438,7 +438,7 @@ function ProfileForm({ userId }: { userId: string | undefined }) {
         <button
           type="submit"
           disabled={upsertProfile.isPending}
-          className="mt-1 rounded-md bg-ink-800 px-3 py-2 text-sm font-medium text-paper-50 transition-colors hover:bg-ink-700 disabled:opacity-60"
+          className="mt-1 rounded-md bg-accent-500 px-3 py-2 text-sm font-medium text-paper-50 transition-colors hover:bg-accent-600 disabled:opacity-60"
         >
           {upsertProfile.isPending ? "Saving…" : "Save profile"}
         </button>

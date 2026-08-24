@@ -152,7 +152,7 @@ export default function LoginPage() {
         window.screenY + Math.max(0, (window.outerHeight - height) / 2);
       const popup = window.open(
         url,
-        "delft-google-signin",
+        "crowscribe-google-signin",
         `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,status=no`,
       );
       if (!popup) {
@@ -170,10 +170,10 @@ export default function LoginPage() {
     <main className="flex min-h-screen flex-col items-center justify-center gap-10 px-6">
       <div className="flex flex-col items-center gap-3 text-center">
         <h1 className="text-4xl font-semibold tracking-tight text-ink-800">
-          Delft
+          CrowScribe
         </h1>
         <p className="max-w-sm text-sm text-ink-500">
-          Careful records. Quiet craft. One private place.
+          Where ideas take flight.
         </p>
       </div>
 
@@ -239,7 +239,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={!identifierInput || emailForUsername.isPending}
-                className="rounded-md bg-ink-800 px-3 py-2 text-sm font-medium text-paper-50 transition-colors hover:bg-ink-700 disabled:opacity-60"
+                className="rounded-md bg-accent-500 px-3 py-2 text-sm font-medium text-paper-50 transition-colors hover:bg-accent-600 disabled:opacity-60"
               >
                 {emailForUsername.isPending ? "Checking…" : "Continue"}
               </button>
@@ -286,7 +286,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={signInWithPassword.isPending || !password}
-                className="rounded-md bg-ink-800 px-3 py-2 text-sm font-medium text-paper-50 transition-colors hover:bg-ink-700 disabled:opacity-60"
+                className="rounded-md bg-accent-500 px-3 py-2 text-sm font-medium text-paper-50 transition-colors hover:bg-accent-600 disabled:opacity-60"
               >
                 {signInWithPassword.isPending ? "Signing in…" : "Continue"}
               </button>

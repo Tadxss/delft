@@ -19,7 +19,5 @@ test("visiting an authenticated route while signed out redirects to the login sc
 }) => {
   await page.goto("/workspace");
   await expect(page).toHaveURL("http://127.0.0.1:3000/");
-  await expect(
-    page.getByText("Careful records. Quiet craft. One private place."),
-  ).toBeVisible();
+  await expect(page.getByText("Where ideas take flight.")).toBeVisible();
 });
