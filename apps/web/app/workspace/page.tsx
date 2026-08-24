@@ -9,6 +9,7 @@ import {
   useDeleteWorkspace,
   useWorkspaces,
 } from "@crowscribe/shared";
+import { Heading } from "../_components/Heading";
 
 export default function WorkspaceSwitcherPage() {
   const router = useRouter();
@@ -55,7 +56,7 @@ export default function WorkspaceSwitcherPage() {
 
   return (
     <main className="mx-auto flex w-full max-w-lg flex-col gap-8 px-6 py-16">
-      <h1 className="text-2xl font-semibold text-ink-800">Workspaces</h1>
+      <Heading level="page">Workspaces</Heading>
 
       {isLoading ? (
         <p className="text-sm text-ink-500">Loading…</p>

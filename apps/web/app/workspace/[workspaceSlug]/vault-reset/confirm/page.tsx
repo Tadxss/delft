@@ -8,6 +8,7 @@ import {
   useConfirmVaultReset,
   useWorkspace,
 } from "@crowscribe/shared";
+import { Heading } from "../../../../_components/Heading";
 
 // Reached by clicking the emailed link from vault-reset/page.tsx. Nested under the same AuthGate
 // as every other workspace route, so simply landing here (after the magic link (re-)establishes a
@@ -47,9 +48,7 @@ function ConfirmVaultResetContent() {
 
   return (
     <main className="mx-auto max-w-md px-6 py-10 text-sm">
-      <h1 className="text-base font-semibold text-ink-800">
-        Confirm vault reset
-      </h1>
+      <Heading level="page">Confirm vault reset</Heading>
       <p className="mt-3 text-ink-500">
         This will permanently delete every credential currently stored in{" "}
         {workspace?.name ?? "this workspace"}&apos;s vault. This cannot be

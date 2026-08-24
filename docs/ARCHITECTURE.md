@@ -82,12 +82,15 @@ a reorder instead of jumping instantly.
 animation, both already done) started as step 70, Phase A of a new 3-phase roadmap**: four shared
 primitives (`Button`, `Input`/`Textarea`/`Select`, `FormLabel`, `Heading`) now exist in
 `apps/web/app/_components/`, proven out on the login page and `AccountModal.tsx` — every other
-button/input call site in the app is still unmigrated (mechanical follow-up). Phase B (apply a real
-heading/title type scale, currently 5 different `<h1>` combos for the same role) and Phase C
-(standardize modal/list padding, currently two competing conventions) are scoped but not started.
-Information density (three tiers: spacious prose, medium forms, tight lists) was confirmed
-intentional-by-content-type and is explicitly not part of this redesign. See steps 62-70 for the
-full scope of everything shipped and what's still deferred.
+button/input call site in the app is still unmigrated (mechanical follow-up). **Step 71 (Phase B)
+then applied a real heading/title type scale** (`brand`/`page`/`content-large`/`content-compact` in
+`Heading.tsx`), fixing the actual inconsistencies: error/not-found pages and vault-reset pages
+(the biggest jump, `text-base` for a page heading) now use a consistent `page` size, and the share
+page's title now matches the page editor's. Phase C (standardize modal/list padding, currently two
+competing conventions) is scoped but not started. Information density (three tiers: spacious
+prose, medium forms, tight lists) was confirmed intentional-by-content-type and is explicitly not
+part of this redesign. See steps 62-71 for the full scope of everything shipped and what's still
+deferred.
 
 The one recurring (not one-time) item worth keeping an eye on regardless: Storage usage against
 the 1GB free-tier cap as real data accumulates (step 56 added a `maxSizeMB` cap to
@@ -2202,3 +2205,38 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
     used in steps 68-69 and screenshotted all four migrated surfaces (login page, both auth steps,
     the Account modal's list/password/profile views) — pixel-identical to before the migration,
     zero console errors throughout.
+
+71. **Visual/layout redesign, Phase B (heading/title type scale).** ✅ _done_. Re-read every
+    flagged heading/title file directly this session rather than trusting the earlier inventory's
+    flat "3 different content-title sizes" framing at face value — found the content titles
+    actually split into two legitimate tiers by container width, not one arbitrary mess: full
+    writing-surface titles (`PageEditor.tsx`, `max-w-4xl`, `text-4xl font-bold`) versus compact
+    panel titles (`CanvasEditor.tsx`'s toolbar-style header and `CredentialDetail.tsx`'s
+    `max-w-lg` panel, both already independently at `text-2xl font-bold` — an accidental match,
+    not a designed one, but the right size for both). Only the share page's title
+    (`max-w-3xl`, `text-3xl`) was a genuine unexplained outlier despite being the same role as
+    `PageEditor.tsx`'s title, just read-only.
+
+    Expanded `Heading.tsx`'s single Phase-A level (which actually meant "brand mark," not a
+    generic page heading) into 4 explicit roles, `level` now a required prop:
+    `brand` (`text-4xl font-semibold tracking-tight`, login wordmark only, unchanged),
+    `page` (`text-2xl font-semibold`, generic top-level page heading), `content-large`
+    (`text-4xl font-bold leading-snug`), `content-compact` (`text-2xl font-bold leading-snug`).
+    `HEADING_CLASSES` exported alongside the component so `PageEditor.tsx`/`CanvasEditor.tsx`'s
+    title `<input>`s — editable form fields, can't go through `<Heading>` itself — apply the same
+    values directly.
+
+    Componentized with **no size change** (already correct): login wordmark, `Workspaces`,
+    `CredentialDetail.tsx`'s `<h2>`, both editor title inputs. Componentized **with a real fix**:
+    `error.tsx`/`workspace/error.tsx`/`not-found.tsx` (`text-xl` → `page`'s `text-2xl`),
+    the two vault-reset pages (`text-base` → `page`'s `text-2xl` — the biggest jump in the whole
+    audit, `text-base` for a page `<h1>` was the clearest outright bug), and the share page's title
+    (`text-3xl` → `content-large`'s `text-4xl`, matching `PageEditor.tsx`).
+
+    Verified: `pnpm check-types`/`lint`/`build` all clean. Signed in via the same magic-link/Mailpit
+    flow as steps 68-70, created a workspace/page/canvas, published the page, and screenshotted
+    every changed surface: login (unchanged), `Workspaces` (unchanged), the page editor title
+    (unchanged), the canvas editor title (unchanged), a real 404 page (visibly larger, reads
+    correctly), the published share view (now matching the editor's title size, no wrapping), and
+    a vault-reset page (the `text-base`→`text-2xl` jump — reads clearly better against its body
+    copy, not oversized). Zero console errors across every surface.

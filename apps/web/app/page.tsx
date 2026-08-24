@@ -173,7 +173,7 @@ export default function LoginPage() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-10 px-6">
       <div className="flex flex-col items-center gap-3 text-center">
-        <Heading>CrowScribe</Heading>
+        <Heading level="brand">CrowScribe</Heading>
         <p className="max-w-sm text-sm text-ink-500">
           Where ideas take flight.
         </p>

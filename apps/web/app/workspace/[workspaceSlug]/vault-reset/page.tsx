@@ -8,6 +8,7 @@ import {
   useRequestVaultReset,
   useWorkspace,
 } from "@crowscribe/shared";
+import { Heading } from "../../../_components/Heading";
 
 // Last resort: reachable only from ForgotPassphrasePanel's "Lost your recovery key too?" link,
 // meaning both the passphrase and the recovery key are gone. A real route rather than modal state
@@ -44,9 +45,9 @@ export default function VaultResetRequestPage() {
 
   return (
     <main className="mx-auto max-w-md px-6 py-10 text-sm">
-      <h1 className="text-base font-semibold text-ink-800">
+      <Heading level="page">
         Reset {workspace?.name ?? "this workspace"}&apos;s vault
-      </h1>
+      </Heading>
       <p className="mt-3 text-ink-500">
         Use this only if you&apos;ve lost both this vault&apos;s passphrase{" "}
         <em>and</em> its recovery key. This permanently deletes every credential

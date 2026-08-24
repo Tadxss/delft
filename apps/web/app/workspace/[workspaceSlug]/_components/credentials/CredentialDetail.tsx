@@ -25,6 +25,7 @@ import {
   useDeleteCredential,
   useUpdateCredential,
 } from "@crowscribe/shared";
+import { Heading } from "../../../../_components/Heading";
 import { CREDENTIAL_TYPE_OPTIONS } from "./credentialTypeOptions";
 
 const EMPTY_SECRET: CredentialSecret = { notes: "" };
@@ -551,9 +552,9 @@ export function CredentialDetail({
   return (
     <div className="flex max-w-lg flex-col gap-4 p-6">
       <div className="flex items-start justify-between gap-4">
-        <h2 className="text-2xl font-bold text-ink-800">
+        <Heading level="content-compact" as="h2">
           {form.title || "Untitled"}
-        </h2>
+        </Heading>
         <div className="flex shrink-0 gap-2">
           <button
             type="button"
