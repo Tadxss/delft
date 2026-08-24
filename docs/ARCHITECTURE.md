@@ -66,9 +66,9 @@ step's empty-state copy deferral (nest/canvas/vault metaphor language), narrowly
 Vercel project and moved the live URL to `https://crowscribe.vercel.app` (`https://delft.vercel.app`
 still works too, kept as a legacy alias), and step 65 closed out the Supabase Auth dashboard config
 and the Supabase project's display-name rename, both done by the user. Step 66 then renamed the
-`@delft/*` workspace package scopes to `@crowscribe/*`. Still open: domain registration ("soon to
-do") and a custom logo/icon (still a text-monogram favicon). See steps 62-66 for the full scope and
-what's still deferred.
+`@delft/*` workspace package scopes to `@crowscribe/*`. Still open: a custom logo/icon (still a
+text-monogram favicon) and domain registration, deliberately parked as the project's final touch
+rather than something to do now. See steps 62-66 for the full scope and what's still deferred.
 
 The one recurring (not one-time) item worth keeping an eye on regardless: Storage usage against
 the 1GB free-tier cap as real data accumulates (step 56 added a `maxSizeMB` cap to
