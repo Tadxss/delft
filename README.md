@@ -19,9 +19,10 @@ editor with autosave, image upload with client-side compression, publish/share t
 read-only `/share/[slug]` route), auth (password + Google), a Credentials Manager (encrypted
 vault, nested folders), an Excalidraw-style Canvas, a user profile (name/occupation/bio/avatar),
 and a Notion-style dark/light UI (hover-affordance sidebar, icon-only header,
-`/workspace/{slug}--{id}` URLs). Live at `https://delft.vercel.app`, auto-deploying on push to
-`master`. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)'s numbered Build Order for how each
-shipped, and its "Next Up" section for current focus.
+`/workspace/{slug}--{id}` URLs). Live at `https://crowscribe.vercel.app` (`https://delft.vercel.app`
+still works too, kept as a legacy alias), auto-deploying on push to `master`. See
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)'s numbered Build Order for how each shipped, and its
+"Next Up" section for current focus.
 
 Everything here runs on free tiers by design — Supabase Storage in particular caps out at 1GB, so
 image uploads are compressed/resized client-side (1920px max, WebP, EXIF stripped) before they ever
@@ -66,7 +67,8 @@ npx supabase db reset     # reapply all migrations from scratch (destructive to 
 npx supabase gen types typescript --local > packages/types/src/database.ts
 ```
 
-This repo is linked (`supabase link`) to a hosted project, live at `https://delft.vercel.app` — see
+This repo is linked (`supabase link`) to a hosted project, live at `https://crowscribe.vercel.app`
+(`https://delft.vercel.app` still works too) — see
 `docs/ARCHITECTURE.md` Build Order step 18 for the deployment setup and what's still manual (git
 auto-deploy, hosted auth URL/Google provider config). `npx supabase db push` applies local
 migrations to the hosted database. See `packages/types/src/database.ts`'s header comment for the
