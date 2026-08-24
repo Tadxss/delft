@@ -13,7 +13,8 @@ areas below — every finding still holds as originally written.
 non-blocking risk** — see "Fixed" and "Accepted risk" below. Kept as a historical record (not
 deleted) per this doc's own "accumulate, don't delete" convention.
 
-Live app: `https://delft.vercel.app`. Read [docs/ARCHITECTURE.md](ARCHITECTURE.md) and
+Live app: `https://crowscribe.vercel.app` (`https://delft.vercel.app` still works too, kept as a
+legacy alias). Read [docs/ARCHITECTURE.md](ARCHITECTURE.md) and
 [docs/TESTING.md](TESTING.md) first for the existing architecture/test conventions — every fix
 below should follow those same patterns (RLS policy naming, `useX`/`useUpdateX` hook shape,
 `window.confirm` for destructive actions, e2e specs per feature, etc.), not introduce new ones.
@@ -58,7 +59,7 @@ covers it, rather than deleting it — same "accumulate, don't delete" conventio
   Deliberately left open rather than adding a paid device-lab service (BrowserStack etc., which
   would also mean routing a credentials app's traffic through a third party) or a real-Safari CI
   toolchain (macOS runner + `safaridriver`/Appium — a genuinely separate setup from the rest of the
-  e2e suite). The cheapest real coverage here is manual: open `https://delft.vercel.app` on an
+  e2e suite). The cheapest real coverage here is manual: open `https://crowscribe.vercel.app` on an
   iPhone/iPad you own and walk through Pages/Canvas/Credentials once in a while.
 
 ## Fixed

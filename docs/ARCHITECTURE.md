@@ -18,8 +18,9 @@ when something ships. Entries accumulate; don't edit or delete old ones, append 
 Read this section first in a new session — it's the answer to "what should I work on."
 
 **Every originally-planned feature has shipped** — Pages, auth (password + Google), Credentials
-Manager, Excalidraw Canvas, and hosted deployment (live at `https://delft.vercel.app`, auto-deploying
-on push to `master`). See Build Order below for how each shipped.
+Manager, Excalidraw Canvas, and hosted deployment (live at `https://crowscribe.vercel.app`,
+`https://delft.vercel.app` still works too, auto-deploying on push to `master`). See Build Order
+below for how each shipped.
 
 **[docs/BETA_READINESS.md](BETA_READINESS.md) is now fully closed out, as of Build Order step 37**
 — every finding from the original audit (silent autosave failures, no mobile layout, `Modal.tsx`
@@ -61,10 +62,12 @@ deliberately declined:**
 **Since then: a rebrand from Delft to CrowScribe shipped as step 62** — name/metadata, hero/
 tagline, Tailwind palette, and primary CTA color, per a brand handoff doc. Step 63 closed out that
 step's empty-state copy deferral (nest/canvas/vault metaphor language), narrowly scoped — the
-"Workspace" label and "Publish" wording were deliberately left alone. Still open: the `@delft/*`
-workspace package scopes, domain registration, the Vercel/Supabase project rename, and a custom
-logo/icon (still a text-monogram favicon) — the hosted app is still `https://delft.vercel.app`
-under its pre-rebrand project name. See steps 62-63 for the full scope and what's still deferred.
+"Workspace" label and "Publish" wording were deliberately left alone. Step 64 then renamed the
+Vercel project and moved the live URL to `https://crowscribe.vercel.app` (`https://delft.vercel.app`
+still works too, kept as a legacy alias), and step 65 closed out the Supabase Auth dashboard config
+and the Supabase project's display-name rename, both done by the user. Still open: domain
+registration ("soon to do"), the `@delft/*` workspace package scopes, and a custom logo/icon (still
+a text-monogram favicon). See steps 62-65 for the full scope and what's still deferred.
 
 The one recurring (not one-time) item worth keeping an eye on regardless: Storage usage against
 the 1GB free-tier cap as real data accumulates (step 56 added a `maxSizeMB` cap to
@@ -1105,7 +1108,8 @@ check-types`/`lint` (repo-wide).
     device/simulator testing — was deliberately moved to that doc's "Accepted risk" section: no
     device was available here, and a paid device lab or a separate real-Safari CI toolchain
     (macOS runner + `safaridriver`/Appium) were both declined for now. The cheapest real coverage
-    if it's ever wanted is manual: the live app at `https://delft.vercel.app` on an owned device.
+    if it's ever wanted is manual: the live app at `https://crowscribe.vercel.app` on an owned
+    device.
 
 34. **Fixed BETA_READINESS.md item 2: every read-hook consumer swallows errors.** ✅ _done_, the
     last remaining High-severity item in that doc. `useWorkspaces`, `usePages`, `useCredentials`,
@@ -1961,3 +1965,47 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
 
     Verified: `pnpm check-types` clean; grepped `apps/web/e2e/` for all three old strings to confirm
     no other stale assertion remained.
+
+64. **Vercel project renamed, live URL moved to `crowscribe.vercel.app`.** ✅ _done_, closing another
+    piece of step 62's deferral. Split into a safe part and a bigger one, after read-only
+    investigation in plan mode found something that changed the risk picture: per step 18's
+    "recurring gotcha" note, `delft.vercel.app` is a manually-set alias (`vercel alias set`), not an
+    auto-derived `<project-name>.vercel.app` domain — so renaming the Vercel project's internal name
+    doesn't touch the live alias or break anything. That's the safe part
+    (`vercel project rename delft crowscribe`, confirmed via `vercel project ls`). The bigger,
+    separate decision — actually moving the live public URL — was a deliberate user choice made
+    with that corrected understanding: `vercel alias set <latest-production-deployment>
+    crowscribe.vercel.app`, leaving `delft.vercel.app` in place rather than removing it (no reason
+    to break old links/bookmarks). Both verified serving real content via direct `curl` (`200`, page
+    title present), the same pattern step 18 used after finding a Vercel-SSO-redirect failure mode
+    there once already.
+
+    **Hosted Supabase Auth config (Site URL / redirect-URL allow-list, currently only
+    `delft.vercel.app`) was deliberately not touched from here** — same reasoning `config push` was
+    avoided in step 18: scripting hosted auth config risks silently breaking redirects for real
+    users, and no safe CLI path exists anyway (the Supabase CLI has no config-update subcommand, and
+    hunting for its stored management-API token to call the API directly wasn't worth it for this).
+    Handed off to the user as a manual dashboard step (Authentication → URL Configuration → add
+    `https://crowscribe.vercel.app`, keep `delft.vercel.app` allow-listed too) — **magic-link/Google
+    sign-in via the new domain may misdirect until that's done**. The Supabase project's own
+    display-name rename (cosmetic only, doesn't affect the API URL) was left to the user too, for
+    the same no-CLI-subcommand reason.
+
+    Doc references to the live URL updated to match (`CLAUDE.md`, `README.md`,
+    `docs/BETA_READINESS.md`, and this file's Next Up section and step-33 "Accepted risk" pointer),
+    keeping `delft.vercel.app` mentioned alongside as still-working. Step 18's own historical
+    narrative describing the original alias-claiming event is left untouched, per this section's
+    own don't-edit-old-entries rule.
+
+    Still open: domain registration (needs the user's payment/account access — out of scope here
+    entirely), the `@delft/*` workspace package scopes, the Supabase project's display-name rename
+    (handed to the user), and a custom logo/icon.
+
+65. **Closed both items handed off in step 64.** ✅ _done_, user confirmed. The Supabase Auth
+    dashboard's Site URL/redirect allow-list now includes `https://crowscribe.vercel.app`
+    (`delft.vercel.app` still allow-listed too) — the misdirect risk step 64 flagged no longer
+    applies. The Supabase project's display name was also renamed to "crowscribe" in the dashboard.
+    Both were manual dashboard steps, done by the user directly — nothing scripted from here.
+
+    Still open: domain registration ("soon to do," per the user — still needs their payment/account
+    access), the `@delft/*` workspace package scopes, and a custom logo/icon.
