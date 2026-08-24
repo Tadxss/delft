@@ -70,16 +70,16 @@ and the Supabase project's display-name rename, both done by the user. Step 66 t
 text-monogram favicon) and domain registration, deliberately parked as the project's final touch
 rather than something to do now.
 
-**A separate UI/UX + animation pass started as step 67**, Phase 1 (foundation) only: added `motion`
+**A separate UI/UX + animation pass started as step 67**, Phase 1 (foundation): added `motion`
 as a dependency, gave the modal a real open/close animation (it previously had no exit animation at
 all), a single global hover/press transition rule replacing the ad hoc mix that existed before, a
 theme-toggle icon crossfade, and skeleton loading states everywhere that was still static "Loading…"
-text. Two more phases are planned but not started: panel/sidebar transitions (the collapse/expand
-and mobile drawer are still hard instant swaps) and drag-and-drop feel (row hover states and
-post-drop reordering are still instant, no animation). A separate, later initiative — broader
-visual/layout redesign (spacing, typography, information density) — was explicitly scoped out of
-all of this; it's design work, not animation. See steps 62-67 for the full scope and what's still
-deferred.
+text. **Step 68 then shipped Phase 2**: the sidebar's desktop collapse/expand and mobile drawer,
+previously both hard instant swaps, now animate (width+crossfade for collapse/expand, slide+fade
+for the drawer). One phase remains, not started: drag-and-drop feel (row hover states and post-drop
+reordering are still instant, no animation). A separate, later initiative — broader visual/layout
+redesign (spacing, typography, information density) — was explicitly scoped out of all of this;
+it's design work, not animation. See steps 62-68 for the full scope and what's still deferred.
 
 The one recurring (not one-time) item worth keeping an eye on regardless: Storage usage against
 the 1GB free-tier cap as real data accumulates (step 56 added a `maxSizeMB` cap to
@@ -2095,3 +2095,24 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
     live behind auth, not reachable from the logged-out page checked) — worth a real click-through
     once signed in before calling this fully confirmed. `pnpm analyze` bundle-size check (flagged
     in the plan) not run this session either.
+
+68. **UI motion pass, Phase 2 (sidebar collapse/expand + mobile drawer).** ✅ _done_, real
+    click-through verified this time (Phase 1's gap — both its animations lived behind auth and
+    weren't checked signed-in — closed here). Same `m`/`AnimatePresence` pattern from Phase 1,
+    applied to `SidebarShell.tsx`'s two remaining hard instant swaps: desktop collapse/expand
+    (`w-10` rail ↔ `w-64` full sidebar, previously a dead-instant conditional swap) now animates
+    `width` on an outer `m.div` (40px ↔ 256px, 180ms `easeInOut`) with the rail/full-sidebar content
+    cross-fading via `AnimatePresence mode="wait"` inside it; the mobile drawer (previously a plain
+    `{mobileOpen && <div>}` mount/unmount) now fades its backdrop and slides its panel in from the
+    left (`x: "-100%"` → `0`, 200ms `easeOut`) via `AnimatePresence` wrapping the whole block.
+    `collapsed`/`mobileOpen` state, `localStorage` persistence, and the pathname-triggered
+    auto-close effect were untouched — animation-layer-only change.
+
+    Verified: `pnpm check-types`/`lint`/`build` all clean. Signed in for real via the same
+    magic-link flow the e2e suite uses (typed an email, "Email me a sign-in link instead", pulled
+    the link from local Mailpit, navigated to it directly — `127.0.0.1`, not `localhost`, matching
+    `next.config.js`'s `allowedDevOrigins` gotcha), created a workspace, then drove the actual UI
+    via Playwright MCP: collapse/expand toggled cleanly (screenshotted both states — full sidebar
+    to bare rail and back, no layout jump), and resizing to a `390×844` mobile viewport then
+    opening the drawer confirmed the backdrop dims the page and the panel slides in over it, not a
+    hard pop. Zero console errors across the whole session.
