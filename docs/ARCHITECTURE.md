@@ -98,6 +98,13 @@ content-title tiers. Information density (three tiers: spacious prose, medium fo
 was confirmed intentional-by-content-type from the start and was never in scope. See steps 62-72
 for the full scope of everything shipped in this rebrand + motion pass + redesign effort.
 
+**Step 73 then swapped the accent/surface palette again**, this time to a crow-inspired
+obsidian/slate/violet scheme replacing step 62's Twilight Blue, per the user's explicit hex values.
+Single-file change (`globals.css`), but caught and fixed a real dark-mode contrast bug along the
+way: `Button`'s `primary`/`destructive` text was using a theme-flipping token that went muddy
+against the new medium-brightness violet accent — now a literal `text-white`, confirmed crisp in
+both themes. See step 73 for the full ramp and the contrast math.
+
 The one recurring (not one-time) item worth keeping an eye on regardless: Storage usage against
 the 1GB free-tier cap as real data accumulates (step 56 added a `maxSizeMB` cap to
 `PageEditor.tsx`'s image compression, but it's still worth periodic monitoring, not a one-time
@@ -2294,3 +2301,48 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
     confirmed the new `destructive` variant on a real vault-reset page renders unchanged from
     before. Zero console errors across the entire flow. This closes out the full 3-phase visual/
     layout redesign started in step 70.
+
+73. **Crow-inspired 60-30-10 palette swap.** ✅ _done_. User asked whether the app follows the
+    60-30-10 color-distribution rule (qualitatively yes — `paper-*` dominant ~60%, `ink-*`
+    secondary ~30%, `accent-*` sparing ~10%, confirmed by counting `accent-500`/`accent-600` usage:
+    19 occurrences across 11 files, always for buttons/links/focus rings/active states, never
+    backgrounds or body text) then supplied a new palette to implement it with: deep obsidian/dark
+    slate dominant, ash-gray/charcoal secondary, iridescent violet accent — replacing the Twilight
+    Blue from step 62. Confirmed via `tailwind.config.cjs`'s own comment that this is a
+    single-file change: every `bg-paper-50`/`text-ink-800`/`border-accent-500` class across the
+    whole app resolves through a CSS custom property defined once in `globals.css`, so no component
+    files needed touching (same reason the original rebrand's gold→blue accent iterations only ever
+    touched that one file).
+
+    The user supplied 3 anchor colors per mode; the token system needs 4 `paper-*` + 6 `ink-*` + 2
+    `accent-*` shades per mode, so the rest of each ramp was interpolated to stay monotonic,
+    consistent with how the existing ramps were built. One real design call, confirmed with the
+    user: their second light-mode accent option (Sharp Raven Black `#0F172A`) reads as an ink shade
+    rather than an accent (too dark/low-saturation to visually "pop"), so it became the new
+    light-mode `ink-900` instead, and Deep Crow Violet `#6D28D9` (their first option) became the
+    actual accent. `apps/web/app/icon.tsx`'s hardcoded favicon colors (can't use CSS vars,
+    `ImageResponse` renders standalone) updated to match; `global-error.tsx`'s hardcoded fallback
+    colors deliberately left alone — independent of `globals.css`/theme by design, since either
+    could be what crashed.
+
+    **Real issue caught during verification, not just eyeballed**: dark mode's button text
+    (`text-paper-50`, designed to auto-flip to whichever extreme contrasts with the fill) went
+    muddy against the new Electric Violet `#8B5CF6` — computed via the WCAG relative-luminance
+    formula at ~4.3:1 against near-black text, just under the 4.5:1 AA threshold for normal text
+    (though comfortably above the 3:1 UI-component minimum). Root cause: the auto-flip trick only
+    gives strong contrast when the fill sits at a brightness *extreme* per theme, which held for
+    the old ink-800-filled buttons and the old pastel dark-mode blue accent, but breaks for a
+    punchy medium-brightness violet. Raised to the user with the actual numbers rather than
+    silently shipping it or silently "fixing" it by deviating from their exact given hex; they
+    chose keeping `#8B5CF6` exactly as specified and switching `Button`'s `primary`/`destructive`
+    variants (plus `not-found.tsx`'s `<Link>`, the one CTA that stayed outside the `Button`
+    component) from the auto-flipping token to a literal `text-white` — the better of the two
+    options, and unambiguously good in light mode where the accent is dark enough that white was
+    never in question.
+
+    Verified: `pnpm check-types`/`lint`/`build` all clean. Signed in via the same magic-link/Mailpit
+    flow as steps 68-72, checked both themes: the login page, a signed-in workspace (sidebar,
+    "Create" button), vault setup (`VaultUnlockPanel.tsx`), and `CredentialDetail.tsx`'s type-
+    selector pills and Save button (the highest concentration of `accent-500` fills on one screen)
+    — confirmed crisp white-on-violet in both themes after the text-color fix, versus the muddy
+    near-black text the pre-fix screenshot showed in dark mode. Zero console errors throughout.
