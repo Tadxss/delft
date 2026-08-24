@@ -357,7 +357,11 @@ export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
           </p>
         )}
         {isLoading ? (
-          <p className="px-1 text-sm text-ink-400">Loading…</p>
+          <div className="flex flex-col gap-1 px-1 py-1">
+            <div className="h-5 w-3/4 animate-pulse rounded bg-paper-200" />
+            <div className="h-5 w-1/2 animate-pulse rounded bg-paper-200" />
+            <div className="h-5 w-2/3 animate-pulse rounded bg-paper-200" />
+          </div>
         ) : pagesError ? (
           <p className="px-1 text-sm text-red-700">
             Couldn&apos;t load pages: {pagesErrorObj.message}
@@ -415,7 +419,10 @@ export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
         </button>
       </div>
       {canvasesLoading ? (
-        <p className="px-1 text-sm text-ink-400">Loading…</p>
+        <div className="flex flex-col gap-1 px-1 py-1">
+          <div className="h-5 w-2/3 animate-pulse rounded bg-paper-200" />
+          <div className="h-5 w-1/2 animate-pulse rounded bg-paper-200" />
+        </div>
       ) : canvasesError ? (
         <p className="px-1 text-sm text-red-700">
           Couldn&apos;t load canvases: {canvasesErrorObj.message}

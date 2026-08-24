@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { LazyMotion, domAnimation } from "motion/react";
 import {
   createSupabaseClient,
   SupabaseProvider,
@@ -56,13 +57,21 @@ export function Providers({ children }: { children: ReactNode }) {
 
   if (!supabase) {
     return (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      <QueryClientProvider client={queryClient}>
+        <LazyMotion features={domAnimation} strict>
+          {children}
+        </LazyMotion>
+      </QueryClientProvider>
     );
   }
 
   return (
     <QueryClientProvider client={queryClient}>
-      <SupabaseProvider client={supabase}>{children}</SupabaseProvider>
+      <SupabaseProvider client={supabase}>
+        <LazyMotion features={domAnimation} strict>
+          {children}
+        </LazyMotion>
+      </SupabaseProvider>
     </QueryClientProvider>
   );
 }
