@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Check, Copy } from "lucide-react";
+import { Button } from "../../../../_components/Button";
 
 // Shown exactly once, right after a recovery key is generated (fresh vault setup, or a legacy
 // vault's one-time migration) — this is the only moment the plaintext recovery key ever exists
@@ -59,14 +60,13 @@ export function RecoveryKeyDisplay({
           />
           I&apos;ve saved this recovery key somewhere safe.
         </label>
-        <button
-          type="button"
+        <Button
           disabled={!saved || continuing}
           onClick={onContinue}
-          className="mt-3 w-full rounded-md bg-accent-500 px-3 py-2 text-sm font-medium text-paper-50 transition-colors hover:bg-accent-600 disabled:opacity-60"
+          className="mt-3 w-full"
         >
           {continuing ? "Saving…" : "Continue"}
-        </button>
+        </Button>
       </div>
     </div>
   );

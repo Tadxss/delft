@@ -9,7 +9,10 @@ import {
   useDeleteWorkspace,
   useWorkspaces,
 } from "@crowscribe/shared";
+import { Button } from "../_components/Button";
+import { FormLabel } from "../_components/FormLabel";
 import { Heading } from "../_components/Heading";
+import { Input } from "../_components/Input";
 
 export default function WorkspaceSwitcherPage() {
   const router = useRouter();
@@ -100,28 +103,19 @@ export default function WorkspaceSwitcherPage() {
         onSubmit={handleCreate}
         className="flex flex-col gap-2 border-t border-paper-200 pt-6"
       >
-        <label
-          htmlFor="workspace-name"
-          className="text-xs font-medium uppercase tracking-wide text-ink-500"
-        >
-          New workspace
-        </label>
+        <FormLabel htmlFor="workspace-name">New workspace</FormLabel>
         <div className="flex gap-2">
-          <input
+          <Input
             id="workspace-name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. Personal"
             maxLength={200}
-            className="flex-1 rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
+            className="flex-1"
           />
-          <button
-            type="submit"
-            disabled={createWorkspace.isPending}
-            className="rounded-md bg-accent-500 px-4 py-2 text-sm font-medium text-paper-50 hover:bg-accent-600 disabled:opacity-60"
-          >
+          <Button type="submit" disabled={createWorkspace.isPending}>
             Create
-          </button>
+          </Button>
         </div>
         {createWorkspace.isError && (
           <p className="text-xs text-red-700">

@@ -3,6 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { Workspace } from "@crowscribe/types";
+import { Button } from "../../../../_components/Button";
+import { Input } from "../../../../_components/Input";
 import {
   buildWorkspaceHref,
   deriveRecoveryKeyMaterial,
@@ -138,7 +140,7 @@ export function ForgotPassphrasePanel({
             onSubmit={handleNewPassphraseSubmit}
             className="mt-4 flex flex-col gap-3"
           >
-            <input
+            <Input
               type="password"
               required
               minLength={MIN_PASSPHRASE_LENGTH}
@@ -146,9 +148,8 @@ export function ForgotPassphrasePanel({
               placeholder="New vault passphrase"
               value={newPassphrase}
               onChange={(e) => setNewPassphrase(e.target.value)}
-              className="rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
             />
-            <input
+            <Input
               type="password"
               required
               minLength={MIN_PASSPHRASE_LENGTH}
@@ -156,15 +157,10 @@ export function ForgotPassphrasePanel({
               placeholder="Confirm new passphrase"
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
-              className="rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
             />
-            <button
-              type="submit"
-              disabled={busy}
-              className="mt-1 rounded-md bg-accent-500 px-3 py-2 text-sm font-medium text-paper-50 transition-colors hover:bg-accent-600 disabled:opacity-60"
-            >
+            <Button type="submit" disabled={busy} className="mt-1">
               {busy ? "Saving…" : "Set new passphrase"}
-            </button>
+            </Button>
             {mismatch && (
               <p className="text-xs text-red-700">
                 Passphrases don&apos;t match.
@@ -190,7 +186,7 @@ export function ForgotPassphrasePanel({
           onSubmit={handleRecoveryKeySubmit}
           className="mt-4 flex flex-col gap-3"
         >
-          <input
+          <Input
             type="text"
             required
             autoComplete="off"
@@ -199,15 +195,11 @@ export function ForgotPassphrasePanel({
             placeholder="XXXXX-XXXXX-XXXXX-…"
             value={recoveryKeyInput}
             onChange={(e) => setRecoveryKeyInput(e.target.value)}
-            className="rounded-md border border-paper-200 bg-paper-50 px-3 py-2 font-mono text-sm text-ink-800 outline-none focus:border-accent-500"
+            className="font-mono"
           />
-          <button
-            type="submit"
-            disabled={busy}
-            className="rounded-md bg-accent-500 px-3 py-2 text-sm font-medium text-paper-50 transition-colors hover:bg-accent-600 disabled:opacity-60"
-          >
+          <Button type="submit" disabled={busy}>
             {busy ? "Checking…" : "Continue"}
-          </button>
+          </Button>
           {error && (
             <div className="text-xs text-red-700">
               <p>{error}</p>

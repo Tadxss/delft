@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import * as Sentry from "@sentry/nextjs";
+import { Button } from "../_components/Button";
 import { Heading } from "../_components/Heading";
 
 // Scoped to app/workspace/ (rather than relying on the root error.tsx alone) since this is where
@@ -26,13 +27,7 @@ export default function WorkspaceError({
       <p className="max-w-sm text-sm text-ink-500">
         We hit an unexpected problem. Try again, or come back in a moment.
       </p>
-      <button
-        type="button"
-        onClick={reset}
-        className="rounded-md bg-accent-500 px-4 py-2 text-sm font-medium text-paper-50 hover:bg-accent-600"
-      >
-        Try again
-      </button>
+      <Button onClick={reset}>Try again</Button>
     </div>
   );
 }

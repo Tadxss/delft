@@ -8,6 +8,7 @@ import {
   useRequestVaultReset,
   useWorkspace,
 } from "@crowscribe/shared";
+import { Button } from "../../../_components/Button";
 import { Heading } from "../../../_components/Heading";
 
 // Last resort: reachable only from ForgotPassphrasePanel's "Lost your recovery key too?" link,
@@ -61,16 +62,16 @@ export default function VaultResetRequestPage() {
         </p>
       ) : (
         <>
-          <button
-            type="button"
+          <Button
+            variant="destructive"
             onClick={handleRequest}
             disabled={requestReset.isPending}
-            className="mt-4 rounded-md bg-red-700 px-3 py-2 text-sm font-medium text-paper-50 transition-colors hover:bg-red-800 disabled:opacity-60"
+            className="mt-4"
           >
             {requestReset.isPending
               ? "Sending…"
               : "Email me a reset confirmation link"}
-          </button>
+          </Button>
           {error && <p className="mt-2 text-xs text-red-700">{error}</p>}
         </>
       )}
