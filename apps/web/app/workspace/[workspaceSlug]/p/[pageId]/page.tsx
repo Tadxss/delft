@@ -3,8 +3,8 @@
 import { useParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useQueryClient } from "@tanstack/react-query";
-import type { PageSummary } from "@delft/types";
-import { parseWorkspaceSlug, usePage } from "@delft/shared";
+import type { PageSummary } from "@crowscribe/types";
+import { parseWorkspaceSlug, usePage } from "@crowscribe/shared";
 import { PageEditorLoading } from "./_components/PageEditorLoading";
 import { PageShell } from "./_components/PageShell";
 

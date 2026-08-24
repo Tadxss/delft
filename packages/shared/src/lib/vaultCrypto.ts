@@ -1,4 +1,4 @@
-import type { CredentialSecret } from "@delft/types";
+import type { CredentialSecret } from "@crowscribe/types";
 
 // All Credentials Manager crypto lives here: PBKDF2 key derivation, AES-GCM encrypt/decrypt of a
 // credential's {username, password, notes} payload, and a password generator. The derived key is

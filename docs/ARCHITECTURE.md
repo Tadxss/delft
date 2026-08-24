@@ -65,9 +65,10 @@ step's empty-state copy deferral (nest/canvas/vault metaphor language), narrowly
 "Workspace" label and "Publish" wording were deliberately left alone. Step 64 then renamed the
 Vercel project and moved the live URL to `https://crowscribe.vercel.app` (`https://delft.vercel.app`
 still works too, kept as a legacy alias), and step 65 closed out the Supabase Auth dashboard config
-and the Supabase project's display-name rename, both done by the user. Still open: domain
-registration ("soon to do"), the `@delft/*` workspace package scopes, and a custom logo/icon (still
-a text-monogram favicon). See steps 62-65 for the full scope and what's still deferred.
+and the Supabase project's display-name rename, both done by the user. Step 66 then renamed the
+`@delft/*` workspace package scopes to `@crowscribe/*`. Still open: domain registration ("soon to
+do") and a custom logo/icon (still a text-monogram favicon). See steps 62-66 for the full scope and
+what's still deferred.
 
 The one recurring (not one-time) item worth keeping an eye on regardless: Storage usage against
 the 1GB free-tier cap as real data accumulates (step 56 added a `maxSizeMB` cap to
@@ -2009,3 +2010,27 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
 
     Still open: domain registration ("soon to do," per the user — still needs their payment/account
     access), the `@delft/*` workspace package scopes, and a custom logo/icon.
+
+66. **Renamed the `@delft/*` workspace package scopes to `@crowscribe/*`.** ✅ _done_. Last open
+    code item from the rebrand's follow-up list — a uniform, unambiguous rename (no design
+    decisions), so done as a scripted find-replace of the literal string `@delft/` → `@crowscribe/`
+    across the 64 non-generated files that referenced it (excluding `pnpm-lock.yaml`, regenerated
+    via `pnpm install` afterward rather than hand-edited, and `.next/` build cache output), spot-
+    checked rather than reviewed file-by-file given the volume and uniformity.
+
+    Touched all 4 internal packages' `package.json` `name` fields and their `workspace:*` cross-
+    references (`packages/shared`, `packages/types`, `packages/eslint-config`,
+    `packages/typescript-config`), `apps/web/package.json`'s 4 corresponding dependency entries,
+    every source import across `packages/shared/src/**` and most of `apps/web/app/**`, the
+    `eslint.config.js`/`tsconfig.json` extends paths in `apps/web`, `packages/shared`, and
+    `packages/types`, and `apps/web/next.config.js`'s `transpilePackages` list. `CLAUDE.md`'s
+    architecture-description prose and this file's Next Up "Still open" line updated to match;
+    every historical Build Order mention of `@delft/*` being deferred (steps 62, 64, 65) is left
+    untouched, per this section's own don't-edit-old-entries rule.
+
+    Verified: `pnpm install` (regenerated `pnpm-lock.yaml` cleanly), then
+    `pnpm check-types`/`lint`/`build` all clean from the repo root — the real test for a rename like
+    this, since a missed import or stale `extends` path surfaces as a resolution error in one of
+    those. Grepped for residual `@delft/` afterward — zero matches outside the historical Build
+    Order lines called out above. `pnpm dev` smoke-check not yet run by either of us — worth doing
+    before treating this as fully verified end-to-end.

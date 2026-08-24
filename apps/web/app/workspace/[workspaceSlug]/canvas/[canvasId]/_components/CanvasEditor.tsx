@@ -4,8 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
-import type { Canvas } from "@delft/types";
-import { useDeleteCanvas, useUpdateCanvas } from "@delft/shared";
+import type { Canvas } from "@crowscribe/types";
+import { useDeleteCanvas, useUpdateCanvas } from "@crowscribe/shared";
 import "@excalidraw/excalidraw/index.css";
 
 const AUTOSAVE_DEBOUNCE_MS = 800;

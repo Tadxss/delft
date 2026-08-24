@@ -18,7 +18,7 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { ChevronsLeft, Plus } from "lucide-react";
-import type { CanvasSummary, PageSummary } from "@delft/types";
+import type { CanvasSummary, PageSummary } from "@crowscribe/types";
 import {
   canvasQueryOptions,
   useCreateCanvas,
@@ -32,7 +32,7 @@ import {
   computeSubtreeIds,
   computeAppendPosition,
   computeReorderPosition,
-} from "@delft/shared";
+} from "@crowscribe/shared";
 import { PageTreeNode } from "./PageTreeNode";
 import { ReorderStrip } from "./ReorderStrip";
 import { offsetDragOverlay } from "./dragOverlayOffset";

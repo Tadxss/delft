@@ -1,6 +1,6 @@
 import { cache } from "react";
 import { createClient } from "@supabase/supabase-js";
-import type { Database } from "@delft/types";
+import type { Database } from "@crowscribe/types";
 
 // A plain anon-key client, no session/storage adapter — this route is intentionally public and
 // unauthenticated. It only ever reaches rows the pages_select_published_anon RLS policy (see

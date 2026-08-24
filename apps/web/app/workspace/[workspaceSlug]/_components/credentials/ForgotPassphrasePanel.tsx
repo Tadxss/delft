@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import type { Workspace } from "@delft/types";
+import type { Workspace } from "@crowscribe/types";
 import {
   buildWorkspaceHref,
   deriveRecoveryKeyMaterial,
@@ -12,7 +12,7 @@ import {
   useRotateVaultPassphrase,
   useVaultKey,
   wrapVaultMasterKey,
-} from "@delft/shared";
+} from "@crowscribe/shared";
 
 const MIN_PASSPHRASE_LENGTH = 8;
 

@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@delft/types";
+import type { Database } from "@crowscribe/types";
 import type { SupabaseStorageAdapter } from "./storage";
 
 export interface CreateSupabaseClientOptions {

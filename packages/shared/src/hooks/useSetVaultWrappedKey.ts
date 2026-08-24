@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Workspace } from "@delft/types";
+import type { Workspace } from "@crowscribe/types";
 import { useSupabaseClient } from "../supabase/context";
 import { mapWorkspaceRow } from "../supabase/mappers";
 

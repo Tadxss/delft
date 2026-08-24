@@ -2,8 +2,8 @@
 
 import { useParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import type { CanvasSummary } from "@delft/types";
-import { parseWorkspaceSlug, useCanvas } from "@delft/shared";
+import type { CanvasSummary } from "@crowscribe/types";
+import { parseWorkspaceSlug, useCanvas } from "@crowscribe/shared";
 import { CanvasEditor } from "./_components/CanvasEditor";
 import { CanvasShell } from "./_components/CanvasShell";
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Credential, Workspace } from "@delft/types";
+import type { Credential, Workspace } from "@crowscribe/types";
 import {
   decryptSecret,
   deriveVaultKey,
@@ -13,7 +13,7 @@ import {
   useSetVaultWrappedKey,
   useVaultKey,
   wrapVaultMasterKey,
-} from "@delft/shared";
+} from "@crowscribe/shared";
 import { ForgotPassphrasePanel } from "./ForgotPassphrasePanel";
 import { RecoveryKeyDisplay } from "./RecoveryKeyDisplay";
 import { VaultMigrationPanel } from "./VaultMigrationPanel";

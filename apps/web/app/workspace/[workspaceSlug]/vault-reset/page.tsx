@@ -7,7 +7,7 @@ import {
   useAuthUser,
   useRequestVaultReset,
   useWorkspace,
-} from "@delft/shared";
+} from "@crowscribe/shared";
 
 // Last resort: reachable only from ForgotPassphrasePanel's "Lost your recovery key too?" link,
 // meaning both the passphrase and the recovery key are gone. A real route rather than modal state

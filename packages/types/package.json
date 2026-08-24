@@ -1,5 +1,5 @@
 {
-  "name": "@delft/types",
+  "name": "@crowscribe/types",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -13,8 +13,8 @@
     "check-types": "tsc --noEmit"
   },
   "devDependencies": {
-    "@delft/eslint-config": "workspace:*",
-    "@delft/typescript-config": "workspace:*",
+    "@crowscribe/eslint-config": "workspace:*",
+    "@crowscribe/typescript-config": "workspace:*",
     "eslint": "^9.39.1",
     "typescript": "^5.9.2"
   }

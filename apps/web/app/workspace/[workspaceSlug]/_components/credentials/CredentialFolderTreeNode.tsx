@@ -11,7 +11,7 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import type { Credential, CredentialFolder } from "@delft/types";
+import type { Credential, CredentialFolder } from "@crowscribe/types";
 import { ReorderStrip } from "../ReorderStrip";
 import { credentialTypeOption } from "./credentialTypeOptions";
 

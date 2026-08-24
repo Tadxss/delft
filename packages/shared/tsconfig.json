@@ -1,5 +1,5 @@
 {
-  "extends": "@delft/typescript-config/react-library.json",
+  "extends": "@crowscribe/typescript-config/react-library.json",
   "compilerOptions": {
     "outDir": "dist",
     "module": "ESNext",

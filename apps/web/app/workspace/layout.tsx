@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { KeyRound, Settings } from "lucide-react";
-import { parseWorkspaceSlug, VaultKeyProvider } from "@delft/shared";
+import { parseWorkspaceSlug, VaultKeyProvider } from "@crowscribe/shared";
 import { AccountModal } from "../_components/AccountModal";
 import { AuthGate } from "../_components/AuthGate";
 import { ThemeToggle } from "../_components/ThemeToggle";

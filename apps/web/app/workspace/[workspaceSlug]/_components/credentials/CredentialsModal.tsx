@@ -7,7 +7,7 @@ import {
   useCredentials,
   useVaultKey,
   useWorkspace,
-} from "@delft/shared";
+} from "@crowscribe/shared";
 import { Modal } from "../../../../_components/Modal";
 import { VaultUnlockPanel } from "./VaultUnlockPanel";
 import { CredentialList } from "./CredentialList";

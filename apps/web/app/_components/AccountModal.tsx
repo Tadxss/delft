@@ -11,7 +11,7 @@ import {
   useSignOut,
   useUploadAvatar,
   useUpsertProfile,
-} from "@delft/shared";
+} from "@crowscribe/shared";
 import { OCCUPATIONS } from "../_lib/occupations";
 import { Modal } from "./Modal";
 

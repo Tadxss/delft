@@ -6,14 +6,14 @@ import { useParams, useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { ChevronDown, ChevronRight, MoreHorizontal, Plus } from "lucide-react";
-import type { PageSummary } from "@delft/types";
+import type { PageSummary } from "@crowscribe/types";
 import {
   pageQueryOptions,
   parseWorkspaceSlug,
   useDeletePage,
   useSupabaseClient,
   useUpdatePage,
-} from "@delft/shared";
+} from "@crowscribe/shared";
 import { ReorderStrip } from "./ReorderStrip";
 
 export interface PageTreeNodeProps {

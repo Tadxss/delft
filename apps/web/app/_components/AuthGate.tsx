@@ -2,7 +2,7 @@
 
 import { useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { useAuthUser } from "@delft/shared";
+import { useAuthUser } from "@crowscribe/shared";
 
 // Every authenticated-only route (app/workspace/) uses this. CrowScribe's auth is fully
 // client-side (session lives in localStorage via the SupabaseStorageAdapter in app/providers.tsx,

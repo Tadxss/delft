@@ -1,6 +1,6 @@
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Canvas, Database } from "@delft/types";
+import type { Canvas, Database } from "@crowscribe/types";
 import { useSupabaseClient } from "../supabase/context";
 import { mapCanvasRow } from "../supabase/mappers";
 import { STALE_TIME_ACTIVE_ITEM } from "../queryConfig";

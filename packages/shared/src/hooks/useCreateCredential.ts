@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Credential, CredentialType } from "@delft/types";
+import type { Credential, CredentialType } from "@crowscribe/types";
 import { useSupabaseClient } from "../supabase/context";
 import { mapCredentialRow } from "../supabase/mappers";
 

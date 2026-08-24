@@ -1,4 +1,4 @@
-import type { Database } from "@delft/types";
+import type { Database } from "@crowscribe/types";
 import type {
   Canvas,
   CanvasSummary,
@@ -10,7 +10,7 @@ import type {
   Profile,
   Workspace,
   WorkspaceMember,
-} from "@delft/types";
+} from "@crowscribe/types";
 
 type WorkspaceRow = Database["public"]["Tables"]["workspaces"]["Row"];
 type WorkspaceMemberRow =

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Credential } from "@delft/types";
+import type { Credential } from "@crowscribe/types";
 import {
   decryptSecret,
   encryptSecret,
@@ -11,7 +11,7 @@ import {
   useMigrateVaultToWrappedKey,
   useVaultKey,
   wrapVaultMasterKey,
-} from "@delft/shared";
+} from "@crowscribe/shared";
 import { RecoveryKeyDisplay } from "./RecoveryKeyDisplay";
 
 interface PreparedMigration {
