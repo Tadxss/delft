@@ -1,4 +1,5 @@
-import type { Modifier } from "@dnd-kit/core";
+import type { DropAnimation, Modifier } from "@dnd-kit/core";
+import { defaultDropAnimationSideEffects } from "@dnd-kit/core";
 
 // Shifts the DragOverlay ghost away from the actual cursor position. Without this, the ghost tracks
 // the pointer 1:1 and sits directly on top of whatever row/strip is under it — exactly the thing a
@@ -12,3 +13,14 @@ export const offsetDragOverlay: Modifier = ({ transform }) => ({
   x: transform.x + 16,
   y: transform.y + 28,
 });
+
+// Shared `<DragOverlay dropAnimation={...}>` config, snappier than dnd-kit's default (250ms
+// "ease") — every overlay in this app is a small pill/row, not a large element, so a shorter,
+// more decisive settle reads better than the default's slightly floaty timing.
+export const dragOverlayDropAnimation: DropAnimation = {
+  duration: 180,
+  easing: "cubic-bezier(0.2, 0, 0, 1)",
+  sideEffects: defaultDropAnimationSideEffects({
+    styles: { active: { opacity: "0.4" } },
+  }),
+};

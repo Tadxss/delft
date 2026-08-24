@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
+import { m } from "motion/react";
 import { ChevronDown, ChevronRight, MoreHorizontal, Plus } from "lucide-react";
 import type { PageSummary } from "@crowscribe/types";
 import {
@@ -149,11 +150,11 @@ function PageTreeNodeImpl({
   }
 
   return (
-    <li>
+    <m.li layout="position" transition={{ duration: 0.2 }}>
       <div
         ref={setRowRef}
         {...listeners}
-        className={`group flex items-center gap-1 rounded-md px-1 py-1 text-sm hover:bg-paper-100 ${
+        className={`group flex items-center gap-1 rounded-md px-1 py-1 text-sm transition-all hover:bg-paper-100 ${
           isActive ? "bg-paper-100 font-medium text-ink-800" : "text-ink-600"
         } ${isDragging ? "opacity-40" : ""} ${
           isValidDropTarget
@@ -275,7 +276,7 @@ function PageTreeNodeImpl({
           />
         </ul>
       )}
-    </li>
+    </m.li>
   );
 }
 

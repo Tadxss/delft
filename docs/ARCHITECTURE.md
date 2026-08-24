@@ -70,16 +70,16 @@ and the Supabase project's display-name rename, both done by the user. Step 66 t
 text-monogram favicon) and domain registration, deliberately parked as the project's final touch
 rather than something to do now.
 
-**A separate UI/UX + animation pass started as step 67**, Phase 1 (foundation) only: added `motion`
-as a dependency, gave the modal a real open/close animation (it previously had no exit animation at
-all), a single global hover/press transition rule replacing the ad hoc mix that existed before, a
-theme-toggle icon crossfade, and skeleton loading states everywhere that was still static "Loading…"
-text. Two more phases are planned but not started: panel/sidebar transitions (the collapse/expand
-and mobile drawer are still hard instant swaps) and drag-and-drop feel (row hover states and
-post-drop reordering are still instant, no animation). A separate, later initiative — broader
-visual/layout redesign (spacing, typography, information density) — was explicitly scoped out of
-all of this; it's design work, not animation. See steps 62-67 for the full scope and what's still
-deferred.
+**A UI/UX + animation pass ran across steps 67-69 and is now complete.** Step 67 (Phase 1,
+foundation) added `motion`, a real modal open/close animation (previously no exit animation at
+all), a single global hover/press transition rule, a theme-toggle crossfade, and loading skeletons.
+Step 68 (Phase 2) animated the sidebar's desktop collapse/expand and mobile drawer, previously both
+hard instant swaps. **Step 69 (Phase 3, final) animated drag-and-drop feel**: row hover/drag
+states, `DragOverlay` drop-settle tuning, and — the real gap — rows now animate to their new
+position after a reorder instead of jumping instantly. A separate, later initiative — broader
+visual/layout redesign (spacing, typography, information density) — remains explicitly out of
+scope; it's design work, not animation, and hasn't been started. See steps 62-69 for the full scope
+of everything shipped and what's still deferred.
 
 The one recurring (not one-time) item worth keeping an eye on regardless: Storage usage against
 the 1GB free-tier cap as real data accumulates (step 56 added a `maxSizeMB` cap to
@@ -2095,3 +2095,62 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
     live behind auth, not reachable from the logged-out page checked) — worth a real click-through
     once signed in before calling this fully confirmed. `pnpm analyze` bundle-size check (flagged
     in the plan) not run this session either.
+
+68. **UI motion pass, Phase 2 (sidebar collapse/expand + mobile drawer).** ✅ _done_, real
+    click-through verified this time (Phase 1's gap — both its animations lived behind auth and
+    weren't checked signed-in — closed here). Same `m`/`AnimatePresence` pattern from Phase 1,
+    applied to `SidebarShell.tsx`'s two remaining hard instant swaps: desktop collapse/expand
+    (`w-10` rail ↔ `w-64` full sidebar, previously a dead-instant conditional swap) now animates
+    `width` on an outer `m.div` (40px ↔ 256px, 180ms `easeInOut`) with the rail/full-sidebar content
+    cross-fading via `AnimatePresence mode="wait"` inside it; the mobile drawer (previously a plain
+    `{mobileOpen && <div>}` mount/unmount) now fades its backdrop and slides its panel in from the
+    left (`x: "-100%"` → `0`, 200ms `easeOut`) via `AnimatePresence` wrapping the whole block.
+    `collapsed`/`mobileOpen` state, `localStorage` persistence, and the pathname-triggered
+    auto-close effect were untouched — animation-layer-only change.
+
+    Verified: `pnpm check-types`/`lint`/`build` all clean. Signed in for real via the same
+    magic-link flow the e2e suite uses (typed an email, "Email me a sign-in link instead", pulled
+    the link from local Mailpit, navigated to it directly — `127.0.0.1`, not `localhost`, matching
+    `next.config.js`'s `allowedDevOrigins` gotcha), created a workspace, then drove the actual UI
+    via Playwright MCP: collapse/expand toggled cleanly (screenshotted both states — full sidebar
+    to bare rail and back, no layout jump), and resizing to a `390×844` mobile viewport then
+    opening the drawer confirmed the backdrop dims the page and the panel slides in over it, not a
+    hard pop. Zero console errors across the whole session.
+
+69. **UI motion pass, Phase 3 (drag-and-drop feel) — final phase, motion pass now complete.** ✅
+    _done_, real drag-and-drop verified via Playwright's raw `page.mouse` API (the MCP `browser_drag`
+    tool's generic drag helper couldn't reliably trigger `@dnd-kit/core`'s custom pointer-sensor
+    activation — replicated this repo's own `apps/web/e2e/helpers.ts` `dragElementOnto` pattern
+    instead: `mouse.move` → `down` → a real hold → `move` with 20 intermediate steps → `up`, since
+    dnd-kit needs genuine incremental pointer movement past its activation threshold, not a
+    teleport).
+
+    Three changes: (1) row-level hover/drag-state transitions — `transition-colors` or
+    `transition-all` (the latter where a row toggles a `ring-*` class, since Tailwind's `ring`
+    utilities are `box-shadow`-based and `transition-colors` doesn't cover that) added to
+    `PageTreeNode.tsx`, `CredentialFolderTreeNode.tsx`, `CredentialLeafRow`, `RootDropStrip`
+    (`CredentialList.tsx`), and `PagesRootDropZone` (`Sidebar.tsx`) — all previously instant class
+    swaps, now matching `ReorderStrip`'s existing convention. (2) `DragOverlay` drop-settle tuning —
+    a shared `dragOverlayDropAnimation` config (180ms, custom easing) added to `dragOverlayOffset.ts`
+    alongside the existing offset modifier, applied to all three `DragOverlay` instances
+    (`Sidebar.tsx` ×2, `CredentialList.tsx` ×1), plus a static `scale-105`/`shadow-xl` "lift" style
+    on the overlay content — deliberately *not* wrapped in `m.div`, since dnd-kit's `DragOverlay`
+    already applies its own transform/position internally and stacking a `motion`-driven transform
+    on top risked fighting it; tuning dnd-kit's own config was the lower-risk path. (3) Post-drop
+    reorder animation — the real gap: rows previously jumped instantly to their new position on the
+    TanStack Query invalidate/refetch. Added `layout="position"` (via `m.li` replacing the plain
+    `<li>`, `motion`'s FLIP-style auto-position-animation) to `PageTreeNode.tsx`,
+    `CredentialFolderTreeNode.tsx`, and `CredentialLeafRow`'s row elements —
+    `"position"` rather than bare `layout` deliberately, so only x/y animates, not size (avoiding
+    any squish of child content, and *not* fighting a row's own expand/collapse height change,
+    which stays instant/untouched).
+
+    Verified: `pnpm check-types`/`lint`/`build` all clean. Signed in via the same magic-link/Mailpit
+    flow used in step 68, created 3 pages, and drove two real drags via the raw-mouse approach
+    above: dragging the last page onto the strip before the first (root-level reorder, confirmed via
+    the drop-target status message and the resulting row order) and a second drag captured
+    mid-hold — the screenshot confirms the lifted/scaled `DragOverlay` ghost (correctly offset from
+    the cursor per the existing `offsetDragOverlay` modifier), the source row dimmed via its
+    existing `opacity-40`, and the target `ReorderStrip` highlighted in the accent color, all
+    together in one frame. Zero console errors across both drags. This closes out the full 3-phase
+    motion pass started in step 67.
