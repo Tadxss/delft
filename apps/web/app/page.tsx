@@ -10,6 +10,10 @@ import {
   useSignInWithMagicLink,
   useSignInWithPassword,
 } from "@crowscribe/shared";
+import { Button } from "./_components/Button";
+import { FormLabel } from "./_components/FormLabel";
+import { Heading } from "./_components/Heading";
+import { Input } from "./_components/Input";
 
 type Step = "email" | "password" | "sent";
 
@@ -169,9 +173,7 @@ export default function LoginPage() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-10 px-6">
       <div className="flex flex-col items-center gap-3 text-center">
-        <h1 className="text-4xl font-semibold tracking-tight text-ink-800">
-          CrowScribe
-        </h1>
+        <Heading>CrowScribe</Heading>
         <p className="max-w-sm text-sm text-ink-500">
           Where ideas take flight.
         </p>
@@ -217,13 +219,8 @@ export default function LoginPage() {
             </div>
 
             <form onSubmit={handleEmailSubmit} className="flex flex-col gap-3">
-              <label
-                htmlFor="identifier"
-                className="text-xs font-medium uppercase tracking-wide text-ink-500"
-              >
-                Email or username
-              </label>
-              <input
+              <FormLabel htmlFor="identifier">Email or username</FormLabel>
+              <Input
                 id="identifier"
                 type="text"
                 required
@@ -234,15 +231,13 @@ export default function LoginPage() {
                   setUsernameNotFound(false);
                 }}
                 placeholder="you@example.com"
-                className="rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
               />
-              <button
+              <Button
                 type="submit"
                 disabled={!identifierInput || emailForUsername.isPending}
-                className="rounded-md bg-accent-500 px-3 py-2 text-sm font-medium text-paper-50 transition-colors hover:bg-accent-600 disabled:opacity-60"
               >
                 {emailForUsername.isPending ? "Checking…" : "Continue"}
-              </button>
+              </Button>
               {usernameNotFound && (
                 <p className="text-xs text-red-700">
                   No account found with that username.
@@ -269,27 +264,20 @@ export default function LoginPage() {
               onSubmit={handlePasswordSubmit}
               className="flex flex-col gap-3"
             >
-              <label
-                htmlFor="password"
-                className="text-xs font-medium uppercase tracking-wide text-ink-500"
-              >
-                Password
-              </label>
-              <input
+              <FormLabel htmlFor="password">Password</FormLabel>
+              <Input
                 id="password"
                 type="password"
                 autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
               />
-              <button
+              <Button
                 type="submit"
                 disabled={signInWithPassword.isPending || !password}
-                className="rounded-md bg-accent-500 px-3 py-2 text-sm font-medium text-paper-50 transition-colors hover:bg-accent-600 disabled:opacity-60"
               >
                 {signInWithPassword.isPending ? "Signing in…" : "Continue"}
-              </button>
+              </Button>
               {signInWithPassword.isError && (
                 <p className="text-xs text-red-700">
                   {signInWithPassword.error.message}
@@ -297,16 +285,15 @@ export default function LoginPage() {
               )}
             </form>
 
-            <button
-              type="button"
+            <Button
+              variant="secondary"
               onClick={handleMagicLinkClick}
               disabled={signIn.isPending}
-              className="rounded-md border border-paper-200 px-3 py-2 text-sm text-ink-600 transition-colors hover:bg-paper-50 disabled:opacity-60"
             >
               {signIn.isPending
                 ? "Sending…"
                 : "Email me a sign-in link instead"}
-            </button>
+            </Button>
             {signIn.isError && (
               <p className="text-xs text-red-700">{signIn.error.message}</p>
             )}

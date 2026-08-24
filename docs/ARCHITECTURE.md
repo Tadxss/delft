@@ -74,12 +74,20 @@ rather than something to do now.
 foundation) added `motion`, a real modal open/close animation (previously no exit animation at
 all), a single global hover/press transition rule, a theme-toggle crossfade, and loading skeletons.
 Step 68 (Phase 2) animated the sidebar's desktop collapse/expand and mobile drawer, previously both
-hard instant swaps. **Step 69 (Phase 3, final) animated drag-and-drop feel**: row hover/drag
-states, `DragOverlay` drop-settle tuning, and — the real gap — rows now animate to their new
-position after a reorder instead of jumping instantly. A separate, later initiative — broader
-visual/layout redesign (spacing, typography, information density) — remains explicitly out of
-scope; it's design work, not animation, and hasn't been started. See steps 62-69 for the full scope
-of everything shipped and what's still deferred.
+hard instant swaps. Step 69 (Phase 3, final) animated drag-and-drop feel: row hover/drag states,
+`DragOverlay` drop-settle tuning, and — the real gap — rows now animate to their new position after
+a reorder instead of jumping instantly.
+
+**A separate visual/layout redesign (spacing, typography, shared UI primitives — not colors or
+animation, both already done) started as step 70, Phase A of a new 3-phase roadmap**: four shared
+primitives (`Button`, `Input`/`Textarea`/`Select`, `FormLabel`, `Heading`) now exist in
+`apps/web/app/_components/`, proven out on the login page and `AccountModal.tsx` — every other
+button/input call site in the app is still unmigrated (mechanical follow-up). Phase B (apply a real
+heading/title type scale, currently 5 different `<h1>` combos for the same role) and Phase C
+(standardize modal/list padding, currently two competing conventions) are scoped but not started.
+Information density (three tiers: spacious prose, medium forms, tight lists) was confirmed
+intentional-by-content-type and is explicitly not part of this redesign. See steps 62-70 for the
+full scope of everything shipped and what's still deferred.
 
 The one recurring (not one-time) item worth keeping an eye on regardless: Storage usage against
 the 1GB free-tier cap as real data accumulates (step 56 added a `maxSizeMB` cap to
@@ -2154,3 +2162,43 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
     existing `opacity-40`, and the target `ReorderStrip` highlighted in the accent color, all
     together in one frame. Zero console errors across both drags. This closes out the full 3-phase
     motion pass started in step 67.
+
+70. **Visual/layout redesign, Phase A (shared UI primitives) — first phase of a new 3-phase
+    roadmap.** ✅ _done_. An inventory pass (prompted by the user asking to scope, not yet build, a
+    "broader visual/layout redesign") found the app's real problems weren't colors (already
+    reworked) or animation (steps 67-69) but three things: inconsistent heading/title sizing (5
+    different `<h1>` combos for the same role), no shared UI primitives (the same button/input
+    className string repeated independently 15+ times), and no defined padding scale (modal bodies
+    alternate `p-4`/`p-6`, list rows alternate two conventions). Density (spacious prose vs. medium
+    forms vs. tight lists) was confirmed intentional-by-content-type and left out of scope
+    entirely. The user chose to scope the full 3-phase roadmap now but implement one phase at a
+    time, same as the motion pass.
+
+    This step is Phase A, the foundational one: four new primitives in `apps/web/app/_components/`
+    — `Button` (`primary`/`secondary`/`ghost` variants matching patterns already in use, not a
+    new visual design), `Input`/`Textarea`/`Select` (three thin wrappers sharing one
+    `FIELD_CLASSES` constant instead of each repeating the same long string), `FormLabel`, and
+    `Heading` (deliberately just one `"page"` level for now — Phase B decides the rest of the scale
+    after auditing every heading usage, not guessed at here). Migrated the two most centralized,
+    highest-traffic surfaces as proof-of-concept: the login page (`page.tsx`) and
+    `AccountModal.tsx` (including its `ProfileForm` — username/name/occupation/bio fields, the
+    select, the textarea). Every other call site (`CredentialDetail.tsx`, `CredentialsModal.tsx`,
+    `ForgotPassphrasePanel.tsx`, `VaultUnlockPanel.tsx`, sidebar/tree buttons, etc.) is unmigrated —
+    a mechanical follow-up once these primitives are proven, in the same spirit as the `@delft/*`
+    rename.
+
+    One real risk avoided: `Button`'s `ghost` variant initially got a `className="px-2"` override
+    attempt for the modal's Close button (vs. Back's default `px-1`) — dropped once realized
+    Tailwind has no `tailwind-merge` installed here, so two conflicting utility classes
+    (`px-1`/`px-2`) in one string have undefined precedence (whichever the compiler emits later in
+    the stylesheet wins, not whichever appears later in the class string) rather than the second
+    reliably overriding the first. Both buttons now share the same `ghost` padding instead — a
+    minor, intentional simplification, not a bug.
+
+    Verified: `pnpm check-types`/`lint`/`build` all clean (one real lint fix: `FormLabel`'s
+    `htmlFor` arrives via a `...props` spread, which `jsx-a11y/label-has-associated-control` can't
+    verify through a wrapper component — same category of false positive `Modal.tsx` hit earlier,
+    same fix, a scoped `eslint-disable-next-line`). Signed in via the same magic-link/Mailpit flow
+    used in steps 68-69 and screenshotted all four migrated surfaces (login page, both auth steps,
+    the Account modal's list/password/profile views) — pixel-identical to before the migration,
+    zero console errors throughout.
