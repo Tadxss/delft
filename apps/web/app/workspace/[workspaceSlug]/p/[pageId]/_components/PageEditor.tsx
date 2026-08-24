@@ -10,13 +10,13 @@ import "@blocknote/mantine/style.css";
 import imageCompression from "browser-image-compression";
 import { redoDepth, undoDepth } from "@tiptap/pm/history";
 import { Redo2, Undo2 } from "lucide-react";
-import type { Page } from "@delft/types";
+import type { Page } from "@crowscribe/types";
 import {
   usePublishPage,
   useUnpublishPage,
   useUpdatePage,
   useUploadPageImage,
-} from "@delft/shared";
+} from "@crowscribe/shared";
 import { resolveBlockNoteTheme } from "../../../../../_lib/blocknoteTheme";
 import { restrictedBlockSchema } from "../../../../../_lib/blocknoteSchema";
 

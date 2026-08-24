@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@delft/types";
+import type { Database } from "@crowscribe/types";
 
 // Storage objects aren't foreign-keyed to Postgres, so `on delete cascade` on pages/workspaces
 // never cleans up the `page-images` bucket — BETA_READINESS.md's Storage-orphaning finding. Called

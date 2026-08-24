@@ -14,7 +14,7 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { Folder, FolderPlus, Plus, Search } from "lucide-react";
-import type { Credential, CredentialFolder, CredentialType } from "@delft/types";
+import type { Credential, CredentialFolder, CredentialType } from "@crowscribe/types";
 import {
   useCreateCredentialFolder,
   useDeleteCredentialFolder,
@@ -23,7 +23,7 @@ import {
   computeSubtreeIds,
   computeAppendPosition,
   computeReorderPosition,
-} from "@delft/shared";
+} from "@crowscribe/shared";
 import {
   CredentialFolderTreeNode,
   CredentialLeafRow,

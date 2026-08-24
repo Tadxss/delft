@@ -1,5 +1,5 @@
 import { Code2, Hash, KeyRound, LogIn, type LucideIcon } from "lucide-react";
-import type { CredentialType } from "@delft/types";
+import type { CredentialType } from "@crowscribe/types";
 
 // Single source of truth for credential type → icon/label, consumed by the form's type selector
 // (CredentialDetail.tsx), the list's per-row icon (CredentialFolderTreeNode.tsx), and the list's

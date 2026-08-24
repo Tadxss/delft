@@ -40,10 +40,10 @@ importers:
       '@blocknote/react':
         specifier: ^0.54.0
         version: 0.54.0(@floating-ui/dom@1.8.0)(@types/hast@3.0.5)(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(y-prosemirror@1.3.7(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-view@1.42.2)(y-protocols@1.0.7(yjs@13.6.32))(yjs@13.6.32))(y-protocols@1.0.7(yjs@13.6.32))(yjs@13.6.32)
-      '@delft/shared':
+      '@crowscribe/shared':
         specifier: workspace:*
         version: link:../../packages/shared
-      '@delft/types':
+      '@crowscribe/types':
         specifier: workspace:*
         version: link:../../packages/types
       '@dnd-kit/core':
@@ -89,10 +89,10 @@ importers:
         specifier: 19.2.3
         version: 19.2.3(react@19.2.3)
     devDependencies:
-      '@delft/eslint-config':
+      '@crowscribe/eslint-config':
         specifier: workspace:*
         version: link:../../packages/eslint-config
-      '@delft/typescript-config':
+      '@crowscribe/typescript-config':
         specifier: workspace:*
         version: link:../../packages/typescript-config
       '@playwright/test':
@@ -164,7 +164,7 @@ importers:
 
   packages/shared:
     dependencies:
-      '@delft/types':
+      '@crowscribe/types':
         specifier: workspace:*
         version: link:../types
       '@supabase/supabase-js':
@@ -177,10 +177,10 @@ importers:
         specifier: 19.2.3
         version: 19.2.3
     devDependencies:
-      '@delft/eslint-config':
+      '@crowscribe/eslint-config':
         specifier: workspace:*
         version: link:../eslint-config
-      '@delft/typescript-config':
+      '@crowscribe/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
       '@types/react':
@@ -195,10 +195,10 @@ importers:
 
   packages/types:
     devDependencies:
-      '@delft/eslint-config':
+      '@crowscribe/eslint-config':
         specifier: workspace:*
         version: link:../eslint-config
-      '@delft/typescript-config':
+      '@crowscribe/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
       eslint:

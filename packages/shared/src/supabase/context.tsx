@@ -1,6 +1,6 @@
 import { createContext, useContext, type ReactNode } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@delft/types";
+import type { Database } from "@crowscribe/types";
 
 const SupabaseContext = createContext<SupabaseClient<Database> | null>(null);
 

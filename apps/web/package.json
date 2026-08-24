@@ -18,8 +18,8 @@
     "@blocknote/core": "^0.54.0",
     "@blocknote/mantine": "^0.54.0",
     "@blocknote/react": "^0.54.0",
-    "@delft/shared": "workspace:*",
-    "@delft/types": "workspace:*",
+    "@crowscribe/shared": "workspace:*",
+    "@crowscribe/types": "workspace:*",
     "@dnd-kit/core": "^6.3.1",
     "@excalidraw/excalidraw": "^0.18.1",
     "@sentry/nextjs": "^10.70.0",
@@ -36,8 +36,8 @@
     "react-dom": "19.2.3"
   },
   "devDependencies": {
-    "@delft/eslint-config": "workspace:*",
-    "@delft/typescript-config": "workspace:*",
+    "@crowscribe/eslint-config": "workspace:*",
+    "@crowscribe/typescript-config": "workspace:*",
     "@playwright/test": "^1.62.1",
     "@types/node": "^22.15.3",
     "@types/react": "19.2.2",

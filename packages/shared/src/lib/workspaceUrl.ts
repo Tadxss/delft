@@ -1,4 +1,4 @@
-import type { Workspace } from "@delft/types";
+import type { Workspace } from "@crowscribe/types";
 
 // Lowercase, strip anything that isn't alphanumeric to a single "-", trim leading/trailing "-".
 // Guaranteed never to contain "--" (repeated separators collapse to one), which is what makes the

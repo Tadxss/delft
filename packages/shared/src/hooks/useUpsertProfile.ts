@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Database, Profile } from "@delft/types";
+import type { Database, Profile } from "@crowscribe/types";
 import { useSupabaseClient } from "../supabase/context";
 import { mapProfileRow } from "../supabase/mappers";
 

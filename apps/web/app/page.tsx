@@ -9,7 +9,7 @@ import {
   useSignInWithGoogle,
   useSignInWithMagicLink,
   useSignInWithPassword,
-} from "@delft/shared";
+} from "@crowscribe/shared";
 
 type Step = "email" | "password" | "sent";
 

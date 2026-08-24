@@ -16,7 +16,7 @@ import type {
   CredentialFolder,
   CredentialSecret,
   CredentialType,
-} from "@delft/types";
+} from "@crowscribe/types";
 import {
   decryptSecret,
   encryptSecret,
@@ -24,7 +24,7 @@ import {
   useCreateCredential,
   useDeleteCredential,
   useUpdateCredential,
-} from "@delft/shared";
+} from "@crowscribe/shared";
 import { CREDENTIAL_TYPE_OPTIONS } from "./credentialTypeOptions";
 
 const EMPTY_SECRET: CredentialSecret = { notes: "" };

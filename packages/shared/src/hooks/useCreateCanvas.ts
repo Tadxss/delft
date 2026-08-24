@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Canvas } from "@delft/types";
+import type { Canvas } from "@crowscribe/types";
 import { useSupabaseClient } from "../supabase/context";
 import { mapCanvasRow } from "../supabase/mappers";
 

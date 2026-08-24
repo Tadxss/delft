@@ -6,7 +6,7 @@ import {
   createSupabaseClient,
   SupabaseProvider,
   type SupabaseStorageAdapter,
-} from "@delft/shared";
+} from "@crowscribe/shared";
 
 const webStorageAdapter: SupabaseStorageAdapter = {
   getItem: (key) =>

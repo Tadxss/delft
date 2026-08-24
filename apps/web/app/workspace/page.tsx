@@ -8,7 +8,7 @@ import {
   useCreateWorkspace,
   useDeleteWorkspace,
   useWorkspaces,
-} from "@delft/shared";
+} from "@crowscribe/shared";
 
 export default function WorkspaceSwitcherPage() {
   const router = useRouter();

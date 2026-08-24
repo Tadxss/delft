@@ -7,7 +7,7 @@ import {
   parseWorkspaceSlug,
   useConfirmVaultReset,
   useWorkspace,
-} from "@delft/shared";
+} from "@crowscribe/shared";
 
 // Reached by clicking the emailed link from vault-reset/page.tsx. Nested under the same AuthGate
 // as every other workspace route, so simply landing here (after the magic link (re-)establishes a

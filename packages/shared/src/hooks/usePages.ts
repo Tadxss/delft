@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import type { PageSummary } from "@delft/types";
+import type { PageSummary } from "@crowscribe/types";
 import { useSupabaseClient } from "../supabase/context";
 import { mapPageSummaryRow } from "../supabase/mappers";
 import { GC_TIME_SUMMARY_LIST, STALE_TIME_SUMMARY_LIST } from "../queryConfig";

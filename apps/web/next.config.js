@@ -2,9 +2,9 @@ import { withSentryConfig } from "@sentry/nextjs";
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // @delft/shared and @delft/types are raw TS source (no build step) — Next needs to transpile
+  // @crowscribe/shared and @crowscribe/types are raw TS source (no build step) — Next needs to transpile
   // them itself rather than treating them as pre-built node_modules.
-  transpilePackages: ["@delft/shared", "@delft/types"],
+  transpilePackages: ["@crowscribe/shared", "@crowscribe/types"],
   // Next.js 16 blocks dev-resource (HMR websocket, etc.) requests from any origin not in this
   // list, and treats "127.0.0.1" as a DIFFERENT origin from "localhost" even on the same machine.
   // Local Supabase's default redirect_to/site_url is 127.0.0.1-based (see supabase/config.toml),

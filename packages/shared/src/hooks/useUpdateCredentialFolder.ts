@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { CredentialFolder, Database } from "@delft/types";
+import type { CredentialFolder, Database } from "@crowscribe/types";
 import { useSupabaseClient } from "../supabase/context";
 import { mapCredentialFolderRow } from "../supabase/mappers";
 
