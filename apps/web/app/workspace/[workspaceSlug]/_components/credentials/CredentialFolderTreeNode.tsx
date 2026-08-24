@@ -2,6 +2,7 @@
 
 import { Fragment, memo, useCallback, type RefObject } from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
+import { m } from "motion/react";
 import {
   ChevronDown,
   ChevronRight,
@@ -38,14 +39,14 @@ export function CredentialLeafRow({
   const isSelected = selectedId === credential.id;
   const TypeIcon = credentialTypeOption(credential.type).icon;
   return (
-    <li>
+    <m.li layout="position" transition={{ duration: 0.2 }}>
       <button
         ref={setNodeRef}
         {...listeners}
         type="button"
         onClick={() => onSelect(credential.id)}
         style={{ paddingLeft: depth * 14 + 4 }}
-        className={`flex w-full items-center gap-2 border-l-2 py-1.5 pr-2 text-left text-sm ${
+        className={`flex w-full items-center gap-2 border-l-2 py-1.5 pr-2 text-left text-sm transition-colors ${
           isSelected
             ? "border-accent-500 bg-paper-100 font-medium text-ink-800"
             : "border-transparent text-ink-700 hover:bg-paper-50"
@@ -56,7 +57,7 @@ export function CredentialLeafRow({
           {credential.title || "Untitled"}
         </span>
       </button>
-    </li>
+    </m.li>
   );
 }
 
@@ -143,7 +144,7 @@ function CredentialFolderTreeNodeImpl({
   const isValidDropTarget = isOver && !excludedDropIds.has(folder.id);
 
   return (
-    <li>
+    <m.li layout="position" transition={{ duration: 0.2 }}>
       {isRenaming ? (
         <input
           ref={renameInputRef}
@@ -162,7 +163,7 @@ function CredentialFolderTreeNodeImpl({
         <div
           ref={setRowRef}
           {...listeners}
-          className={`group flex items-center gap-1 rounded-md py-1 pr-1 text-sm text-ink-700 hover:bg-paper-100 ${
+          className={`group flex items-center gap-1 rounded-md py-1 pr-1 text-sm text-ink-700 transition-all hover:bg-paper-100 ${
             isDragging ? "opacity-40" : ""
           } ${isValidDropTarget ? "bg-paper-200 ring-2 ring-inset ring-accent-500" : ""}`}
           style={{ paddingLeft: depth * 14 + 4 }}
@@ -298,7 +299,7 @@ function CredentialFolderTreeNodeImpl({
           )}
         </ul>
       )}
-    </li>
+    </m.li>
   );
 }
 

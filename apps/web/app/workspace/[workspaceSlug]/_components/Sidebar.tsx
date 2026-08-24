@@ -35,7 +35,7 @@ import {
 } from "@crowscribe/shared";
 import { PageTreeNode } from "./PageTreeNode";
 import { ReorderStrip } from "./ReorderStrip";
-import { offsetDragOverlay } from "./dragOverlayOffset";
+import { dragOverlayDropAnimation, offsetDragOverlay } from "./dragOverlayOffset";
 
 // The "Pages" section header, wrapped in its own component so useDroppable can be called on it —
 // it needs to render as a descendant of Sidebar's own <DndContext>, which a hook call directly in
@@ -45,7 +45,7 @@ function PagesRootDropZone({ children }: { children: React.ReactNode }) {
   return (
     <div
       ref={setNodeRef}
-      className={`flex items-center justify-between rounded-md px-1 ${
+      className={`flex items-center justify-between rounded-md px-1 transition-all ${
         isOver ? "bg-paper-200 ring-2 ring-inset ring-accent-500" : ""
       }`}
     >
@@ -396,9 +396,9 @@ export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
             />
           </ul>
         )}
-        <DragOverlay>
+        <DragOverlay dropAnimation={dragOverlayDropAnimation}>
           {draggingPage && (
-            <div className="rounded-md border border-paper-200 bg-paper-50 px-2 py-1 text-sm text-ink-800 shadow-lg">
+            <div className="scale-105 rounded-md border border-paper-200 bg-paper-50 px-2 py-1 text-sm text-ink-800 shadow-xl">
               {draggingPage.title || "Untitled"}
             </div>
           )}
@@ -463,9 +463,9 @@ export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
               active={draggingCanvasId !== null}
             />
           </ul>
-          <DragOverlay>
+          <DragOverlay dropAnimation={dragOverlayDropAnimation}>
             {draggingCanvas && (
-              <div className="rounded-md border border-paper-200 bg-paper-50 px-2 py-1 text-sm text-ink-800 shadow-lg">
+              <div className="scale-105 rounded-md border border-paper-200 bg-paper-50 px-2 py-1 text-sm text-ink-800 shadow-xl">
                 {draggingCanvas.title || "Untitled"}
               </div>
             )}

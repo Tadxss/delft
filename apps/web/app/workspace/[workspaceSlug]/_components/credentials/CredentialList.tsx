@@ -30,7 +30,7 @@ import {
 } from "./CredentialFolderTreeNode";
 import { CREDENTIAL_TYPE_OPTIONS, credentialTypeOption } from "./credentialTypeOptions";
 import { ReorderStrip } from "../ReorderStrip";
-import { offsetDragOverlay } from "../dragOverlayOffset";
+import { dragOverlayDropAnimation, offsetDragOverlay } from "../dragOverlayOffset";
 
 // Slim strip at the top of the tree, only visually shown while a drag is active — dropping a
 // folder here moves it to the root level. No natural section-header label to repurpose the way
@@ -52,7 +52,7 @@ function RootDropStrip({ active }: { active: boolean }) {
   return (
     <div
       ref={setNodeRef}
-      className={`mx-1 mb-1 flex h-7 shrink-0 items-center justify-center rounded-md border border-dashed text-xs ${
+      className={`mx-1 mb-1 flex h-7 shrink-0 items-center justify-center rounded-md border border-dashed text-xs transition-all ${
         active ? "opacity-100" : "pointer-events-none opacity-0"
       } ${isOver ? "border-accent-500 bg-paper-200 text-ink-800" : "border-paper-300 text-ink-400"}`}
     >
@@ -641,9 +641,9 @@ export function CredentialList({
               )}
             </ul>
           )}
-          <DragOverlay>
+          <DragOverlay dropAnimation={dragOverlayDropAnimation}>
             {draggingFolder && (
-              <div className="flex items-center gap-1.5 rounded-md border border-paper-200 bg-paper-50 px-2 py-1 text-sm text-ink-800 shadow-lg">
+              <div className="scale-105 flex items-center gap-1.5 rounded-md border border-paper-200 bg-paper-50 px-2 py-1 text-sm text-ink-800 shadow-xl">
                 <Folder size={14} className="shrink-0 text-ink-400" />
                 {draggingFolder.name || "Untitled"}
               </div>
@@ -654,7 +654,7 @@ export function CredentialList({
                   draggingCredential.type,
                 ).icon;
                 return (
-                  <div className="flex items-center gap-1.5 rounded-md border border-paper-200 bg-paper-50 px-2 py-1 text-sm text-ink-800 shadow-lg">
+                  <div className="scale-105 flex items-center gap-1.5 rounded-md border border-paper-200 bg-paper-50 px-2 py-1 text-sm text-ink-800 shadow-xl">
                     <DraggingTypeIcon
                       size={14}
                       className="shrink-0 text-ink-400"
