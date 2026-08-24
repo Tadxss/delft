@@ -577,7 +577,7 @@ export function CredentialList({
             )
           ) : isEmpty ? (
             <p className="px-3 py-1.5 text-sm text-ink-400">
-              No credentials yet.
+              Your vault is empty. Keep your treasures safe.
             </p>
           ) : (
             <ul>

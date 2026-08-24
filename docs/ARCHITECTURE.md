@@ -59,11 +59,12 @@ deliberately declined:**
   gap.
 
 **Since then: a rebrand from Delft to CrowScribe shipped as step 62** — name/metadata, hero/
-tagline, Tailwind palette, and primary CTA color, per a brand handoff doc. Deliberately incomplete:
-the `@delft/*` workspace package scopes, empty-state copy (needs a nest/treasure metaphor pass),
-domain registration, and the Vercel/Supabase project rename are all still open — the hosted app is
-still `https://delft.vercel.app` under its pre-rebrand project name. See step 62 for the full
-scope and what was explicitly deferred.
+tagline, Tailwind palette, and primary CTA color, per a brand handoff doc. Step 63 closed out that
+step's empty-state copy deferral (nest/canvas/vault metaphor language), narrowly scoped — the
+"Workspace" label and "Publish" wording were deliberately left alone. Still open: the `@delft/*`
+workspace package scopes, domain registration, the Vercel/Supabase project rename, and a custom
+logo/icon (still a text-monogram favicon) — the hosted app is still `https://delft.vercel.app`
+under its pre-rebrand project name. See steps 62-63 for the full scope and what's still deferred.
 
 The one recurring (not one-time) item worth keeping an eye on regardless: Storage usage against
 the 1GB free-tier cap as real data accumulates (step 56 added a `maxSizeMB` cap to
@@ -1935,3 +1936,28 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
     (`curl`-fetched rendered HTML for the metadata/copy round, since a Playwright MCP browser
     instance was locked by another session for parts of this work) plus direct user review/iteration
     of the live palette and accent color in-browser.
+
+63. **Closed the empty-state portion of step 62's deferral: nest/canvas/vault metaphor copy.** ✅
+    _done_. Applied narrowly per explicit user decisions rather than the brand doc's full scope —
+    the "Workspace" label and "Publish"/"Published" button wording were both deliberately left
+    untouched (established, well-understood vocabulary; not part of this pass), and the "treasure"
+    metaphor was scoped to just the credentials empty state, not the full vault/passphrase/
+    recovery-key copy surface (an exploration pass found dozens of candidate strings there — all
+    intentionally out of scope).
+
+    Three strings changed: `Sidebar.tsx`'s pages empty state ("No pages yet." →
+    "No pages yet. Time to build your nest.") and canvas empty state ("No canvases yet." →
+    "Your canvas is blank. What will you draw?", the brand doc's exact suggested line — no
+    nest/treasure/flight word here, it's a plain creative prompt), and `CredentialList.tsx`'s
+    credentials empty state ("No credentials yet." → "Your vault is empty. Keep your treasures
+    safe.").
+
+    **Real gap caught before shipping**: `apps/web/e2e/canvas.spec.ts` asserted the old
+    `"No canvases yet."` text exactly — since the new canvas copy doesn't contain that string as a
+    substring (unlike the pages case, where `getByText`'s default substring match still finds
+    "No pages yet." inside the new sentence), that assertion would have failed in CI the same way
+    step 62's tagline change broke `sign-in.spec.ts` before it was caught. Fixed proactively this
+    time, before committing rather than after a CI failure.
+
+    Verified: `pnpm check-types` clean; grepped `apps/web/e2e/` for all three old strings to confirm
+    no other stale assertion remained.
