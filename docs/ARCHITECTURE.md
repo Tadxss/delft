@@ -64,9 +64,10 @@ tagline, Tailwind palette, and primary CTA color, per a brand handoff doc. Step 
 step's empty-state copy deferral (nest/canvas/vault metaphor language), narrowly scoped — the
 "Workspace" label and "Publish" wording were deliberately left alone. Step 64 then renamed the
 Vercel project and moved the live URL to `https://crowscribe.vercel.app` (`https://delft.vercel.app`
-still works too, kept as a legacy alias). Still open: the `@delft/*` workspace package scopes,
-domain registration, the Supabase project's display-name rename, and a custom logo/icon (still a
-text-monogram favicon). See steps 62-64 for the full scope and what's still deferred.
+still works too, kept as a legacy alias), and step 65 closed out the Supabase Auth dashboard config
+and the Supabase project's display-name rename, both done by the user. Still open: domain
+registration ("soon to do"), the `@delft/*` workspace package scopes, and a custom logo/icon (still
+a text-monogram favicon). See steps 62-65 for the full scope and what's still deferred.
 
 The one recurring (not one-time) item worth keeping an eye on regardless: Storage usage against
 the 1GB free-tier cap as real data accumulates (step 56 added a `maxSizeMB` cap to
@@ -1999,3 +2000,12 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
     Still open: domain registration (needs the user's payment/account access — out of scope here
     entirely), the `@delft/*` workspace package scopes, the Supabase project's display-name rename
     (handed to the user), and a custom logo/icon.
+
+65. **Closed both items handed off in step 64.** ✅ _done_, user confirmed. The Supabase Auth
+    dashboard's Site URL/redirect allow-list now includes `https://crowscribe.vercel.app`
+    (`delft.vercel.app` still allow-listed too) — the misdirect risk step 64 flagged no longer
+    applies. The Supabase project's display name was also renamed to "crowscribe" in the dashboard.
+    Both were manual dashboard steps, done by the user directly — nothing scripted from here.
+
+    Still open: domain registration ("soon to do," per the user — still needs their payment/account
+    access), the `@delft/*` workspace package scopes, and a custom logo/icon.
