@@ -74,12 +74,29 @@ rather than something to do now.
 foundation) added `motion`, a real modal open/close animation (previously no exit animation at
 all), a single global hover/press transition rule, a theme-toggle crossfade, and loading skeletons.
 Step 68 (Phase 2) animated the sidebar's desktop collapse/expand and mobile drawer, previously both
-hard instant swaps. **Step 69 (Phase 3, final) animated drag-and-drop feel**: row hover/drag
-states, `DragOverlay` drop-settle tuning, and — the real gap — rows now animate to their new
-position after a reorder instead of jumping instantly. A separate, later initiative — broader
-visual/layout redesign (spacing, typography, information density) — remains explicitly out of
-scope; it's design work, not animation, and hasn't been started. See steps 62-69 for the full scope
-of everything shipped and what's still deferred.
+hard instant swaps. Step 69 (Phase 3, final) animated drag-and-drop feel: row hover/drag states,
+`DragOverlay` drop-settle tuning, and — the real gap — rows now animate to their new position after
+a reorder instead of jumping instantly.
+
+**A separate visual/layout redesign (spacing, typography, shared UI primitives — not colors or
+animation, both already done) ran across steps 70-72 and is now complete.** Step 70 (Phase A)
+built four shared primitives (`Button`, `Input`/`Textarea`/`Select`, `FormLabel`, `Heading`) in
+`apps/web/app/_components/`, proven out on the login page and `AccountModal.tsx`. Step 71 (Phase B)
+applied a real heading/title type scale (`brand`/`page`/`content-large`/`content-compact`), fixing
+error/not-found/vault-reset pages (the biggest jump, `text-base` for a page heading) and the share
+page's title. **Step 72 (Phase C, final) migrated every remaining exact-match button/input call
+site onto the primitives** (`CredentialDetail.tsx`'s ~15 fields, the vault-flow panels,
+`workspace/page.tsx`) and fixed the real spacing issues found along the way: a recurring
+`px-4`-vs-`px-3` primary-button split (4 files), a same-button-different-padding bug in
+`CredentialDetail.tsx`'s eye-toggle icon, and added a `destructive` `Button` variant for the
+vault-reset pages' red confirm buttons. Most raw buttons/inputs in the app are genuine one-offs
+(icon buttons, tree rows, menu items, pill toggles) and were deliberately left unmigrated — forcing
+them in would have been a visual regression or a Tailwind class-conflict risk, not a real fix.
+Modal padding (`p-6` vs `p-10`) and list-row padding (tree vs. flat) turned out to be intentional
+design differences, documented rather than changed — same reasoning applied to Phase B's
+content-title tiers. Information density (three tiers: spacious prose, medium forms, tight lists)
+was confirmed intentional-by-content-type from the start and was never in scope. See steps 62-72
+for the full scope of everything shipped in this rebrand + motion pass + redesign effort.
 
 The one recurring (not one-time) item worth keeping an eye on regardless: Storage usage against
 the 1GB free-tier cap as real data accumulates (step 56 added a `maxSizeMB` cap to
@@ -2154,3 +2171,126 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
     existing `opacity-40`, and the target `ReorderStrip` highlighted in the accent color, all
     together in one frame. Zero console errors across both drags. This closes out the full 3-phase
     motion pass started in step 67.
+
+70. **Visual/layout redesign, Phase A (shared UI primitives) — first phase of a new 3-phase
+    roadmap.** ✅ _done_. An inventory pass (prompted by the user asking to scope, not yet build, a
+    "broader visual/layout redesign") found the app's real problems weren't colors (already
+    reworked) or animation (steps 67-69) but three things: inconsistent heading/title sizing (5
+    different `<h1>` combos for the same role), no shared UI primitives (the same button/input
+    className string repeated independently 15+ times), and no defined padding scale (modal bodies
+    alternate `p-4`/`p-6`, list rows alternate two conventions). Density (spacious prose vs. medium
+    forms vs. tight lists) was confirmed intentional-by-content-type and left out of scope
+    entirely. The user chose to scope the full 3-phase roadmap now but implement one phase at a
+    time, same as the motion pass.
+
+    This step is Phase A, the foundational one: four new primitives in `apps/web/app/_components/`
+    — `Button` (`primary`/`secondary`/`ghost` variants matching patterns already in use, not a
+    new visual design), `Input`/`Textarea`/`Select` (three thin wrappers sharing one
+    `FIELD_CLASSES` constant instead of each repeating the same long string), `FormLabel`, and
+    `Heading` (deliberately just one `"page"` level for now — Phase B decides the rest of the scale
+    after auditing every heading usage, not guessed at here). Migrated the two most centralized,
+    highest-traffic surfaces as proof-of-concept: the login page (`page.tsx`) and
+    `AccountModal.tsx` (including its `ProfileForm` — username/name/occupation/bio fields, the
+    select, the textarea). Every other call site (`CredentialDetail.tsx`, `CredentialsModal.tsx`,
+    `ForgotPassphrasePanel.tsx`, `VaultUnlockPanel.tsx`, sidebar/tree buttons, etc.) is unmigrated —
+    a mechanical follow-up once these primitives are proven, in the same spirit as the `@delft/*`
+    rename.
+
+    One real risk avoided: `Button`'s `ghost` variant initially got a `className="px-2"` override
+    attempt for the modal's Close button (vs. Back's default `px-1`) — dropped once realized
+    Tailwind has no `tailwind-merge` installed here, so two conflicting utility classes
+    (`px-1`/`px-2`) in one string have undefined precedence (whichever the compiler emits later in
+    the stylesheet wins, not whichever appears later in the class string) rather than the second
+    reliably overriding the first. Both buttons now share the same `ghost` padding instead — a
+    minor, intentional simplification, not a bug.
+
+    Verified: `pnpm check-types`/`lint`/`build` all clean (one real lint fix: `FormLabel`'s
+    `htmlFor` arrives via a `...props` spread, which `jsx-a11y/label-has-associated-control` can't
+    verify through a wrapper component — same category of false positive `Modal.tsx` hit earlier,
+    same fix, a scoped `eslint-disable-next-line`). Signed in via the same magic-link/Mailpit flow
+    used in steps 68-69 and screenshotted all four migrated surfaces (login page, both auth steps,
+    the Account modal's list/password/profile views) — pixel-identical to before the migration,
+    zero console errors throughout.
+
+71. **Visual/layout redesign, Phase B (heading/title type scale).** ✅ _done_. Re-read every
+    flagged heading/title file directly this session rather than trusting the earlier inventory's
+    flat "3 different content-title sizes" framing at face value — found the content titles
+    actually split into two legitimate tiers by container width, not one arbitrary mess: full
+    writing-surface titles (`PageEditor.tsx`, `max-w-4xl`, `text-4xl font-bold`) versus compact
+    panel titles (`CanvasEditor.tsx`'s toolbar-style header and `CredentialDetail.tsx`'s
+    `max-w-lg` panel, both already independently at `text-2xl font-bold` — an accidental match,
+    not a designed one, but the right size for both). Only the share page's title
+    (`max-w-3xl`, `text-3xl`) was a genuine unexplained outlier despite being the same role as
+    `PageEditor.tsx`'s title, just read-only.
+
+    Expanded `Heading.tsx`'s single Phase-A level (which actually meant "brand mark," not a
+    generic page heading) into 4 explicit roles, `level` now a required prop:
+    `brand` (`text-4xl font-semibold tracking-tight`, login wordmark only, unchanged),
+    `page` (`text-2xl font-semibold`, generic top-level page heading), `content-large`
+    (`text-4xl font-bold leading-snug`), `content-compact` (`text-2xl font-bold leading-snug`).
+    `HEADING_CLASSES` exported alongside the component so `PageEditor.tsx`/`CanvasEditor.tsx`'s
+    title `<input>`s — editable form fields, can't go through `<Heading>` itself — apply the same
+    values directly.
+
+    Componentized with **no size change** (already correct): login wordmark, `Workspaces`,
+    `CredentialDetail.tsx`'s `<h2>`, both editor title inputs. Componentized **with a real fix**:
+    `error.tsx`/`workspace/error.tsx`/`not-found.tsx` (`text-xl` → `page`'s `text-2xl`),
+    the two vault-reset pages (`text-base` → `page`'s `text-2xl` — the biggest jump in the whole
+    audit, `text-base` for a page `<h1>` was the clearest outright bug), and the share page's title
+    (`text-3xl` → `content-large`'s `text-4xl`, matching `PageEditor.tsx`).
+
+    Verified: `pnpm check-types`/`lint`/`build` all clean. Signed in via the same magic-link/Mailpit
+    flow as steps 68-70, created a workspace/page/canvas, published the page, and screenshotted
+    every changed surface: login (unchanged), `Workspaces` (unchanged), the page editor title
+    (unchanged), the canvas editor title (unchanged), a real 404 page (visibly larger, reads
+    correctly), the published share view (now matching the editor's title size, no wrapping), and
+    a vault-reset page (the `text-base`→`text-2xl` jump — reads clearly better against its body
+    copy, not oversized). Zero console errors across every surface.
+
+72. **Visual/layout redesign, Phase C (spacing + full primitive migration) — redesign roadmap now
+    complete.** ✅ _done_. Combined the two remaining items: standardizing spacing, and migrating
+    every remaining button/input call site onto the Phase A primitives. Read every raw `<button>`/
+    `<input>`/`<select>`/`<textarea>`/`<label>` in the app directly (not just grepped) before
+    touching anything — found migrating "everything" would have been wrong: most raw elements
+    (icon-only nav buttons, tree-row action icons, menu items, pill toggles, copy-state buttons)
+    are genuine one-offs whose className doesn't actually match a primitive, and forcing a false
+    match in via a className override is a real risk here (no `tailwind-merge` installed, so two
+    conflicting utility classes have undefined precedence — the exact trap almost hit once already
+    in step 70's `Button` `ghost` variant). Only exact/near-exact matches were migrated.
+
+    That read surfaced the real spacing work, smaller and more targeted than "redesign all
+    padding": (1) 4 files (`error.tsx`, `not-found.tsx`, `workspace/error.tsx`,
+    `workspace/page.tsx`'s Create) used `px-4 py-2` for a primary-style CTA while 9+ other primary
+    buttons already used `Button`'s `px-3 py-2` default — consolidated to the majority value by
+    migrating those 4. (2) `CredentialDetail.tsx`'s password/API-key/PIN show-hide eye button was
+    `p-2` in edit mode but `p-1.5` in view mode — identical button, unexplained different padding
+    in the same file — standardized to `p-1.5` (already used elsewhere: `PageEditor.tsx`'s
+    undo/redo, `CredentialFolderTreeNode.tsx`'s folder actions). (3) Both vault-reset pages'
+    delete-everything button was structurally identical to `primary` but red — recurring, not a
+    one-off, so added a 4th `destructive` `Button` variant instead of leaving it raw. (4) Two
+    *apparent* inconsistencies turned out to be intentional and were documented, not changed: modal
+    panel padding splits `p-6` (`CredentialDetail.tsx`'s dense multi-field form) vs. `p-10` (the
+    three vault-flow panels — simpler, centered "gate" moments warranting more room), and list-row
+    padding splits tree rows (border-left selected-indicator design) vs. flat search-result rows
+    (no tree nesting, no indicator needed) — same reasoning step 71 applied to the content-title
+    size tiers.
+
+    Migration: `FormLabel`/`Input`/`Select`/`Textarea` across ~15 label+field pairs in
+    `CredentialDetail.tsx` plus `ForgotPassphrasePanel.tsx` (3 inputs), `VaultUnlockPanel.tsx` (2
+    inputs), and `workspace/page.tsx` (1 field) — all exact `FIELD_CLASSES` matches or
+    additive-only (`font-mono`, `min-w-0 flex-1`, `resize-y`, none conflicting).
+    `Button` `primary`: `CredentialDetail.tsx`'s Save, both `ForgotPassphrasePanel.tsx` submits,
+    `RecoveryKeyDisplay.tsx`'s Continue, `VaultUnlockPanel.tsx`'s submit, `workspace/page.tsx`'s
+    Create, `error.tsx`/`workspace/error.tsx`'s Try again (padding fixed as part of the move).
+    `not-found.tsx`'s Go home stayed a `<Link>` (`Button` doesn't render polymorphically) — its
+    className aligned to match by hand instead. `Button` `secondary`: `CredentialDetail.tsx`'s
+    Cancel. New `Button` `destructive`: both vault-reset pages' delete buttons.
+
+    Verified: `pnpm check-types`/`lint`/`build` all clean. Signed in via the same magic-link/Mailpit
+    flow as steps 68-71: created a workspace, set up a vault (exercising `VaultUnlockPanel.tsx` and
+    `RecoveryKeyDisplay.tsx` live), created a login-type credential end-to-end in
+    `CredentialDetail.tsx` — the highest-risk surface, most fields — checked the eye-toggle in both
+    edit mode (now `p-1.5`, was `p-2`) and view mode (already `p-1.5`, now visually identical), and
+    confirmed the new `destructive` variant on a real vault-reset page renders unchanged from
+    before. Zero console errors across the entire flow. This closes out the full 3-phase visual/
+    layout redesign started in step 70.

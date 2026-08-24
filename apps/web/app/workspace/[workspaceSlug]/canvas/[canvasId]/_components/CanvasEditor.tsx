@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import type { Canvas } from "@crowscribe/types";
 import { useDeleteCanvas, useUpdateCanvas } from "@crowscribe/shared";
+import { HEADING_CLASSES } from "../../../../../_components/Heading";
 import "@excalidraw/excalidraw/index.css";
 
 const AUTOSAVE_DEBOUNCE_MS = 800;
@@ -141,7 +142,7 @@ export function CanvasEditor({ canvas }: { canvas: Canvas }) {
           onChange={(e) => handleTitleChange(e.target.value)}
           placeholder="Untitled"
           maxLength={200}
-          className="w-full flex-1 border-none bg-transparent text-2xl font-bold leading-snug text-ink-800 outline-none placeholder:text-ink-400"
+          className={`w-full flex-1 border-none bg-transparent outline-none placeholder:text-ink-400 ${HEADING_CLASSES["content-compact"]}`}
         />
         <button
           type="button"

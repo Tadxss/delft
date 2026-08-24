@@ -14,6 +14,9 @@ import {
   useVaultKey,
   wrapVaultMasterKey,
 } from "@crowscribe/shared";
+import { Button } from "../../../../_components/Button";
+import { FormLabel } from "../../../../_components/FormLabel";
+import { Input } from "../../../../_components/Input";
 import { ForgotPassphrasePanel } from "./ForgotPassphrasePanel";
 import { RecoveryKeyDisplay } from "./RecoveryKeyDisplay";
 import { VaultMigrationPanel } from "./VaultMigrationPanel";
@@ -225,13 +228,8 @@ export function VaultUnlockPanel({
             : "Enter your vault passphrase to view and manage this workspace's credentials."}
         </p>
         <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-3">
-          <label
-            htmlFor="passphrase"
-            className="text-xs font-medium uppercase tracking-wide text-ink-500"
-          >
-            Vault passphrase
-          </label>
-          <input
+          <FormLabel htmlFor="passphrase">Vault passphrase</FormLabel>
+          <Input
             id="passphrase"
             type="password"
             required
@@ -239,17 +237,11 @@ export function VaultUnlockPanel({
             autoComplete="off"
             value={passphrase}
             onChange={(e) => setPassphrase(e.target.value)}
-            className="rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
           />
           {isSetup && (
             <>
-              <label
-                htmlFor="confirm"
-                className="text-xs font-medium uppercase tracking-wide text-ink-500"
-              >
-                Confirm passphrase
-              </label>
-              <input
+              <FormLabel htmlFor="confirm">Confirm passphrase</FormLabel>
+              <Input
                 id="confirm"
                 type="password"
                 required
@@ -257,14 +249,13 @@ export function VaultUnlockPanel({
                 autoComplete="off"
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
-                className="rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
               />
             </>
           )}
-          <button
+          <Button
             type="submit"
             disabled={unlocking || credentialsLoading}
-            className="mt-1 rounded-md bg-accent-500 px-3 py-2 text-sm font-medium text-paper-50 transition-colors hover:bg-accent-600 disabled:opacity-60"
+            className="mt-1"
           >
             {unlocking
               ? "Unlocking…"
@@ -273,7 +264,7 @@ export function VaultUnlockPanel({
                 : isSetup
                   ? "Create vault"
                   : "Unlock"}
-          </button>
+          </Button>
           {mismatch && (
             <p className="text-xs text-red-700">
               Passphrases don&apos;t match.

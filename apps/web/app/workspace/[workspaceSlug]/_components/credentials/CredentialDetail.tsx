@@ -25,6 +25,10 @@ import {
   useDeleteCredential,
   useUpdateCredential,
 } from "@crowscribe/shared";
+import { Button } from "../../../../_components/Button";
+import { FormLabel } from "../../../../_components/FormLabel";
+import { Heading } from "../../../../_components/Heading";
+import { Input, Select, Textarea } from "../../../../_components/Input";
 import { CREDENTIAL_TYPE_OPTIONS } from "./credentialTypeOptions";
 
 const EMPTY_SECRET: CredentialSecret = { notes: "" };
@@ -270,13 +274,8 @@ export function CredentialDetail({
   if (editing) {
     return (
       <form onSubmit={handleSave} className="flex max-w-lg flex-col gap-3 p-6">
-        <label
-          htmlFor="title"
-          className="text-xs font-medium uppercase tracking-wide text-ink-500"
-        >
-          Title
-        </label>
-        <input
+        <FormLabel htmlFor="title">Title</FormLabel>
+        <Input
           id="title"
           required
           maxLength={200}
@@ -284,7 +283,6 @@ export function CredentialDetail({
           onChange={(e) =>
             setForm((prev) => ({ ...prev, title: e.target.value }))
           }
-          className="rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
         />
 
         <span className="text-xs font-medium uppercase tracking-wide text-ink-500">
@@ -316,19 +314,13 @@ export function CredentialDetail({
           })}
         </div>
 
-        <label
-          htmlFor="folder"
-          className="text-xs font-medium uppercase tracking-wide text-ink-500"
-        >
-          Folder
-        </label>
-        <select
+        <FormLabel htmlFor="folder">Folder</FormLabel>
+        <Select
           id="folder"
           value={form.folderId ?? ""}
           onChange={(e) =>
             setForm((prev) => ({ ...prev, folderId: e.target.value || null }))
           }
-          className="rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
         >
           <option value="">Root</option>
           {folderOptions.map((option) => (
@@ -336,15 +328,10 @@ export function CredentialDetail({
               {option.label}
             </option>
           ))}
-        </select>
+        </Select>
 
-        <label
-          htmlFor="url"
-          className="text-xs font-medium uppercase tracking-wide text-ink-500"
-        >
-          Website
-        </label>
-        <input
+        <FormLabel htmlFor="url">Website</FormLabel>
+        <Input
           id="url"
           type="url"
           maxLength={2000}
@@ -353,34 +340,22 @@ export function CredentialDetail({
             setForm((prev) => ({ ...prev, url: e.target.value }))
           }
           placeholder="https://example.com"
-          className="rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
         />
 
         {form.type === "login" && (
           <>
-            <label
-              htmlFor="username"
-              className="text-xs font-medium uppercase tracking-wide text-ink-500"
-            >
-              Username
-            </label>
-            <input
+            <FormLabel htmlFor="username">Username</FormLabel>
+            <Input
               id="username"
               value={form.username}
               onChange={(e) =>
                 setForm((prev) => ({ ...prev, username: e.target.value }))
               }
-              className="rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
             />
 
-            <label
-              htmlFor="password"
-              className="text-xs font-medium uppercase tracking-wide text-ink-500"
-            >
-              Password
-            </label>
+            <FormLabel htmlFor="password">Password</FormLabel>
             <div className="flex gap-2">
-              <input
+              <Input
                 id="password"
                 type={showSecret ? "text" : "password"}
                 autoComplete="off"
@@ -388,14 +363,14 @@ export function CredentialDetail({
                 onChange={(e) =>
                   setForm((prev) => ({ ...prev, password: e.target.value }))
                 }
-                className="min-w-0 flex-1 rounded-md border border-paper-200 bg-paper-50 px-3 py-2 font-mono text-sm text-ink-800 outline-none focus:border-accent-500"
+                className="min-w-0 flex-1 font-mono"
               />
               <button
                 type="button"
                 onClick={() => setShowSecret((v) => !v)}
                 aria-label={showSecret ? "Hide" : "Show"}
                 title={showSecret ? "Hide" : "Show"}
-                className="shrink-0 rounded-md p-2 text-ink-500 hover:bg-paper-100 hover:text-ink-800"
+                className="shrink-0 rounded-md p-1.5 text-ink-500 hover:bg-paper-100 hover:text-ink-800"
               >
                 {showSecret ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
@@ -413,19 +388,13 @@ export function CredentialDetail({
 
         {form.type === "oauth" && (
           <>
-            <label
-              htmlFor="username"
-              className="text-xs font-medium uppercase tracking-wide text-ink-500"
-            >
-              Account / Email
-            </label>
-            <input
+            <FormLabel htmlFor="username">Account / Email</FormLabel>
+            <Input
               id="username"
               value={form.username}
               onChange={(e) =>
                 setForm((prev) => ({ ...prev, username: e.target.value }))
               }
-              className="rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
             />
             <p className="text-xs text-ink-400">
               No password stored — sign-in happens through the provider
@@ -436,14 +405,9 @@ export function CredentialDetail({
 
         {form.type === "api_key" && (
           <>
-            <label
-              htmlFor="apiKey"
-              className="text-xs font-medium uppercase tracking-wide text-ink-500"
-            >
-              API Key
-            </label>
+            <FormLabel htmlFor="apiKey">API Key</FormLabel>
             <div className="flex gap-2">
-              <input
+              <Input
                 id="apiKey"
                 type={showSecret ? "text" : "password"}
                 autoComplete="off"
@@ -451,14 +415,14 @@ export function CredentialDetail({
                 onChange={(e) =>
                   setForm((prev) => ({ ...prev, apiKey: e.target.value }))
                 }
-                className="min-w-0 flex-1 rounded-md border border-paper-200 bg-paper-50 px-3 py-2 font-mono text-sm text-ink-800 outline-none focus:border-accent-500"
+                className="min-w-0 flex-1 font-mono"
               />
               <button
                 type="button"
                 onClick={() => setShowSecret((v) => !v)}
                 aria-label={showSecret ? "Hide" : "Show"}
                 title={showSecret ? "Hide" : "Show"}
-                className="shrink-0 rounded-md p-2 text-ink-500 hover:bg-paper-100 hover:text-ink-800"
+                className="shrink-0 rounded-md p-1.5 text-ink-500 hover:bg-paper-100 hover:text-ink-800"
               >
                 {showSecret ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
@@ -468,14 +432,9 @@ export function CredentialDetail({
 
         {form.type === "pin" && (
           <>
-            <label
-              htmlFor="pin"
-              className="text-xs font-medium uppercase tracking-wide text-ink-500"
-            >
-              PIN
-            </label>
+            <FormLabel htmlFor="pin">PIN</FormLabel>
             <div className="flex gap-2">
-              <input
+              <Input
                 id="pin"
                 type={showSecret ? "text" : "password"}
                 inputMode="numeric"
@@ -484,14 +443,14 @@ export function CredentialDetail({
                 onChange={(e) =>
                   setForm((prev) => ({ ...prev, pin: e.target.value }))
                 }
-                className="min-w-0 flex-1 rounded-md border border-paper-200 bg-paper-50 px-3 py-2 font-mono text-sm text-ink-800 outline-none focus:border-accent-500"
+                className="min-w-0 flex-1 font-mono"
               />
               <button
                 type="button"
                 onClick={() => setShowSecret((v) => !v)}
                 aria-label={showSecret ? "Hide" : "Show"}
                 title={showSecret ? "Hide" : "Show"}
-                className="shrink-0 rounded-md p-2 text-ink-500 hover:bg-paper-100 hover:text-ink-800"
+                className="shrink-0 rounded-md p-1.5 text-ink-500 hover:bg-paper-100 hover:text-ink-800"
               >
                 {showSecret ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
@@ -507,38 +466,25 @@ export function CredentialDetail({
           </>
         )}
 
-        <label
-          htmlFor="notes"
-          className="text-xs font-medium uppercase tracking-wide text-ink-500"
-        >
-          Notes
-        </label>
-        <textarea
+        <FormLabel htmlFor="notes">Notes</FormLabel>
+        <Textarea
           id="notes"
           value={form.notes}
           onChange={(e) =>
             setForm((prev) => ({ ...prev, notes: e.target.value }))
           }
           rows={4}
-          className="resize-y rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
+          className="resize-y"
         />
 
         <div className="mt-2 flex items-center gap-2">
-          <button
-            type="submit"
-            disabled={isSaving}
-            className="rounded-md bg-accent-500 px-3 py-2 text-sm font-medium text-paper-50 transition-colors hover:bg-accent-600 disabled:opacity-60"
-          >
+          <Button type="submit" disabled={isSaving}>
             {isSaving ? "Saving…" : "Save"}
-          </button>
+          </Button>
           {!isNew && (
-            <button
-              type="button"
-              onClick={() => setEditing(false)}
-              className="rounded-md border border-paper-200 px-3 py-2 text-sm text-ink-600 hover:bg-paper-50"
-            >
+            <Button variant="secondary" onClick={() => setEditing(false)}>
               Cancel
-            </button>
+            </Button>
           )}
         </div>
         {saveError && (
@@ -551,9 +497,9 @@ export function CredentialDetail({
   return (
     <div className="flex max-w-lg flex-col gap-4 p-6">
       <div className="flex items-start justify-between gap-4">
-        <h2 className="text-2xl font-bold text-ink-800">
+        <Heading level="content-compact" as="h2">
           {form.title || "Untitled"}
-        </h2>
+        </Heading>
         <div className="flex shrink-0 gap-2">
           <button
             type="button"

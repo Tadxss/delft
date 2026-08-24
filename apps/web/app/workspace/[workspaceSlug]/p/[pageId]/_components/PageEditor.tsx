@@ -17,6 +17,7 @@ import {
   useUpdatePage,
   useUploadPageImage,
 } from "@crowscribe/shared";
+import { HEADING_CLASSES } from "../../../../../_components/Heading";
 import { resolveBlockNoteTheme } from "../../../../../_lib/blocknoteTheme";
 import { restrictedBlockSchema } from "../../../../../_lib/blocknoteSchema";
 
@@ -186,7 +187,7 @@ export function PageEditor({ page }: { page: Page }) {
           onChange={(e) => handleTitleChange(e.target.value)}
           placeholder="Untitled"
           maxLength={500}
-          className="w-full flex-1 border-none bg-transparent text-4xl font-bold leading-snug text-ink-800 outline-none placeholder:text-ink-400"
+          className={`w-full flex-1 border-none bg-transparent outline-none placeholder:text-ink-400 ${HEADING_CLASSES["content-large"]}`}
         />
         <div className="flex shrink-0 items-center gap-2 pt-2">
           <button

@@ -13,6 +13,9 @@ import {
   useUpsertProfile,
 } from "@crowscribe/shared";
 import { OCCUPATIONS } from "../_lib/occupations";
+import { Button } from "./Button";
+import { FormLabel } from "./FormLabel";
+import { Input, Select, Textarea } from "./Input";
 import { Modal } from "./Modal";
 
 const MIN_PASSWORD_LENGTH = 8;
@@ -77,27 +80,21 @@ export function AccountModal({
           <span className="text-sm font-medium text-ink-800">Account</span>
         ) : (
           <div className="flex items-center gap-1">
-            <button
-              type="button"
+            <Button
+              variant="ghost"
               onClick={() => setView("list")}
               aria-label="Back"
-              className="rounded px-1 py-1 text-ink-500 hover:bg-paper-100 hover:text-ink-800"
             >
               <ChevronLeft size={16} />
-            </button>
+            </Button>
             <span className="text-sm font-medium text-ink-800">
               {view === "password" ? "Password" : "Update profile"}
             </span>
           </div>
         )}
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close"
-          className="rounded px-2 py-1 text-ink-500 hover:bg-paper-100 hover:text-ink-800"
-        >
+        <Button variant="ghost" onClick={onClose} aria-label="Close">
           <X size={16} />
-        </button>
+        </Button>
       </div>
 
       {view === "list" ? (
@@ -141,13 +138,8 @@ export function AccountModal({
             each time.
           </p>
           <form onSubmit={handleSubmit} className="mt-1 flex flex-col gap-2">
-            <label
-              htmlFor="password"
-              className="text-xs font-medium uppercase tracking-wide text-ink-500"
-            >
-              New password
-            </label>
-            <input
+            <FormLabel htmlFor="password">New password</FormLabel>
+            <Input
               id="password"
               type="password"
               required
@@ -155,15 +147,9 @@ export function AccountModal({
               autoComplete="new-password"
               value={password}
               onChange={(e) => setPasswordValue(e.target.value)}
-              className="rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
             />
-            <label
-              htmlFor="confirm"
-              className="text-xs font-medium uppercase tracking-wide text-ink-500"
-            >
-              Confirm password
-            </label>
-            <input
+            <FormLabel htmlFor="confirm">Confirm password</FormLabel>
+            <Input
               id="confirm"
               type="password"
               required
@@ -171,15 +157,10 @@ export function AccountModal({
               autoComplete="new-password"
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
-              className="rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
             />
-            <button
-              type="submit"
-              disabled={setPassword.isPending}
-              className="mt-1 rounded-md bg-accent-500 px-3 py-2 text-sm font-medium text-paper-50 transition-colors hover:bg-accent-600 disabled:opacity-60"
-            >
+            <Button type="submit" disabled={setPassword.isPending} className="mt-1">
               {setPassword.isPending ? "Saving…" : "Save password"}
-            </button>
+            </Button>
             {mismatch && (
               <p className="text-xs text-red-700">
                 Passwords don&apos;t match.
@@ -330,77 +311,47 @@ function ProfileForm({ userId }: { userId: string | undefined }) {
       </div>
 
       <form onSubmit={handleSubmit} className="mt-2 flex flex-col gap-2">
-        <label
-          htmlFor="username"
-          className="text-xs font-medium uppercase tracking-wide text-ink-500"
-        >
-          Username (optional)
-        </label>
-        <input
+        <FormLabel htmlFor="username">Username (optional)</FormLabel>
+        <Input
           id="username"
           value={username}
           onChange={(e) => setUsername(e.target.value.toLowerCase())}
           placeholder="e.g. ada_lovelace"
-          className="rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
         />
         <p className="-mt-1 text-xs text-ink-400">
           Lowercase letters, numbers, and underscores only, 3–20 characters.
           Lets you sign in with this instead of your email.
         </p>
 
-        <label
-          htmlFor="firstName"
-          className="text-xs font-medium uppercase tracking-wide text-ink-500"
-        >
-          First name
-        </label>
-        <input
+        <FormLabel htmlFor="firstName">First name</FormLabel>
+        <Input
           id="firstName"
           maxLength={100}
           value={firstName}
           onChange={(e) => setFirstName(e.target.value)}
-          className="rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
         />
 
-        <label
-          htmlFor="middleName"
-          className="text-xs font-medium uppercase tracking-wide text-ink-500"
-        >
-          Middle name (optional)
-        </label>
-        <input
+        <FormLabel htmlFor="middleName">Middle name (optional)</FormLabel>
+        <Input
           id="middleName"
           maxLength={100}
           value={middleName}
           onChange={(e) => setMiddleName(e.target.value)}
-          className="rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
         />
 
-        <label
-          htmlFor="lastName"
-          className="text-xs font-medium uppercase tracking-wide text-ink-500"
-        >
-          Last name
-        </label>
-        <input
+        <FormLabel htmlFor="lastName">Last name</FormLabel>
+        <Input
           id="lastName"
           maxLength={100}
           value={lastName}
           onChange={(e) => setLastName(e.target.value)}
-          className="rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
         />
 
-        <label
-          htmlFor="occupation"
-          className="text-xs font-medium uppercase tracking-wide text-ink-500"
-        >
-          Occupation
-        </label>
-        <select
+        <FormLabel htmlFor="occupation">Occupation</FormLabel>
+        <Select
           id="occupation"
           value={occupation}
           onChange={(e) => setOccupation(e.target.value)}
-          className="rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
         >
           <option value="">Select an occupation</option>
           {OCCUPATIONS.map((o) => (
@@ -409,39 +360,29 @@ function ProfileForm({ userId }: { userId: string | undefined }) {
             </option>
           ))}
           <option value="Other">Other</option>
-        </select>
+        </Select>
         {occupation === "Other" && (
-          <input
+          <Input
             value={customOccupation}
             maxLength={200}
             onChange={(e) => setCustomOccupation(e.target.value)}
             placeholder="Enter your occupation"
-            className="rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
           />
         )}
 
-        <label
-          htmlFor="bio"
-          className="text-xs font-medium uppercase tracking-wide text-ink-500"
-        >
-          Bio
-        </label>
-        <textarea
+        <FormLabel htmlFor="bio">Bio</FormLabel>
+        <Textarea
           id="bio"
           maxLength={2000}
           value={bio}
           onChange={(e) => setBio(e.target.value)}
           rows={3}
-          className="resize-none rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500"
+          className="resize-none"
         />
 
-        <button
-          type="submit"
-          disabled={upsertProfile.isPending}
-          className="mt-1 rounded-md bg-accent-500 px-3 py-2 text-sm font-medium text-paper-50 transition-colors hover:bg-accent-600 disabled:opacity-60"
-        >
+        <Button type="submit" disabled={upsertProfile.isPending} className="mt-1">
           {upsertProfile.isPending ? "Saving…" : "Save profile"}
-        </button>
+        </Button>
         {upsertProfile.isError && (
           <p className="text-xs text-red-700">
             {(upsertProfile.error as { code?: string })?.code === "23505"
