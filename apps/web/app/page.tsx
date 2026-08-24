@@ -11,6 +11,7 @@ import {
   useSignInWithPassword,
 } from "@crowscribe/shared";
 import { Button } from "./_components/Button";
+import { CrowMark } from "./_components/CrowMark";
 import { FormLabel } from "./_components/FormLabel";
 import { Heading } from "./_components/Heading";
 import { Input } from "./_components/Input";
@@ -173,6 +174,7 @@ export default function LoginPage() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-10 px-6">
       <div className="flex flex-col items-center gap-3 text-center">
+        <CrowMark size={40} className="text-accent-500" />
         <Heading level="brand">CrowScribe</Heading>
         <p className="max-w-sm text-sm text-ink-500">
           Where ideas take flight.

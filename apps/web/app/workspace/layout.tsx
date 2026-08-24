@@ -7,6 +7,7 @@ import { KeyRound, Settings } from "lucide-react";
 import { parseWorkspaceSlug, VaultKeyProvider } from "@crowscribe/shared";
 import { AccountModal } from "../_components/AccountModal";
 import { AuthGate } from "../_components/AuthGate";
+import { CrowMark } from "../_components/CrowMark";
 import { ThemeToggle } from "../_components/ThemeToggle";
 import { CredentialsModal } from "./[workspaceSlug]/_components/credentials/CredentialsModal";
 
@@ -22,8 +23,9 @@ function TopBar() {
     <header className="flex h-12 shrink-0 items-center justify-between border-b border-paper-200 bg-paper-100 px-4">
       <Link
         href="/workspace"
-        className="text-base font-semibold tracking-tight text-ink-800"
+        className="flex items-center gap-1.5 text-base font-semibold tracking-tight text-ink-800"
       >
+        <CrowMark size={18} />
         CrowScribe
       </Link>
       <div className="flex items-center gap-1">

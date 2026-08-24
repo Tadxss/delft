@@ -1,14 +1,12 @@
 import { ImageResponse } from "next/og";
 import { CROW_MARK_PATH, CROW_MARK_VIEWBOX } from "./_components/CrowMark";
 
-export const size = { width: 32, height: 32 };
+export const size = { width: 180, height: 180 };
 export const contentType = "image/png";
 
-// Next.js's file-based icon convention — no static asset needed, generated at request time via
-// `next/og`'s built-in ImageResponse (zero-cost, no external service). Renders the shared crow
-// mark (see CrowMark.tsx) on a dark square, matching the dark-mode paper-50/light-mode paper-50
-// background/foreground pair used across every ImageResponse-based icon in this app.
-export default function Icon() {
+// iOS home-screen icon convention (apple-touch-icon), auto-picked-up by Next.js the same way as
+// icon.tsx — same mark/colors, just larger and without rounded corners (iOS applies its own mask).
+export default function AppleIcon() {
   return new ImageResponse(
     (
       <div
@@ -22,8 +20,8 @@ export default function Icon() {
         }}
       >
         <svg
-          width="22"
-          height="13.2"
+          width="124"
+          height="74.4"
           viewBox={CROW_MARK_VIEWBOX}
           fill="#f8fafc"
         >

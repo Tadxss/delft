@@ -105,6 +105,14 @@ way: `Button`'s `primary`/`destructive` text was using a theme-flipping token th
 against the new medium-brightness violet accent — now a literal `text-white`, confirmed crisp in
 both themes. See step 73 for the full ramp and the contrast math.
 
+**Step 74 closed out the one item step 62 had parked**: a real crow-silhouette logo mark, built
+entirely in code (no external asset/paid tool), replacing the text-monogram favicon and landing on
+every brand-text-only slot in the app — favicon, new `apple-icon.tsx`, new `opengraph-image.tsx`,
+and paired with the "CrowScribe" wordmark in both the landing hero and the workspace top bar. Also
+caught and fixed a real gap along the way: `layout.tsx` had no `metadataBase`, harmless until the
+new OG image needed one to resolve correctly in production. Domain registration remains the one
+deliberately-parked item — still an open, not-yet-started choice for whoever picks this up next.
+
 The one recurring (not one-time) item worth keeping an eye on regardless: Storage usage against
 the 1GB free-tier cap as real data accumulates (step 56 added a `maxSizeMB` cap to
 `PageEditor.tsx`'s image compression, but it's still worth periodic monitoring, not a one-time
@@ -2346,3 +2354,44 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
     selector pills and Save button (the highest concentration of `accent-500` fills on one screen)
     — confirmed crisp white-on-violet in both themes after the text-color fix, versus the muddy
     near-black text the pre-fix screenshot showed in dark mode. Zero console errors throughout.
+
+74. **Custom crow logo mark.** ✅ _done_. Closes out the one item step 62 had deliberately parked
+    ("still a text-monogram favicon"). Until this step the only "logo" anywhere was the plain text
+    "CrowScribe" (landing hero, workspace top bar) plus `icon.tsx`'s favicon — a dark square with a
+    white "C" letter. No SVG/image asset existed anywhere in the repo, and only `icon.tsx` used
+    Next.js's file-based icon/OG conventions — no `apple-icon.tsx`, `opengraph-image.tsx`, or
+    `manifest.ts`.
+
+    Built a real crow-silhouette mark entirely in code, zero-cost — `next/og`'s `ImageResponse`
+    (Satori-based) supports inline `<svg>`/`<path>` JSX, not just flexbox+text, so no external
+    design tool or paid asset was needed. `apps/web/app/_components/CrowMark.tsx` is the single
+    source of truth for the shape (an angular two-wing silhouette, sharp tips rather than
+    soft/rounded, chosen for small-size legibility down to the 16px favicon — a literal detailed
+    crow with beak/feather texture turns to mud that small) — exported both as a plain React `<svg
+    fill="currentColor">` component (used in-app, so it inherits Tailwind text-color classes like
+    every `lucide-react` icon already does) and as a raw `d`/`viewBox` pair (reused by the three
+    `ImageResponse`-based files, which can't consume CSS custom properties or import a client
+    component into their render context).
+
+    Landed everywhere the app previously had a brand-text-only slot: `icon.tsx` (favicon, mark
+    replaces the "C" letter), new `apple-icon.tsx` (180×180 iOS home-screen icon, same colors), new
+    `opengraph-image.tsx` (1200×630 link-preview card — mark + "CrowScribe" + the landing page's
+    existing tagline), and paired next to the "CrowScribe" text in both `workspace/layout.tsx`'s
+    `TopBar` (18px, `text-ink-800`) and the landing hero in `page.tsx` (40px, `text-accent-500`).
+
+    **Real gap caught along the way, not part of the original ask**: `layout.tsx`'s `metadata` had
+    no `metadataBase`, which had been harmless until now (no image existed to resolve against a
+    base URL) but surfaced as a real Next.js build warning the moment `opengraph-image.tsx` was
+    added — without it, OG/Twitter image URLs would've resolved against `localhost:3000` in
+    production. Fixed by setting `metadataBase: new URL("https://crowscribe.vercel.app")`.
+
+    Verified: `pnpm check-types`/`lint`/`build` all clean, including confirmation the
+    `metadataBase` warning cleared. Visual check via `pnpm dev` + Playwright MCP: `/icon` at true
+    32×32 renders the mark clearly (a simple bird/wing notch, not the old "C"), `/opengraph-image`
+    renders the full lockup (mark + wordmark + tagline) cleanly at card size, the landing hero shows
+    the mark above "CrowScribe" in both light and dark mode, and a full magic-link sign-in through
+    to `/workspace` confirmed the top-bar pairing reads correctly at 18px alongside the still-crisp
+    white-on-violet "Create" button from step 73. Zero console errors (the one 404 for
+    `/favicon.ico` seen while directly probing the raw `/icon` route is pre-existing/harmless — no
+    static `favicon.ico` has ever existed, and actual app pages request `/icon` via Next's injected
+    `<link rel="icon">` instead, which had zero errors both before and after this change).
