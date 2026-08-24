@@ -363,7 +363,9 @@ export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
             Couldn&apos;t load pages: {pagesErrorObj.message}
           </p>
         ) : roots.length === 0 ? (
-          <p className="px-1 text-sm text-ink-400">No pages yet.</p>
+          <p className="px-1 text-sm text-ink-400">
+            No pages yet. Time to build your nest.
+          </p>
         ) : (
           <ul className="flex flex-col gap-0.5">
             {roots.map((page, index) => (
@@ -419,7 +421,9 @@ export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
           Couldn&apos;t load canvases: {canvasesErrorObj.message}
         </p>
       ) : (canvases ?? []).length === 0 ? (
-        <p className="px-1 text-sm text-ink-400">No canvases yet.</p>
+        <p className="px-1 text-sm text-ink-400">
+          Your canvas is blank. What will you draw?
+        </p>
       ) : (
         <DndContext
           sensors={sensors}

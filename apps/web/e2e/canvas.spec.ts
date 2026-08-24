@@ -114,7 +114,9 @@ test("create a canvas, draw a shape, and confirm autosave persists it", async ({
   await page.click('button:has-text("Delete")');
   await page.waitForURL(/\/workspace\/[^/]+$/, { timeout: 15000 });
   await openSidebar(page);
-  await expect(onlyVisible(page.getByText("No canvases yet."))).toBeVisible();
+  await expect(
+    onlyVisible(page.getByText("Your canvas is blank. What will you draw?")),
+  ).toBeVisible();
 });
 
 test("drag-and-drop reorders sibling canvases, and the new order survives a reload", async ({
