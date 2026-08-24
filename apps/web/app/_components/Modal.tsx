@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import { AnimatePresence, m } from "motion/react";
 
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -78,26 +79,35 @@ export function Modal({
     }
   }, [open]);
 
-  if (!open) return null;
-
   return createPortal(
-    <div
-      role="presentation"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-      onClick={onClose}
-    >
-      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- onClick here only stops the backdrop's onClose from firing on clicks inside the panel, it isn't an interactive control of its own */}
-      <div
-        ref={panelRef}
-        role="dialog"
-        aria-modal="true"
-        tabIndex={-1}
-        onClick={(e) => e.stopPropagation()}
-        className={`flex max-h-[85vh] w-full ${widthClassName} ${heightClassName} flex-col overflow-hidden rounded-lg border border-paper-200 bg-paper-50 shadow-lg outline-none [animation:modal-panel-in_150ms_ease-out]`}
-      >
-        {children}
-      </div>
-    </div>,
+    <AnimatePresence>
+      {open && (
+        <m.div
+          role="presentation"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={onClose}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.15 }}
+        >
+          <m.div
+            ref={panelRef}
+            role="dialog"
+            aria-modal="true"
+            tabIndex={-1}
+            onClick={(e) => e.stopPropagation()}
+            className={`flex max-h-[85vh] w-full ${widthClassName} ${heightClassName} flex-col overflow-hidden rounded-lg border border-paper-200 bg-paper-50 shadow-lg outline-none`}
+            initial={{ opacity: 0, scale: 0.97 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.97 }}
+            transition={{ duration: 0.15, ease: "easeOut" }}
+          >
+            {children}
+          </m.div>
+        </m.div>
+      )}
+    </AnimatePresence>,
     document.body,
   );
 }

@@ -68,7 +68,18 @@ still works too, kept as a legacy alias), and step 65 closed out the Supabase Au
 and the Supabase project's display-name rename, both done by the user. Step 66 then renamed the
 `@delft/*` workspace package scopes to `@crowscribe/*`. Still open: a custom logo/icon (still a
 text-monogram favicon) and domain registration, deliberately parked as the project's final touch
-rather than something to do now. See steps 62-66 for the full scope and what's still deferred.
+rather than something to do now.
+
+**A separate UI/UX + animation pass started as step 67**, Phase 1 (foundation) only: added `motion`
+as a dependency, gave the modal a real open/close animation (it previously had no exit animation at
+all), a single global hover/press transition rule replacing the ad hoc mix that existed before, a
+theme-toggle icon crossfade, and skeleton loading states everywhere that was still static "Loading…"
+text. Two more phases are planned but not started: panel/sidebar transitions (the collapse/expand
+and mobile drawer are still hard instant swaps) and drag-and-drop feel (row hover states and
+post-drop reordering are still instant, no animation). A separate, later initiative — broader
+visual/layout redesign (spacing, typography, information density) — was explicitly scoped out of
+all of this; it's design work, not animation. See steps 62-67 for the full scope and what's still
+deferred.
 
 The one recurring (not one-time) item worth keeping an eye on regardless: Storage usage against
 the 1GB free-tier cap as real data accumulates (step 56 added a `maxSizeMB` cap to
@@ -2034,3 +2045,53 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
     those. Grepped for residual `@delft/` afterward — zero matches outside the historical Build
     Order lines called out above. `pnpm dev` smoke-check not yet run by either of us — worth doing
     before treating this as fully verified end-to-end.
+
+67. **UI motion pass, Phase 1 (foundation).** ✅ _done_. First step of a broader UI/UX + animation
+    improvement the user asked for — scoped down deliberately: exploration found the app had almost
+    no animation anywhere (one hand-written CSS `@keyframes` on the modal, no consistent hover
+    pattern, no library installed), and the user's ask spanned micro-interactions, panel
+    transitions, drag-and-drop feel, *and* a broader visual/layout redesign. That last one is
+    design work, not animation, and was explicitly split out as a separate future initiative rather
+    than bundled in. This step is the foundation layer everything else builds on; panel/sidebar
+    transitions and drag-and-drop feel are an intentionally separate future phase, not done here.
+
+    Added `motion` (the current name for Framer Motion, still MIT/free, no conflict with this
+    project's zero-cost constraint) as a dependency, wired up via `LazyMotion`/`domAnimation` in
+    `apps/web/app/providers.tsx` (`strict` mode, so every animated component must use the `m`
+    proxy rather than the full `motion` import — keeps the added bundle weight to the smaller
+    feature-bundle size rather than the whole library).
+
+    `Modal.tsx` — closed the exact gap its own prior comment flagged ("deliberately no exit
+    animation... not worth it here"): backdrop now fades in/out and the panel now animates on both
+    open *and* close via `AnimatePresence` wrapping the conditional render, replacing the old
+    `if (!open) return null` hard unmount. The old CSS `@keyframes modal-panel-in` in `globals.css`
+    is gone, replaced by `m.div` `initial`/`animate`/`exit` props. Every modal in the app
+    (`AccountModal`, `CredentialsModal`, the vault panels, etc.) inherits this for free since they
+    all go through this one shared primitive.
+
+    Consistent hover/press system — done as a single `globals.css` `@layer`-equivalent base rule
+    (`transition-property: color, background-color, border-color, box-shadow, opacity` at 150ms,
+    scoped to `button`/`a`/`input`/`textarea`/`select`, guarded by
+    `@media (prefers-reduced-motion: no-preference)`) rather than touching the ~60 individual
+    `hover:` call sites across 23 files that lacked a transition — one source of truth instead of a
+    mechanical sweep, and it respects the user's OS-level reduced-motion preference by construction
+    rather than a fixed duration everyone's stuck with.
+
+    `ThemeToggle.tsx` — the sun/moon icon swap now crossfades with a slight rotate via
+    `AnimatePresence mode="wait"` instead of an instant conditional render.
+
+    Loading states — extended the one existing `animate-pulse` skeleton precedent (`CanvasShell.tsx`)
+    to every remaining static "Loading…" text: `Sidebar.tsx`'s in-place pages/canvases loading rows
+    (now pulsing placeholder bars), and the route-level `PageEditorLoading.tsx` /
+    `canvas/[canvasId]/loading.tsx` (generic skeletons matching `PageShell`/`CanvasShell`'s layout,
+    since no title is known yet at that point in the load — unlike those two, which render once the
+    sidebar's cached title is available).
+
+    Verified: `pnpm check-types`/`lint`/`build` all clean (one `eslint-disable` comment in
+    `Modal.tsx` became genuinely unused once the backdrop/panel became `m.div` instead of a plain
+    `div`, removed rather than left stale); a `pnpm dev` + Playwright MCP visual check of the
+    logged-out login page confirmed zero console errors and normal rendering. The Modal/
+    ThemeToggle animations themselves weren't visually re-verified in-browser this session (both
+    live behind auth, not reachable from the logged-out page checked) — worth a real click-through
+    once signed in before calling this fully confirmed. `pnpm analyze` bundle-size check (flagged
+    in the plan) not run this session either.

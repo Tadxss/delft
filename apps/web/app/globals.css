@@ -86,15 +86,21 @@ a {
    default UI piece explicitly disabled) rather than a raw HTML export, so it inherits
    @blocknote/mantine's own styling directly — no separate read-only stylesheet needed here. */
 
-/* Modal.tsx's entrance animation — opacity/transform only (compositor-friendly, no layout cost),
-   deliberately no exit animation (that needs deferred-unmount state, not worth it here). */
-@keyframes modal-panel-in {
-  from {
-    opacity: 0;
-    transform: scale(0.97);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
+/* Global hover/press transition — Tailwind's own transition-* utilities cover most interactive
+   elements already, but this catches every plain button/link/input across the app so the
+   previously-ad-hoc mix (some had transition-colors, most didn't) is consistent by default.
+   Explicit opt-out via `transition-none` still works since a class always beats this base-layer
+   rule at equal specificity when it comes later in the cascade — Tailwind's utilities layer loads
+   after `base`. Respects prefers-reduced-motion instead of a fixed duration/property list so
+   users who've asked for less motion system-wide actually get it here too. */
+@media (prefers-reduced-motion: no-preference) {
+  button,
+  a,
+  input,
+  textarea,
+  select {
+    transition-property: color, background-color, border-color, box-shadow, opacity;
+    transition-duration: 150ms;
+    transition-timing-function: ease;
   }
 }
