@@ -7,7 +7,6 @@ import { KeyRound, Settings } from "lucide-react";
 import { parseWorkspaceSlug, VaultKeyProvider } from "@crowscribe/shared";
 import { AccountModal } from "../_components/AccountModal";
 import { AuthGate } from "../_components/AuthGate";
-import { CrowMark } from "../_components/CrowMark";
 import { ThemeToggle } from "../_components/ThemeToggle";
 import { CredentialsModal } from "./[workspaceSlug]/_components/credentials/CredentialsModal";
 
@@ -25,7 +24,14 @@ function TopBar() {
         href="/workspace"
         className="flex items-center gap-1.5 text-base font-semibold tracking-tight text-ink-800"
       >
-        <CrowMark size={18} />
+        {/* eslint-disable-next-line @next/next/no-img-element -- points at our own /icon route (already a properly-sized generated PNG); next/image's optimization pipeline isn't worth the config for a small header badge */}
+        <img
+          src="/icon"
+          width={20}
+          height={20}
+          alt=""
+          className="rounded ring-1 ring-inset ring-white/10"
+        />
         CrowScribe
       </Link>
       <div className="flex items-center gap-1">

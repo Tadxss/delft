@@ -1,14 +1,18 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { ImageResponse } from "next/og";
-import { CROW_MARK_PATH, CROW_MARK_VIEWBOX } from "./_components/CrowMark";
 
+export const runtime = "nodejs";
 export const size = { width: 32, height: 32 };
 export const contentType = "image/png";
 
-// Next.js's file-based icon convention — no static asset needed, generated at request time via
-// `next/og`'s built-in ImageResponse (zero-cost, no external service). Renders the shared crow
-// mark (see CrowMark.tsx) on a dark square, matching the dark-mode paper-50/light-mode paper-50
-// background/foreground pair used across every ImageResponse-based icon in this app.
+// Next.js's file-based icon convention — generated at request time via `next/og`'s built-in
+// ImageResponse (zero-cost, no external service), embedding the real logo (public/logo.png) as a
+// base64 data URI rather than redrawing it. Letting ImageResponse/Satori downscale it to 32x32
+// here means this route serves a small PNG, not the ~1MB source master. The source image already
+// has its own dark rounded-square card baked into the pixels, so no extra background is added.
 export default function Icon() {
+  const logo = readFileSync(join(process.cwd(), "public", "logo.png")).toString("base64");
   return new ImageResponse(
     (
       <div
@@ -16,19 +20,15 @@ export default function Icon() {
           width: "100%",
           height: "100%",
           display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "#111318",
         }}
       >
-        <svg
-          width="22"
-          height="13.2"
-          viewBox={CROW_MARK_VIEWBOX}
-          fill="#f8fafc"
-        >
-          <path d={CROW_MARK_PATH} />
-        </svg>
+        {/* eslint-disable-next-line @next/next/no-img-element -- ImageResponse (Satori) requires a plain <img>, not next/image */}
+        <img
+          src={`data:image/png;base64,${logo}`}
+          width={size.width}
+          height={size.height}
+          alt=""
+        />
       </div>
     ),
     { ...size },

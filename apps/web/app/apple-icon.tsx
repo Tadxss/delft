@@ -1,12 +1,15 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { ImageResponse } from "next/og";
-import { CROW_MARK_PATH, CROW_MARK_VIEWBOX } from "./_components/CrowMark";
 
+export const runtime = "nodejs";
 export const size = { width: 180, height: 180 };
 export const contentType = "image/png";
 
 // iOS home-screen icon convention (apple-touch-icon), auto-picked-up by Next.js the same way as
-// icon.tsx — same mark/colors, just larger and without rounded corners (iOS applies its own mask).
+// icon.tsx — same embedded logo, just rendered larger (iOS applies its own rounding mask on top).
 export default function AppleIcon() {
+  const logo = readFileSync(join(process.cwd(), "public", "logo.png")).toString("base64");
   return new ImageResponse(
     (
       <div
@@ -14,19 +17,15 @@ export default function AppleIcon() {
           width: "100%",
           height: "100%",
           display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "#111318",
         }}
       >
-        <svg
-          width="124"
-          height="74.4"
-          viewBox={CROW_MARK_VIEWBOX}
-          fill="#f8fafc"
-        >
-          <path d={CROW_MARK_PATH} />
-        </svg>
+        {/* eslint-disable-next-line @next/next/no-img-element -- ImageResponse (Satori) requires a plain <img>, not next/image */}
+        <img
+          src={`data:image/png;base64,${logo}`}
+          width={size.width}
+          height={size.height}
+          alt=""
+        />
       </div>
     ),
     { ...size },

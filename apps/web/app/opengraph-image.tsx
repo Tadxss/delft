@@ -1,13 +1,16 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { ImageResponse } from "next/og";
-import { CROW_MARK_PATH, CROW_MARK_VIEWBOX } from "./_components/CrowMark";
 
+export const runtime = "nodejs";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
 // Link-preview card (OG + Twitter, since layout.tsx sets twitter.card without a dedicated image —
 // Next.js falls back to this file for both). Auto-picked-up by file convention, no metadata.images
-// wiring needed. Same mark/colors as icon.tsx/apple-icon.tsx, just laid out with the wordmark.
+// wiring needed. Same embedded logo as icon.tsx/apple-icon.tsx, laid out with the wordmark.
 export default function OpengraphImage() {
+  const logo = readFileSync(join(process.cwd(), "public", "logo.png")).toString("base64");
   return new ImageResponse(
     (
       <div
@@ -22,14 +25,13 @@ export default function OpengraphImage() {
           background: "#111318",
         }}
       >
-        <svg
-          width="160"
-          height="96"
-          viewBox={CROW_MARK_VIEWBOX}
-          fill="#8b5cf6"
-        >
-          <path d={CROW_MARK_PATH} />
-        </svg>
+        {/* eslint-disable-next-line @next/next/no-img-element -- ImageResponse (Satori) requires a plain <img>, not next/image */}
+        <img
+          src={`data:image/png;base64,${logo}`}
+          width={140}
+          height={140}
+          alt=""
+        />
         <div
           style={{
             fontSize: 72,
