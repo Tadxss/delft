@@ -22,8 +22,16 @@ function TopBar() {
     <header className="flex h-12 shrink-0 items-center justify-between border-b border-paper-200 bg-paper-100 px-4">
       <Link
         href="/workspace"
-        className="text-base font-semibold tracking-tight text-ink-800"
+        className="flex items-center gap-1.5 text-base font-semibold tracking-tight text-ink-800"
       >
+        {/* eslint-disable-next-line @next/next/no-img-element -- points at our own /icon route (already a properly-sized generated PNG); next/image's optimization pipeline isn't worth the config for a small header badge */}
+        <img
+          src="/icon"
+          width={20}
+          height={20}
+          alt=""
+          className="rounded ring-1 ring-inset ring-white/10"
+        />
         CrowScribe
       </Link>
       <div className="flex items-center gap-1">

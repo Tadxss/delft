@@ -173,6 +173,8 @@ export default function LoginPage() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-10 px-6">
       <div className="flex flex-col items-center gap-3 text-center">
+        {/* eslint-disable-next-line @next/next/no-img-element -- points at our own /apple-icon route (already a properly-sized generated PNG); next/image's optimization pipeline isn't worth the config for this */}
+        <img src="/apple-icon" width={48} height={48} alt="" className="rounded-xl" />
         <Heading level="brand">CrowScribe</Heading>
         <p className="max-w-sm text-sm text-ink-500">
           Where ideas take flight.

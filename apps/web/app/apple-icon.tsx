@@ -3,15 +3,12 @@ import { join } from "node:path";
 import { ImageResponse } from "next/og";
 
 export const runtime = "nodejs";
-export const size = { width: 32, height: 32 };
+export const size = { width: 180, height: 180 };
 export const contentType = "image/png";
 
-// Next.js's file-based icon convention — generated at request time via `next/og`'s built-in
-// ImageResponse (zero-cost, no external service), embedding the real logo (public/logo.png) as a
-// base64 data URI rather than redrawing it. Letting ImageResponse/Satori downscale it to 32x32
-// here means this route serves a small PNG, not the ~1MB source master. The source image already
-// has its own dark rounded-square card baked into the pixels, so no extra background is added.
-export default function Icon() {
+// iOS home-screen icon convention (apple-touch-icon), auto-picked-up by Next.js the same way as
+// icon.tsx — same embedded logo, just rendered larger (iOS applies its own rounding mask on top).
+export default function AppleIcon() {
   const logo = readFileSync(join(process.cwd(), "public", "logo.png")).toString("base64");
   return new ImageResponse(
     (
