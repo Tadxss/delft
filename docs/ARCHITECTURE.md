@@ -2506,3 +2506,14 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
     per-node tree buttons), persisted in `delft-sidebar-{pages,canvas}-collapsed` localStorage
     (SidebarShell's read-on-mount pattern). New `e2e/sidebar-sections.spec.ts` (skipped on
     mobile-safari — the off-canvas drawer remount races the toggle clicks).
+
+    Then: **removed the page editor's Undo/Redo buttons** (BlockNote handles `Ctrl/Cmd+Z` /
+    `+Shift+Z` / `+Y` natively — no keymap overrides here) and their `canUndo`/`canRedo` +
+    `@tiptap/pm/history` plumbing. And **reworked the page editor header to a Notion-style
+    full-width layout**: a sticky, full-width top bar (`sticky top-0` under the content-pane
+    scroll) holds Publish + a low-key `<EditedIndicator>` ("Edited 40m ago" → absolute date past
+    a week, `apps/web/app/_lib/formatRelativeTime.ts` — built-in `Intl`, no date lib; ticks
+    itself every 60s and the `page.updatedAt` prop refreshes via `useUpdatePage`'s
+    `setQueryData(["page", id])` on every autosave). Dropped `max-w-4xl mx-auto` so content is
+    full width. `PageShell` / `PageEditorLoading` mirror the new shape (publish-button-shaped
+    skeleton in the bar) to keep the load→editor swap shift-free.
