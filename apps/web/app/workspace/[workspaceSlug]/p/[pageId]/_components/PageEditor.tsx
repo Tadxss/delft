@@ -158,7 +158,7 @@ export function PageEditor({ page }: { page: Page }) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="sticky top-0 z-10 flex shrink-0 items-center justify-end gap-3 border-b border-paper-200 bg-paper-50 px-4 py-1.5 sm:px-8">
+      <div className="sticky top-0 z-10 flex shrink-0 items-center justify-end gap-3 bg-paper-50 px-4 pb-1.5 pt-5 sm:px-8">
         <EditedIndicator timestamp={page.updatedAt} />
         <button
           type="button"
@@ -174,7 +174,7 @@ export function PageEditor({ page }: { page: Page }) {
         </button>
       </div>
 
-      <div className="flex flex-1 flex-col gap-4 px-4 pb-10 pt-8 sm:px-8">
+      <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-4 px-4 pb-10 pt-8 sm:px-8">
         <label htmlFor="page-title" className="sr-only">
           Title
         </label>
