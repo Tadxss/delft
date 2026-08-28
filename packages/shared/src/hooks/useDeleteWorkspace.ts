@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSupabaseClient } from "../supabase/context";
 import { removePageImages } from "../lib/removePageImages";
+import { removeWorkspaceLogo } from "../lib/removeWorkspaceLogo";
 
 // Plain RLS-gated delete (workspaces_delete_owner) — `on delete cascade` on every workspace_id
 // foreign key (workspace_members, pages, credentials, canvases) means this cascades everything
@@ -23,6 +24,7 @@ export function useDeleteWorkspace(userId: string | undefined) {
         id,
         (pages ?? []).map((page) => page.id),
       );
+      await removeWorkspaceLogo(supabase, id);
 
       const { error } = await supabase.from("workspaces").delete().eq("id", id);
       if (error) throw error;

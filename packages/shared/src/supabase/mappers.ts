@@ -32,6 +32,7 @@ export function mapWorkspaceRow(row: WorkspaceRow): Workspace {
     ownerId: row.owner_id,
     name: row.name,
     logoUrl: row.logo_url,
+    description: row.description,
     vaultSalt: row.vault_salt,
     vaultWrappedKey: row.vault_wrapped_key,
     vaultWrappedKeyIv: row.vault_wrapped_key_iv,

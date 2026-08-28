@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
@@ -17,7 +17,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { Plus } from "lucide-react";
+import { ChevronDown, ChevronRight, Plus } from "lucide-react";
 import type { CanvasSummary, PageSummary } from "@crowscribe/types";
 import {
   canvasQueryOptions,
@@ -38,15 +38,24 @@ import { ReorderStrip } from "./ReorderStrip";
 import { SidebarHeader } from "./SidebarHeader";
 import { dragOverlayDropAnimation, offsetDragOverlay } from "./dragOverlayOffset";
 
+// Shared styling for the "PAGES" / "CANVAS" section labels and their hover-revealed "+" button.
+const SECTION_LABEL =
+  "text-[10px] font-semibold uppercase tracking-wider text-ink-500";
+const SECTION_CHEVRON =
+  "flex h-4 w-4 shrink-0 items-center justify-center rounded text-ink-400 hover:bg-paper-100 hover:text-ink-700";
+
 // The "Pages" section header, wrapped in its own component so useDroppable can be called on it —
 // it needs to render as a descendant of Sidebar's own <DndContext>, which a hook call directly in
 // Sidebar's body can't do (Sidebar's function body isn't itself "inside" the provider it returns).
+// `group/pages` scopes the "+" button's hover reveal to this header row only; the label <span>
+// stays a direct child so workspace-pages.spec.ts's `getByText("Pages").locator("..")` drop still
+// resolves to this droppable.
 function PagesRootDropZone({ children }: { children: React.ReactNode }) {
   const { setNodeRef, isOver } = useDroppable({ id: "pages-root" });
   return (
     <div
       ref={setNodeRef}
-      className={`flex items-center justify-between rounded-md px-1 transition-all ${
+      className={`group/pages flex items-center gap-1 rounded-md px-1 transition-all ${
         isOver ? "bg-paper-200 ring-2 ring-inset ring-accent-500" : ""
       }`}
     >
@@ -129,6 +138,38 @@ export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
     null,
   );
   const [canvasDragError, setCanvasDragError] = useState<string | null>(null);
+  // Per-section collapse, persisted — same read-on-mount + write-through pattern as
+  // SidebarShell's `collapsed` flag. Default false (expanded); the mount effect corrects it.
+  const [pagesCollapsed, setPagesCollapsed] = useState(false);
+  const [canvasCollapsed, setCanvasCollapsed] = useState(false);
+  useEffect(() => {
+    setPagesCollapsed(
+      window.localStorage.getItem("delft-sidebar-pages-collapsed") === "true",
+    );
+    setCanvasCollapsed(
+      window.localStorage.getItem("delft-sidebar-canvas-collapsed") === "true",
+    );
+  }, []);
+  const togglePages = useCallback(() => {
+    setPagesCollapsed((prev) => {
+      const next = !prev;
+      window.localStorage.setItem(
+        "delft-sidebar-pages-collapsed",
+        String(next),
+      );
+      return next;
+    });
+  }, []);
+  const toggleCanvas = useCallback(() => {
+    setCanvasCollapsed((prev) => {
+      const next = !prev;
+      window.localStorage.setItem(
+        "delft-sidebar-canvas-collapsed",
+        String(next),
+      );
+      return next;
+    });
+  }, []);
   // Two sensors, not one PointerSensor for both: a delay-based constraint (needed on touch, so a
   // scroll swipe isn't immediately hijacked as a drag) makes mouse dragging feel broken, because it
   // requires holding the pointer still for the full delay before any movement is allowed — an
@@ -329,15 +370,25 @@ export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
         onDragEnd={handleDragEnd}
       >
         <PagesRootDropZone>
-          <span className="text-xs font-medium uppercase tracking-wide text-ink-500">
-            Pages
-          </span>
-          <div className="flex items-center gap-0.5">
+          <button
+            type="button"
+            onClick={togglePages}
+            aria-label={pagesCollapsed ? "Show pages" : "Hide pages"}
+            className={SECTION_CHEVRON}
+          >
+            {pagesCollapsed ? (
+              <ChevronRight size={12} />
+            ) : (
+              <ChevronDown size={12} />
+            )}
+          </button>
+          <span className={SECTION_LABEL}>Pages</span>
+          <div className="ml-auto flex items-center gap-0.5">
             <button
               type="button"
               onClick={() => createChild(null)}
               aria-label="New page"
-              className="relative rounded px-1.5 py-0.5 text-ink-500 before:absolute before:-left-2 before:-right-2.5 before:-top-1 before:-bottom-1.5 before:content-[''] hover:bg-paper-100 hover:text-ink-800"
+              className="relative rounded px-1.5 py-0.5 text-ink-500 opacity-100 transition-opacity before:absolute before:-left-2 before:-right-2.5 before:-top-1 before:-bottom-1.5 before:content-[''] hover:bg-paper-100 hover:text-ink-800 md:opacity-0 md:group-hover/pages:opacity-100 md:group-focus-within/pages:opacity-100"
             >
               <Plus size={14} />
             </button>
@@ -348,46 +399,47 @@ export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
             Couldn&apos;t move page: {dragError}
           </p>
         )}
-        {isLoading ? (
-          <div className="flex flex-col gap-1 px-1 py-1">
-            <div className="h-5 w-3/4 animate-pulse rounded bg-paper-200" />
-            <div className="h-5 w-1/2 animate-pulse rounded bg-paper-200" />
-            <div className="h-5 w-2/3 animate-pulse rounded bg-paper-200" />
-          </div>
-        ) : pagesError ? (
-          <p className="px-1 text-sm text-red-700">
-            Couldn&apos;t load pages: {pagesErrorObj.message}
-          </p>
-        ) : roots.length === 0 ? (
-          <p className="px-1 text-sm text-ink-400">
-            No pages yet. Time to build your nest.
-          </p>
-        ) : (
-          <ul className="flex flex-col gap-0.5">
-            {roots.map((page, index) => (
-              <Fragment key={page.id}>
-                <ReorderStrip
-                  id={`page-strip:root:${index === 0 ? "start" : roots[index - 1]!.id}`}
-                  active={draggingId !== null}
-                />
-                <PageTreeNode
-                  page={page}
-                  childrenByParent={childrenByParent}
-                  expanded={expanded}
-                  excludedDropIds={excludedDropIds}
-                  dragActive={draggingId !== null}
-                  onToggle={toggle}
-                  onCreateChild={createChild}
-                  depth={0}
-                />
-              </Fragment>
-            ))}
-            <ReorderStrip
-              id={`page-strip:root:${roots[roots.length - 1]!.id}`}
-              active={draggingId !== null}
-            />
-          </ul>
-        )}
+        {!pagesCollapsed &&
+          (isLoading ? (
+            <div className="flex flex-col gap-1 px-1 py-1">
+              <div className="h-5 w-3/4 animate-pulse rounded bg-paper-200" />
+              <div className="h-5 w-1/2 animate-pulse rounded bg-paper-200" />
+              <div className="h-5 w-2/3 animate-pulse rounded bg-paper-200" />
+            </div>
+          ) : pagesError ? (
+            <p className="px-1 text-sm text-red-700">
+              Couldn&apos;t load pages: {pagesErrorObj.message}
+            </p>
+          ) : roots.length === 0 ? (
+            <p className="px-1 text-sm text-ink-400">
+              No pages yet. Time to build your nest.
+            </p>
+          ) : (
+            <ul className="flex flex-col gap-0.5">
+              {roots.map((page, index) => (
+                <Fragment key={page.id}>
+                  <ReorderStrip
+                    id={`page-strip:root:${index === 0 ? "start" : roots[index - 1]!.id}`}
+                    active={draggingId !== null}
+                  />
+                  <PageTreeNode
+                    page={page}
+                    childrenByParent={childrenByParent}
+                    expanded={expanded}
+                    excludedDropIds={excludedDropIds}
+                    dragActive={draggingId !== null}
+                    onToggle={toggle}
+                    onCreateChild={createChild}
+                    depth={0}
+                  />
+                </Fragment>
+              ))}
+              <ReorderStrip
+                id={`page-strip:root:${roots[roots.length - 1]!.id}`}
+                active={draggingId !== null}
+              />
+            </ul>
+          ))}
         <DragOverlay dropAnimation={dragOverlayDropAnimation}>
           {draggingPage && (
             <div className="scale-105 rounded-md border border-paper-200 bg-paper-50 px-2 py-1 text-sm text-ink-800 shadow-xl">
@@ -397,40 +449,51 @@ export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
         </DragOverlay>
       </DndContext>
 
-      <div className="mt-2 flex items-center justify-between px-1">
-        <span className="text-xs font-medium uppercase tracking-wide text-ink-500">
-          Canvas
-        </span>
+      <div className="group/canvas mt-2 flex items-center gap-1 px-1">
+        <button
+          type="button"
+          onClick={toggleCanvas}
+          aria-label={canvasCollapsed ? "Show canvases" : "Hide canvases"}
+          className={SECTION_CHEVRON}
+        >
+          {canvasCollapsed ? (
+            <ChevronRight size={12} />
+          ) : (
+            <ChevronDown size={12} />
+          )}
+        </button>
+        <span className={SECTION_LABEL}>Canvas</span>
         <button
           type="button"
           onClick={createNewCanvas}
           aria-label="New canvas"
-          className="relative rounded px-1.5 py-0.5 text-ink-500 before:absolute before:-left-2 before:-right-2.5 before:-top-3 before:-bottom-2 before:content-[''] hover:bg-paper-100 hover:text-ink-800"
+          className="relative ml-auto rounded px-1.5 py-0.5 text-ink-500 opacity-100 transition-opacity before:absolute before:-left-2 before:-right-2.5 before:-top-3 before:-bottom-2 before:content-[''] hover:bg-paper-100 hover:text-ink-800 md:opacity-0 md:group-hover/canvas:opacity-100 md:group-focus-within/canvas:opacity-100"
         >
           <Plus size={14} />
         </button>
       </div>
-      {canvasesLoading ? (
-        <div className="flex flex-col gap-1 px-1 py-1">
-          <div className="h-5 w-2/3 animate-pulse rounded bg-paper-200" />
-          <div className="h-5 w-1/2 animate-pulse rounded bg-paper-200" />
-        </div>
-      ) : canvasesError ? (
-        <p className="px-1 text-sm text-red-700">
-          Couldn&apos;t load canvases: {canvasesErrorObj.message}
-        </p>
-      ) : (canvases ?? []).length === 0 ? (
-        <p className="px-1 text-sm text-ink-400">
-          Your canvas is blank. What will you draw?
-        </p>
-      ) : (
-        <DndContext
-          sensors={sensors}
-          collisionDetection={pointerWithin}
-          modifiers={[offsetDragOverlay]}
-          onDragStart={handleCanvasDragStart}
-          onDragEnd={handleCanvasDragEnd}
-        >
+      {!canvasCollapsed &&
+        (canvasesLoading ? (
+          <div className="flex flex-col gap-1 px-1 py-1">
+            <div className="h-5 w-2/3 animate-pulse rounded bg-paper-200" />
+            <div className="h-5 w-1/2 animate-pulse rounded bg-paper-200" />
+          </div>
+        ) : canvasesError ? (
+          <p className="px-1 text-sm text-red-700">
+            Couldn&apos;t load canvases: {canvasesErrorObj.message}
+          </p>
+        ) : (canvases ?? []).length === 0 ? (
+          <p className="px-1 text-sm text-ink-400">
+            Your canvas is blank. What will you draw?
+          </p>
+        ) : (
+          <DndContext
+            sensors={sensors}
+            collisionDetection={pointerWithin}
+            modifiers={[offsetDragOverlay]}
+            onDragStart={handleCanvasDragStart}
+            onDragEnd={handleCanvasDragEnd}
+          >
           {canvasDragError && (
             <p className="px-1 text-xs text-red-700">
               Couldn&apos;t move canvas: {canvasDragError}
@@ -462,8 +525,8 @@ export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
               </div>
             )}
           </DragOverlay>
-        </DndContext>
-      )}
+          </DndContext>
+        ))}
     </nav>
   );
 }
