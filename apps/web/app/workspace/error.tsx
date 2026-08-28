@@ -6,8 +6,9 @@ import { Button } from "../_components/Button";
 import { Heading } from "../_components/Heading";
 
 // Scoped to app/workspace/ (rather than relying on the root error.tsx alone) since this is where
-// all the state-heavy editors live (BlockNote, Excalidraw) — keeps the TopBar mounted above the
-// error instead of losing the whole chrome. Renders inside workspace/layout.tsx's `flex flex-1`
+// all the state-heavy editors live (BlockNote, Excalidraw) — a crash in one page/canvas keeps the
+// rest of the app shell (and, on the sidebar-less picker route, its header) mounted instead of
+// blowing away to the full-page root fallback. Renders inside AppLayout's `flex min-h-0 flex-1`
 // content area, so this fills that rather than the full viewport (the root one does that).
 export default function WorkspaceError({
   error,

@@ -23,8 +23,7 @@ test("deleting a workspace removes it from the switcher and its data no longer r
 
   page.once("dialog", (dialog) => dialog.accept());
   await page
-    .getByText("Throwaway")
-    .locator("..")
+    .locator("li", { hasText: "Throwaway" })
     .getByRole("button", { name: "Delete" })
     .click();
 

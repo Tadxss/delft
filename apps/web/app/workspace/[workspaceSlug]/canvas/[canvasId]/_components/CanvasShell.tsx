@@ -5,7 +5,7 @@
 export function CanvasShell({ title }: { title: string }) {
   return (
     <div className="flex h-full flex-col">
-      <div className="flex shrink-0 items-center justify-between gap-4 px-4 pb-2 pt-16 sm:px-6 sm:pt-6">
+      <div className="flex shrink-0 items-center justify-between gap-4 px-4 pb-2 pt-14 sm:px-6 sm:pt-6">
         <p className="w-full flex-1 truncate text-2xl font-bold leading-snug text-ink-800">
           {title || "Untitled"}
         </p>

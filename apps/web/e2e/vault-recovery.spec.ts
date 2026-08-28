@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { signIn, uniqueEmail } from "./helpers";
+import { onlyVisible, openSidebar, signIn, uniqueEmail } from "./helpers";
 
 // The recovery key round trip end to end: setup shows it once and can't be skipped, a wrong
 // recovery key is rejected, the correct one lets you set a brand-new passphrase, and every
@@ -14,7 +14,8 @@ test("forgot passphrase recovers via the recovery key with zero data loss", asyn
   await page.click('button:has-text("Create")');
   await page.waitForURL(/\/workspace\/[^/]+--[^/]+$/, { timeout: 15000 });
 
-  await page.getByRole("button", { name: "Credentials" }).click();
+  await openSidebar(page);
+  await onlyVisible(page.getByRole("button", { name: "Credentials" })).click();
   await page.fill("#passphrase", "the-original-passphrase");
   await page.fill("#confirm", "the-original-passphrase");
   await page.click('button:has-text("Create vault")');
@@ -44,7 +45,8 @@ test("forgot passphrase recovers via the recovery key with zero data loss", asyn
 
   // Lock and come back with the wrong passphrase.
   await page.click('button[aria-label="Close"]');
-  await page.getByRole("button", { name: "Credentials" }).click();
+  await openSidebar(page);
+  await onlyVisible(page.getByRole("button", { name: "Credentials" })).click();
   await page.fill("#passphrase", "not-the-real-passphrase");
   await page.click('button:has-text("Unlock")');
   await expect(
@@ -92,7 +94,8 @@ test("forgot passphrase recovers via the recovery key with zero data loss", asyn
 
   // Lock and confirm the NEW passphrase is what actually works now, not the original one.
   await page.click('button[aria-label="Close"]');
-  await page.getByRole("button", { name: "Credentials" }).click();
+  await openSidebar(page);
+  await onlyVisible(page.getByRole("button", { name: "Credentials" })).click();
   await page.fill("#passphrase", "the-original-passphrase");
   await page.click('button:has-text("Unlock")');
   await expect(

@@ -81,11 +81,11 @@ function CopyIcon() {
 }
 
 // The block's own `render` UI — a language picker (searchable, matching the app's Notion-style
-// aesthetic) and a copy button, replacing @blocknote/core's bare native <select>. The block's
-// background is always Shiki's dark theme regardless of the app's light/dark mode (set by the
-// `syntaxHighlighter` extension, unrelated to this component), so the toolbar's own chips use a
-// fixed translucent-on-dark style to stay legible against it, while the language dropdown panel —
-// which floats over the page, not the code — uses the app's normal paper/ink theme tokens.
+// aesthetic) and a copy button, replacing @blocknote/core's bare native <select>. Toolbar chips
+// and the dropdown panel both use the app's paper/ink theme tokens; the code-block surface itself
+// is re-themed per light/dark in globals.css (Shiki runs with `defaultColor: false`, so the block
+// background — not this component — drives contrast). The `.code-block-toolbar` class is the hook
+// for the hover/focus reveal rule, also in globals.css.
 export function CodeBlockView({
   block,
   editor,
@@ -195,7 +195,7 @@ export function CodeBlockView({
     <>
       <div
         ref={wrapperRef}
-        className="absolute right-2 top-2 z-10 flex items-center gap-1"
+        className="code-block-toolbar absolute right-2 top-1.5 z-10 flex items-center gap-2"
       >
         {editor.isEditable && (
           <div className="relative">
@@ -205,7 +205,7 @@ export function CodeBlockView({
               aria-haspopup="listbox"
               aria-expanded={pickerOpen}
               onClick={() => (pickerOpen ? closePicker() : setPickerOpen(true))}
-              className="flex h-7 items-center gap-1 rounded-md border border-white/10 bg-white/10 px-2 text-xs text-white/90 hover:bg-white/15"
+              className="flex h-7 items-center gap-1 rounded-md border border-paper-200 bg-paper-100 px-2 text-xs text-ink-700 hover:bg-paper-200 hover:text-ink-900"
             >
               {currentLanguage.name}
               <ChevronDownIcon />
@@ -262,7 +262,7 @@ export function CodeBlockView({
           title="Copy code"
           aria-label="Copy code"
           onClick={handleCopy}
-          className="flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/10 text-white/90 hover:bg-white/15"
+          className="flex h-7 w-7 items-center justify-center rounded-md border border-paper-200 bg-paper-100 text-ink-700 hover:bg-paper-200 hover:text-ink-900"
         >
           {copied ? <CheckIcon /> : <CopyIcon />}
         </button>

@@ -17,7 +17,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { ChevronsLeft, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import type { CanvasSummary, PageSummary } from "@crowscribe/types";
 import {
   canvasQueryOptions,
@@ -35,6 +35,7 @@ import {
 } from "@crowscribe/shared";
 import { PageTreeNode } from "./PageTreeNode";
 import { ReorderStrip } from "./ReorderStrip";
+import { SidebarHeader } from "./SidebarHeader";
 import { dragOverlayDropAnimation, offsetDragOverlay } from "./dragOverlayOffset";
 
 // The "Pages" section header, wrapped in its own component so useDroppable can be called on it —
@@ -318,17 +319,8 @@ export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
     : null;
 
   return (
-    <nav className="group flex h-full w-64 shrink-0 flex-col gap-2 border-r border-paper-200 bg-paper-50 p-3">
-      <div className="flex items-center justify-end px-1">
-        <button
-          type="button"
-          onClick={onCollapse}
-          aria-label="Collapse sidebar"
-          className="relative rounded px-1.5 py-0.5 text-ink-500 opacity-100 before:absolute before:-left-2 before:-right-2.5 before:-top-3 before:-bottom-1 before:content-[''] hover:bg-paper-100 hover:text-ink-800 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100"
-        >
-          <ChevronsLeft size={14} />
-        </button>
-      </div>
+    <nav className="group flex h-full w-64 shrink-0 flex-col gap-2 overflow-y-auto overflow-x-clip border-r border-paper-200 bg-paper-50 p-3">
+      <SidebarHeader onCollapse={onCollapse} />
       <DndContext
         sensors={sensors}
         collisionDetection={pointerWithin}

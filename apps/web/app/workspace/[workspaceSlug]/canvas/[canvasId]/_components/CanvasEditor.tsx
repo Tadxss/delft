@@ -132,7 +132,7 @@ export function CanvasEditor({ canvas }: { canvas: Canvas }) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex shrink-0 items-center justify-between gap-4 px-4 pb-2 pt-16 sm:px-6 sm:pt-6">
+      <div className="flex shrink-0 items-center justify-between gap-4 px-4 pb-2 pt-14 sm:px-6 sm:pt-6">
         <label htmlFor="canvas-title" className="sr-only">
           Title
         </label>

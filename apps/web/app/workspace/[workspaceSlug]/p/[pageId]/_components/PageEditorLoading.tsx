@@ -5,7 +5,7 @@
 // available), so this is a generic skeleton rather than the real heading.
 export function PageEditorLoading() {
   return (
-    <div className="mx-auto flex h-full max-w-4xl flex-col gap-4 px-4 pb-10 pt-24 sm:px-8 sm:pt-28">
+    <div className="mx-auto flex h-full max-w-4xl flex-col gap-4 px-4 pb-10 pt-14 sm:px-8 sm:pt-10">
       <div className="h-9 w-2/3 animate-pulse rounded bg-paper-200" />
       <div className="flex flex-col gap-3 opacity-40">
         <div className="h-4 w-5/6 animate-pulse rounded bg-paper-200" />

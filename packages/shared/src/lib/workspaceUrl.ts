@@ -21,6 +21,15 @@ export function buildWorkspaceHref(
   return `/workspace/${slugifyWorkspaceName(workspace.name)}--${workspace.id}`;
 }
 
+// Up-to-two-letter initials for the logo-less fallback badge. Two or more words → first letter of
+// each of the first two; one word → its first two letters; nothing usable → "?".
+export function workspaceInitials(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "?";
+  if (words.length === 1) return words[0]!.slice(0, 2).toUpperCase();
+  return (words[0]![0]! + words[1]![0]!).toUpperCase();
+}
+
 // Recovers the workspace id from a `{slug}--{id}` route param. Falls back to treating the whole
 // param as the id if no "--" is present, so a bare id (e.g. an old/manually-typed link) still
 // works rather than 404ing.

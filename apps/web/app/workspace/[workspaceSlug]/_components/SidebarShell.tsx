@@ -38,9 +38,9 @@ export function SidebarShell() {
   }
 
   const desktopSidebar = (
-    <div className="hidden md:flex">
+    <div className="hidden h-full md:flex">
       <m.div
-        className="shrink-0 overflow-hidden"
+        className="h-full shrink-0 overflow-hidden"
         animate={{ width: collapsed ? 40 : 256 }}
         transition={{ duration: 0.18, ease: "easeInOut" }}
       >
@@ -66,7 +66,7 @@ export function SidebarShell() {
           ) : (
             <m.div
               key="full"
-              className="w-64"
+              className="h-full w-64"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -88,7 +88,7 @@ export function SidebarShell() {
         type="button"
         onClick={() => setMobileOpen(true)}
         aria-label="Open sidebar"
-        className="fixed left-2 top-14 z-30 rounded-md border border-paper-200 bg-paper-50 p-1.5 text-ink-500 shadow-sm hover:bg-paper-100 hover:text-ink-800 md:hidden"
+        className="fixed left-3 top-3 z-30 rounded-md border border-paper-200 bg-paper-50 p-1.5 text-ink-500 shadow-sm hover:bg-paper-100 hover:text-ink-800 md:hidden"
       >
         <Menu size={16} />
       </button>
