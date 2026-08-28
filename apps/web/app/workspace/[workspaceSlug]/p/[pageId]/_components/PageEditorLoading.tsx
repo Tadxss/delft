@@ -7,10 +7,10 @@
 export function PageEditorLoading() {
   return (
     <div className="flex h-full flex-col">
-      <div className="sticky top-0 z-10 flex shrink-0 items-center justify-end gap-3 border-b border-paper-200 bg-paper-50 px-4 py-1.5 sm:px-8">
+      <div className="sticky top-0 z-10 flex shrink-0 items-center justify-end gap-3 bg-paper-50 px-4 py-1.5 sm:px-8">
         <div className="h-[30px] w-[70px] animate-pulse rounded-md bg-paper-200" />
       </div>
-      <div className="flex flex-1 flex-col gap-4 px-4 pb-10 pt-8 sm:px-8">
+      <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-4 px-4 pb-10 pt-8 sm:px-8">
         <div className="h-9 w-2/3 animate-pulse rounded bg-paper-200" />
         <div className="flex flex-col gap-3 opacity-40">
           <div className="h-4 w-5/6 animate-pulse rounded bg-paper-200" />
