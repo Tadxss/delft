@@ -16,6 +16,11 @@
   --accent-500: #6d28d9;
   --accent-600: #5b21b6;
 
+  /* Code-block surface — light mode pairs a soft light background with Shiki's light token
+     palette (see the code-block section below); dark mode lifts the card above the page. */
+  --code-bg: #f6f8fa;
+  --code-border: var(--paper-200);
+
   --background: var(--paper-50);
   --surface: #ffffff;
   --border: var(--paper-200);
@@ -38,6 +43,10 @@
   --ink-900: #e8eaf0;
   --accent-500: #8b5cf6;
   --accent-600: #a78bfa;
+
+  /* Lifted a step above --paper-50 (#111318) so the code card reads as a distinct surface. */
+  --code-bg: #1b1f27;
+  --code-border: var(--paper-200);
 
   --background: var(--paper-50);
   --surface: #1a1f28;
@@ -85,6 +94,60 @@ a {
 /* /share/[slug] mounts a read-only BlockNoteView (see SharedPageView, editable={false} with every
    default UI piece explicitly disabled) rather than a raw HTML export, so it inherits
    @blocknote/mantine's own styling directly — no separate read-only stylesheet needed here. */
+
+/* Code blocks — @blocknote/core's Block.css hardcodes a near-black background (rgb(22 22 22))
+   in both themes and defaults Shiki's tokens to its dark palette. Shiki runs with
+   `defaultColor: false` here, so each token only carries `--shiki-light`/`--shiki-dark` CSS
+   vars (no literal color) and the visible result is driven entirely by the block background +
+   the `.shiki { color }` rule — which lets us re-theme it purely in CSS, no !important needed
+   against inline styles. The `.bn-container` prefix is load-bearing: @blocknote/mantine's
+   stylesheet is imported after globals.css, so a bare `.bn-block-content[...]` selector ties on
+   specificity and loses — the extra ancestor class wins regardless of order. */
+.bn-container .bn-block-content[data-content-type="codeBlock"] {
+  background-color: var(--code-bg);
+  border: 1px solid var(--code-border);
+}
+
+/* Light mode: swap Shiki's tokens to their light palette (Block.css picks --shiki-dark by
+   default). Scoped to the code block so the markdown source popup's own `.shiki` rule is left
+   alone. */
+:root:not(.dark) .bn-container .bn-block-content[data-content-type="codeBlock"] {
+  color: var(--ink-900);
+}
+:root:not(.dark)
+  .bn-container
+  .bn-block-content[data-content-type="codeBlock"]
+  .shiki {
+  color: var(--shiki-light);
+}
+
+/* Language selector + copy button (CodeBlockView.tsx): only reveal on hover/focus so they
+   don't clutter the block or overlap its first line at rest; `focus-within` keeps the
+   language picker usable once open, and `hover: none` devices always show it. */
+.bn-container .bn-block-content[data-content-type="codeBlock"] .code-block-toolbar {
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+.bn-container
+  .bn-block-content[data-content-type="codeBlock"]:hover
+  .code-block-toolbar,
+.bn-container
+  .bn-block-content[data-content-type="codeBlock"]:focus-within
+  .code-block-toolbar {
+  opacity: 1;
+}
+@media (hover: none) {
+  .bn-container
+    .bn-block-content[data-content-type="codeBlock"]
+    .code-block-toolbar {
+    opacity: 1;
+  }
+}
+
+/* Reserve space at the top of the code so the toolbar never sits over the first line. */
+.bn-container .bn-block-content[data-content-type="codeBlock"] > pre {
+  padding-top: 2.25rem;
+}
 
 /* Global hover/press transition — Tailwind's own transition-* utilities cover most interactive
    elements already, but this catches every plain button/link/input across the app so the

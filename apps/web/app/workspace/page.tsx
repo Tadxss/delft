@@ -8,6 +8,7 @@ import {
   useCreateWorkspace,
   useDeleteWorkspace,
   useWorkspaces,
+  workspaceInitials,
 } from "@crowscribe/shared";
 import { Button } from "../_components/Button";
 import { FormLabel } from "../_components/FormLabel";
@@ -58,7 +59,7 @@ export default function WorkspaceSwitcherPage() {
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-lg flex-col gap-8 px-6 py-16">
+    <main className="mx-auto flex w-full max-w-lg flex-col gap-8 overflow-y-auto px-6 py-16">
       <Heading level="page">Workspaces</Heading>
 
       {isLoading ? (
@@ -74,9 +75,21 @@ export default function WorkspaceSwitcherPage() {
               <button
                 type="button"
                 onClick={() => router.push(buildWorkspaceHref(workspace))}
-                className="w-full rounded-md border border-paper-200 bg-paper-100 px-4 py-3 pr-16 text-left text-sm text-ink-800 transition-colors hover:border-accent-500"
+                className="flex w-full items-center gap-3 rounded-md border border-paper-200 bg-paper-100 px-4 py-3 pr-16 text-left text-sm text-ink-800 transition-colors hover:border-accent-500"
               >
-                {workspace.name}
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded bg-paper-200 text-[11px] font-semibold text-ink-500">
+                  {workspace.logoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- small user-uploaded image with no build-time known dimensions; next/image's optimization isn't worth the config for this
+                    <img
+                      src={workspace.logoUrl}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    workspaceInitials(workspace.name)
+                  )}
+                </span>
+                <span className="min-w-0 flex-1 truncate">{workspace.name}</span>
               </button>
               {workspace.ownerId === user?.id && (
                 <button

@@ -65,15 +65,26 @@ export async function signIn(page: Page, email: string): Promise<void> {
 // it's never present. The drawer also auto-closes on navigation, so callers need to call this again
 // after any nav, not just once per test.
 //
-// Deliberately does NOT gate on `toggle.isVisible()` — that's an instant, non-retrying check, and
-// immediately after a fresh `goto()`/`reload()` the page may not have settled yet (the same
-// category of race `signIn()` above works around), so a same-tick visibility check can miss a
-// toggle that's about to render. `viewportSize()` is synchronous, known from context config before
-// any content loads, and exactly matches the `md` breakpoint this toggle is gated on — no race
-// possible. `.click()` itself still auto-waits for the toggle to actually be actionable.
+// Deliberately does NOT gate the *closed → open* path on `toggle.isVisible()` — that's an instant,
+// non-retrying check, and immediately after a fresh `goto()`/`reload()` the page may not have
+// settled yet (the same category of race `signIn()` above works around), so a same-tick visibility
+// check can miss a toggle that's about to render. `viewportSize()` is synchronous, known from
+// context config before any content loads, and exactly matches the `md` breakpoint this toggle is
+// gated on — no race possible. `.click()` itself still auto-waits for the toggle to be actionable.
+//
+// It DOES short-circuit when the drawer is already open: it stays open until the next navigation,
+// so a second call in the same test (e.g. reopening a modal that lives in the sidebar) would just
+// click the now-backdrop-covered toggle and hang. The in-drawer "Collapse sidebar" button is only
+// visible when the drawer is open (below `md` the always-mounted desktop `<Sidebar>` copy is
+// `display:none`), so it's a safe tell.
 export async function openSidebar(page: Page): Promise<void> {
   const viewport = page.viewportSize();
   if (!viewport || viewport.width >= 768) return;
+  const alreadyOpen = await page
+    .getByRole("button", { name: "Collapse sidebar" })
+    .isVisible()
+    .catch(() => false);
+  if (alreadyOpen) return;
   await page.getByRole("button", { name: "Open sidebar" }).click();
 }
 

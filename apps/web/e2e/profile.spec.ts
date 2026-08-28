@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { signIn, uniqueEmail } from "./helpers";
+import { onlyVisible, openSidebar, signIn, uniqueEmail } from "./helpers";
 
 // A minimal valid 1x1 PNG, base64-encoded — enough for browser-image-compression to accept and
 // process without needing a real file on disk.
@@ -16,7 +16,10 @@ test("profile form: name/occupation/bio persist, avatar uploads and overwrites i
   await page.click('button:has-text("Create")');
   await page.waitForURL(/\/workspace\/[^/]+--[^/]+$/, { timeout: 15000 });
 
-  await page.getByRole("button", { name: "Account settings" }).click();
+  await openSidebar(page);
+  await onlyVisible(
+    page.getByRole("button", { name: "Account settings" }),
+  ).click();
   await page
     .getByRole("button", { name: "Update profile", exact: true })
     .click();
@@ -33,7 +36,10 @@ test("profile form: name/occupation/bio persist, avatar uploads and overwrites i
 
   // Close and reopen the modal — confirm the save actually persisted, not just local state.
   await page.getByRole("button", { name: "Close" }).click();
-  await page.getByRole("button", { name: "Account settings" }).click();
+  await openSidebar(page);
+  await onlyVisible(
+    page.getByRole("button", { name: "Account settings" }),
+  ).click();
   await page
     .getByRole("button", { name: "Update profile", exact: true })
     .click();
@@ -56,7 +62,10 @@ test("profile form: name/occupation/bio persist, avatar uploads and overwrites i
     timeout: 10000,
   });
   await page.getByRole("button", { name: "Close" }).click();
-  await page.getByRole("button", { name: "Account settings" }).click();
+  await openSidebar(page);
+  await onlyVisible(
+    page.getByRole("button", { name: "Account settings" }),
+  ).click();
   await page
     .getByRole("button", { name: "Update profile", exact: true })
     .click();

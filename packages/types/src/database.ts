@@ -353,6 +353,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          logo_url: string | null
           name: string
           owner_id: string
           vault_recovery_wrapped_key: string | null
@@ -364,6 +365,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          logo_url?: string | null
           name: string
           owner_id: string
           vault_recovery_wrapped_key?: string | null
@@ -375,6 +377,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          logo_url?: string | null
           name?: string
           owner_id?: string
           vault_recovery_wrapped_key?: string | null

@@ -18,6 +18,11 @@ function TopBar() {
   const [accountOpen, setAccountOpen] = useState(false);
   const [credentialsOpen, setCredentialsOpen] = useState(false);
 
+  // Inside a workspace the chrome lives at the top of the sidebar (see SidebarHeader) — no
+  // separate top header there. This bar only renders on the sidebar-less routes: the
+  // `/workspace` picker and the slug-less error boundary.
+  if (params.workspaceSlug) return null;
+
   return (
     <header className="flex h-12 shrink-0 items-center justify-between border-b border-paper-200 bg-paper-100 px-4">
       <Link
@@ -71,9 +76,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthGate>
       <VaultKeyProvider>
-        <div className="flex min-h-screen flex-col">
+        <div className="flex h-screen flex-col overflow-hidden">
           <TopBar />
-          <div className="flex flex-1">{children}</div>
+          <div className="flex min-h-0 flex-1">{children}</div>
         </div>
       </VaultKeyProvider>
     </AuthGate>

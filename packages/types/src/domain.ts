@@ -2,6 +2,9 @@ export interface Workspace {
   id: string;
   ownerId: string;
   name: string;
+  // Public URL of the workspace's uploaded logo image (in the `workspace-logos` Storage bucket),
+  // or null — the UI falls back to the workspace's initials when unset.
+  logoUrl: string | null;
   vaultSalt: string | null;
   // The Vault Master Key (VMK), AES-GCM wrapped under the passphrase-derived key and, separately,
   // under a one-time-shown recovery key — see packages/shared/src/lib/vaultCrypto.ts. A workspace

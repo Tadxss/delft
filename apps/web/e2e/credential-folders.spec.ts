@@ -2,6 +2,8 @@ import { test, expect, type Page } from "@playwright/test";
 import {
   backToList,
   dragElementOnto,
+  onlyVisible,
+  openSidebar,
   reorderStripBefore,
   signIn,
   uniqueEmail,
@@ -12,7 +14,8 @@ async function setUpVault(page: Page) {
   await page.click('button:has-text("Create")');
   await page.waitForURL(/\/workspace\/[^/]+--[^/]+$/, { timeout: 15000 });
 
-  await page.getByRole("button", { name: "Credentials" }).click();
+  await openSidebar(page);
+  await onlyVisible(page.getByRole("button", { name: "Credentials" })).click();
   await page.fill("#passphrase", "the-real-passphrase");
   await page.fill("#confirm", "the-real-passphrase");
   await page.click('button:has-text("Create vault")');
@@ -37,7 +40,14 @@ async function createRootFolder(page: Page, name: string) {
 // The always-visible tree row for a folder — its toggle button (chevron + icon + name) wrapped by
 // the "group" div that also holds the hover-revealed action icons.
 function folderRow(page: Page, name: string) {
-  return page.locator("button", { hasText: name }).first().locator("..");
+  // Scoped to the Credentials dialog: the workspace name now also renders as a button in the
+  // sidebar header, so an unscoped `button:has-text("Personal")` would match that first when a
+  // folder happens to share the workspace's name.
+  return page
+    .getByRole("dialog")
+    .locator("button", { hasText: name })
+    .first()
+    .locator("..");
 }
 
 async function createCredentialInFolder(

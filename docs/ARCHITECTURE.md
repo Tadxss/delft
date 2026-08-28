@@ -2444,3 +2444,49 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
     reference image, correctly scaled, no cropping/stretching; landing hero checked in both light
     and dark mode; TopBar checked via a full magic-link sign-in, before and after the contrast
     fix. Zero new console errors.
+
+76. **Workspace chrome moved into the sidebar; per-workspace logo added.** ✅ _done_. A cluster of
+    UX changes turning the top header into a Notion-style in-sidebar workspace switcher.
+
+    - **Fixed-viewport app shell.** `workspace/layout.tsx` went `min-h-screen` → `h-screen
+      overflow-hidden`; the workspace content column (`[workspaceSlug]/layout.tsx`) became the
+      single `overflow-y-auto` scroll pane, and `SidebarShell`'s wrapper chain + `Sidebar`'s
+      `<nav>` carry `h-full` + `overflow-y-auto` so the sidebar and (formerly scrolling-away)
+      chrome stay pinned while a long page scrolls.
+    - **Code-block polish** (`_lib/CodeBlockView.tsx` + `globals.css`): the language/copy toolbar
+      is hover/focus-reveal only, theme-token chips instead of translucent-white, and the block
+      surface is re-themed per light/dark via new `--code-bg`/`--code-border` vars (Shiki runs
+      `defaultColor: false`, so the block background — not inline styles — drives contrast; light
+      mode also flips `.shiki` to `var(--shiki-light)`). `.bn-container` prefix is load-bearing on
+      those rules — `@blocknote/mantine/style.css` loads after `globals.css`.
+    - **Header removed inside a workspace.** `TopBar` (`workspace/layout.tsx`) early-returns
+      `null` when `params.workspaceSlug` is set, so it renders only on the sidebar-less `/workspace`
+      picker + the slug-less error boundary. Its buttons (Credentials, `ThemeToggle`, Account) plus
+      the workspace name + a dropdown menu ("Workspace settings", "Switch workspace", "Sign out")
+      moved into a new `SidebarHeader.tsx` at the top of the sidebar, above a full-bleed divider.
+      The mobile drawer renders the sidebar twice, so the 5 e2e specs that click those buttons
+      gained `openSidebar()` + `onlyVisible()` (and `openSidebar()` became idempotent — it
+      short-circuits when the in-drawer "Collapse sidebar" button is already visible).
+    - **Per-workspace logo** (`20260828033527_workspace_logo.sql`): nullable `workspaces.logo_url`
+      (covered by `workspaces_update_owner` — no RLS/grant change, same as every vault column) +
+      a new public `workspace-logos` Storage bucket whose policies are a verbatim copy of
+      `page_images_*` (membership via the object path's first folder segment). New hooks
+      `useUpdateWorkspace` (partial `{ name?, logoUrl? }` patch — the first workspace-rename path
+      in the app; slug in the URL is decorative so a rename just `router.replace`s to the fresh
+      href) and `useUploadWorkspaceLogo` (byte-for-byte `useUploadAvatar` keyed by workspace,
+      fixed `{id}/logo.webp` path, `upsert`, `?v=` cache-bust). Owner-only `WorkspaceSettingsModal`
+      (opened from the dropdown) sets the logo two ways — a native `<label>`-wrapped file input
+      (compress→upload→persist) or a pasted `http(s)` URL written straight to `logo_url` (no storage
+      round trip; client-side length check matches the `char_length <= 2000` DB constraint) — plus
+      Remove and rename. Logo-less fallback is the workspace's initials (`workspaceInitials()` in
+      `lib/workspaceUrl.ts`, ≤2 letters), shown in the sidebar header badge and next to each row on
+      the picker. The dropdown itself is just "Workspace settings" + "Switch workspace" — sign-out
+      stays in the Account modal. Covered by `e2e/workspace-settings.spec.ts`.
+
+    Verified: `pnpm lint`/`check-types`/`build` clean; e2e green across chromium/webkit/mobile-safari
+    for the new spec plus `workspace-delete`, `workspace-isolation`, `credentials`, `profile`
+    (`workspace-delete`'s Delete-button locator was loosened to `li:has-text(...)` after the picker
+    row gained a badge span). Visual checks via Playwright MCP: scroll-pinning, code blocks in both
+    themes, headerless workspace + mobile drawer, logo upload/remove/rename round-tripping through a
+    reload. **Hosted DB still needs `supabase db push` + a redeploy before the logo column exists
+    on `crowscribe.vercel.app`** — applied locally via `supabase migration up` only.
