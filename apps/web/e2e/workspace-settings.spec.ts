@@ -31,7 +31,8 @@ test("workspace settings: rename and logo persist", async ({ page }) => {
   // --- rename ---
   await openWorkspaceSettings(page, "Personal");
   await page.fill("#workspace-settings-name", "Renamed Space");
-  await page.getByRole("button", { name: "Save", exact: true }).click();
+  // Two "Save" buttons in the modal now (Name, Description) — the first is Name's.
+  await page.getByRole("button", { name: "Save", exact: true }).first().click();
   // The URL slug refreshes to the new name; the id after "--" is unchanged.
   await page.waitForURL(/\/workspace\/renamed-space--[^/]+$/, {
     timeout: 15000,
@@ -74,4 +75,38 @@ test("workspace settings: rename and logo persist", async ({ page }) => {
   await expect(
     onlyVisible(page.locator("nav img[alt='']")).first(),
   ).toBeVisible();
+
+  // --- Remove reverts the header badge to initials and survives a reload ---
+  await openWorkspaceSettings(page, "Renamed Space");
+  await page.getByRole("button", { name: "Remove" }).click();
+  await expect(page.getByRole("button", { name: "Remove" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Close" }).click();
+  await page.reload();
+  await openSidebar(page);
+  await expect(onlyVisible(page.locator("nav img[alt='']"))).toHaveCount(0);
+  // Badge fell back to initials — the workspace-name button reads "RS Renamed Space".
+  await expect(workspaceButton(page, "RS Renamed Space")).toBeVisible();
+});
+
+test("workspace settings: description persists", async ({ page }) => {
+  await signIn(page, uniqueEmail("workspace-description"));
+
+  await page.fill("#workspace-name", "Personal");
+  await page.click('button:has-text("Create")');
+  await page.waitForURL(/\/workspace\/[^/]+--[^/]+$/, { timeout: 15000 });
+
+  await openWorkspaceSettings(page, "Personal");
+  await page.fill(
+    "#workspace-settings-description",
+    "Ops runbooks and scratch notes.",
+  );
+  // The description Save is the second "Save" in the modal (after the Name one).
+  await page.getByRole("button", { name: "Save", exact: true }).nth(1).click();
+  await page.getByRole("button", { name: "Close" }).click();
+
+  await page.reload();
+  await openWorkspaceSettings(page, "Personal");
+  await expect(page.locator("#workspace-settings-description")).toHaveValue(
+    "Ops runbooks and scratch notes.",
+  );
 });

@@ -13,10 +13,12 @@ import {
 } from "@crowscribe/shared";
 import { Button } from "../../../_components/Button";
 import { FormLabel } from "../../../_components/FormLabel";
-import { Input } from "../../../_components/Input";
+import { Input, Textarea } from "../../../_components/Input";
 import { Modal } from "../../../_components/Modal";
 
 const MAX_LOGO_URL_LENGTH = 2000; // matches the workspaces.logo_url CHECK constraint
+const MAX_DESCRIPTION_LENGTH = 2000; // matches the workspaces.description CHECK constraint
+const MAX_RAW_LOGO_BYTES = 15 * 1024 * 1024; // reject giant inputs before they hit the compressor
 
 // Owner-only workspace settings — set the logo (upload a file OR paste an image URL), remove it,
 // and rename the workspace. Opened from the SidebarHeader dropdown. Upload mirrors AccountModal's
@@ -37,6 +39,7 @@ export function WorkspaceSettingsModal({
   const uploadLogo = useUploadWorkspaceLogo();
 
   const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
   const [urlInput, setUrlInput] = useState("");
   const [logoBusy, setLogoBusy] = useState(false);
   const [logoError, setLogoError] = useState<string | null>(null);
@@ -45,24 +48,33 @@ export function WorkspaceSettingsModal({
   useEffect(() => {
     if (open) {
       setName(workspace?.name ?? "");
+      setDescription(workspace?.description ?? "");
       setUrlInput("");
       setLogoError(null);
     }
-  }, [open, workspace?.name]);
+  }, [open, workspace?.name, workspace?.description]);
 
   const logoUrl = workspace?.logoUrl ?? null;
   const trimmedName = name.trim();
   const nameChanged = trimmedName.length > 0 && trimmedName !== workspace?.name;
+  const trimmedDescription = description.trim();
+  const descriptionChanged =
+    trimmedDescription !== (workspace?.description ?? "");
 
   async function handleLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
     setLogoError(null);
+    if (file.size > MAX_RAW_LOGO_BYTES) {
+      setLogoError("That image is too large — pick one under 15 MB.");
+      return;
+    }
     setLogoBusy(true);
     try {
       const compressed = await imageCompression(file, {
         maxWidthOrHeight: 512,
+        maxSizeMB: 0.3,
         fileType: "image/webp",
         useWebWorker: true,
         exifOrientation: 1,
@@ -111,6 +123,14 @@ export function WorkspaceSettingsModal({
           ),
       },
     );
+  }
+
+  function handleSaveDescription() {
+    if (!descriptionChanged) return;
+    updateWorkspace.mutate({
+      id: workspaceId,
+      description: trimmedDescription || null,
+    });
   }
 
   return (
@@ -214,6 +234,27 @@ export function WorkspaceSettingsModal({
               {updateWorkspace.error.message}
             </p>
           )}
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <FormLabel htmlFor="workspace-settings-description">
+            Description
+          </FormLabel>
+          <Textarea
+            id="workspace-settings-description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            maxLength={MAX_DESCRIPTION_LENGTH}
+            rows={3}
+            placeholder="What's this workspace for?"
+          />
+          <Button
+            onClick={handleSaveDescription}
+            disabled={!descriptionChanged || updateWorkspace.isPending}
+            className="self-start"
+          >
+            Save
+          </Button>
         </div>
       </div>
     </Modal>

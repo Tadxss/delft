@@ -53,6 +53,9 @@ test("create a workspace, create nested pages, edit content, and confirm autosav
   // Wait past the 800ms autosave debounce + a network round trip
   await page.waitForTimeout(1500);
 
+  // The top-bar "Edited …" indicator reflects the just-saved write.
+  await expect(page.getByText(/^Edited /)).toBeVisible();
+
   // Reload and confirm both title and content survived the round trip through Postgres
   await page.reload();
   await expect(page.locator('input[placeholder="Untitled"]')).toHaveValue(

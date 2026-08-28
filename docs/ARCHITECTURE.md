@@ -2490,3 +2490,30 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
     themes, headerless workspace + mobile drawer, logo upload/remove/rename round-tripping through a
     reload. **Hosted DB still needs `supabase db push` + a redeploy before the logo column exists
     on `crowscribe.vercel.app`** — applied locally via `supabase migration up` only.
+
+    Followups (same shipped cluster): **workspace-logo bucket is now self-cleaning** — a new
+    `lib/removeWorkspaceLogo.ts` (mirrors `removePageImages`: best-effort, catch-and-log) deletes
+    `{id}/logo.webp` whenever `useUpdateWorkspace` sets `logo_url` to anything that isn't that
+    object's own URL (Remove, or pasting an external URL), and `useDeleteWorkspace` deletes it
+    before the row delete. The fixed-path `upsert` upload never orphaned; this closes the
+    Remove/replace/delete leaks. **Workspace `description`** column
+    (`20260828181053_workspace_description.sql`, `char_length <= 2000`, no RLS/grant change) with
+    a `<Textarea>` in the settings modal — stored + editable only, not displayed elsewhere yet.
+    **Sidebar sections**: "PAGES"/"CANVAS" labels shrunk to `text-[10px]`; each section's "+" is
+    now `md:opacity-0` + a scoped `group/pages`|`group/canvas` hover reveal (opacity, not
+    `hidden`, so Playwright's `:visible` clicks still work); each section collapses via a chevron
+    (`aria-label` "Show/Hide pages|canvases" — deliberately not "Expand"/"Collapse" to avoid the
+    per-node tree buttons), persisted in `delft-sidebar-{pages,canvas}-collapsed` localStorage
+    (SidebarShell's read-on-mount pattern). New `e2e/sidebar-sections.spec.ts` (skipped on
+    mobile-safari — the off-canvas drawer remount races the toggle clicks).
+
+    Then: **removed the page editor's Undo/Redo buttons** (BlockNote handles `Ctrl/Cmd+Z` /
+    `+Shift+Z` / `+Y` natively — no keymap overrides here) and their `canUndo`/`canRedo` +
+    `@tiptap/pm/history` plumbing. And **reworked the page editor header to a Notion-style
+    full-width layout**: a sticky, full-width top bar (`sticky top-0` under the content-pane
+    scroll) holds Publish + a low-key `<EditedIndicator>` ("Edited 40m ago" → absolute date past
+    a week, `apps/web/app/_lib/formatRelativeTime.ts` — built-in `Intl`, no date lib; ticks
+    itself every 60s and the `page.updatedAt` prop refreshes via `useUpdatePage`'s
+    `setQueryData(["page", id])` on every autosave). Dropped `max-w-4xl mx-auto` so content is
+    full width. `PageShell` / `PageEditorLoading` mirror the new shape (publish-button-shaped
+    skeleton in the bar) to keep the load→editor swap shift-free.
