@@ -25,7 +25,7 @@ export default function OpengraphImage() {
           background: "#111318",
         }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element -- ImageResponse (Satori) requires a plain <img>, not next/image */}
+        {/* Satori's <img> — see eslint.config.js for why no-img-element is off in metadata routes */}
         <img
           src={`data:image/png;base64,${logo}`}
           width={140}
