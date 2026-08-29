@@ -8,7 +8,7 @@
 //
 // Secrets (supabase/functions/.env locally, `supabase secrets set` hosted):
 //   RESEND_API_KEY  – unset ⇒ this function is inert
-//   RESEND_FROM     – verified sender, e.g. `CrowScribe <invites@mail.crowscribe.app>`
+//   RESEND_FROM     – verified sender; hosted value is `CrowScribe <invites@send.crowscribe.space>`
 //   SITE_URL        – app origin for the accept link (never taken from the caller)
 // Auto-injected by the platform: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY.
 
