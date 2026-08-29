@@ -94,7 +94,7 @@ function CanvasRow({
           href={href}
           onMouseEnter={prefetch}
           onFocus={prefetch}
-          className={`block truncate rounded-md px-1 py-1 text-sm hover:bg-paper-100 ${
+          className={`block truncate rounded-md py-1 pl-6 pr-1 text-sm hover:bg-paper-100 ${
             isActive ? "bg-paper-100 font-medium text-ink-800" : "text-ink-600"
           }`}
         >
