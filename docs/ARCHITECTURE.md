@@ -147,11 +147,10 @@ hosted migration search_path). Vercel `master` deploy is live at `https://crowsc
 magic-link verified end-to-end). Invitation emails are live (step 83) — Resend sending domain
 `send.crowscribe.space` verified, the three Edge-Function secrets set, `send-invitation-email`
 deployed with the branded `_shared/email.ts` layout (step 84).
-**Still pending — hosted dashboard actions for branded _auth_ email (step 84):** custom SMTP via
-Resend (`smtp.resend.com:465`, sender `noreply@send.crowscribe.space`), pasting the
-`supabase/templates/{magic_link,confirmation,recovery}.html` templates + subjects, and raising
-the Auth emails-per-hour rate limit. Until then, magic-link email uses Supabase's default sender
-+ template (still functional). `supabase/config.toml`'s `[auth]` block stays local-only by design
+Branded auth email is also live (step 84) — hosted routes magic-link/confirmation/recovery
+through Resend custom SMTP (`noreply@send.crowscribe.space`) with the
+`supabase/templates/*.html` templates pasted into the dashboard; verified end-to-end.
+Nothing is pending here now. `supabase/config.toml`'s `[auth]` block stays local-only by design
 (hosted auth config is dashboard-managed; `supabase config push` would clobber the local values).
 
 The one recurring (not one-time) item worth keeping an eye on regardless: Storage usage against
@@ -2847,8 +2846,8 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
     - Still deferred: a "Resend invite" button in the Members modal (step 79 follow-up); DMARC
       stays at `p=none` (monitor before enforcing).
 
-84. **Branded transactional email templates.** ✅ _partial_ (code done; hosted dashboard actions
-    pending). The app sends exactly two emails — the Supabase magic-link email (sign-in, implicit
+84. **Branded transactional email templates.** ✅ _done_. The app sends exactly two emails — the
+    Supabase magic-link email (sign-in, implicit
     signup, and the vault-reset confirmation all use it) and the Resend invitation email — and
     both were unbranded: GoTrue's default template on Supabase's shared SMTP (~2–4/hr, a
     `supabase.io` sender), and the invite email in Tailwind stock grays that don't match the
@@ -2868,13 +2867,16 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
       `apps/web/e2e/helpers.ts` `getLatestMagicLink` (regex-extracts the URL from the body) and
       good practice regardless. Only `magic_link` fires today; the other two are styled as
       insurance against `enable_confirmations` ever flipping.
-    - **Hosted dashboard actions (pending, user):** same "repo is canonical, hosted is applied by
-      hand" constraint as step 18/82 — `config.toml`'s `[auth]` is local-only (`supabase config
-      push` would clobber it). (a) Authentication → Emails → SMTP Settings: custom SMTP via
-      Resend — `smtp.resend.com:465`, user `resend`, pass = the existing `RESEND_API_KEY`, sender
-      `CrowScribe <noreply@send.crowscribe.space>`. (b) Authentication → Emails → Templates: paste
-      the three templates + subjects. (c) Authentication → Rate Limits: raise emails/hour from
-      the default to ~30 now that Resend backs it.
+    - **Hosted dashboard actions (done by the user, dashboard-only — same "repo is canonical,
+      hosted applied by hand" constraint as step 18/82; `config.toml`'s `[auth]` is local-only,
+      `supabase config push` would clobber it):** (a) Authentication → Emails → SMTP Settings:
+      custom SMTP via Resend — `smtp.resend.com:465`, user `resend`, pass = the existing
+      `RESEND_API_KEY`, sender `CrowScribe <noreply@send.crowscribe.space>`. (b) Authentication →
+      Emails → Templates: the three templates + subjects pasted in. (c) Authentication → Rate
+      Limits: emails/hour raised to 30 now that Resend backs it.
     - Zero-cost: Resend SMTP is on the free tier (shares the 100/day, 3,000/mo cap with the API).
     - Out of scope: a dedicated vault-reset email (would need its own service-role function — it
       still piggybacks the magic-link template); adding `react-email` (not doing it).
+    - _(verified: real sign-in on `https://crowscribe.space` — email arrives from
+      `CrowScribe <noreply@send.crowscribe.space>`, subject "Sign in to CrowScribe", branded
+      layout, link signs in. Invite email already branded via the step-83 function deploy.)_

@@ -26,9 +26,9 @@ Live at `https://crowscribe.space` (a Namecheap domain on Vercel nameservers, au
 `master` deploy — the old `crowscribe.vercel.app` / `delft.vercel.app` URLs are no longer
 maintained). Auto-deploys on push to `master`. Build Order steps 78–84 shipped: multi-user workspaces +
 invitation emails (PR #44); the `crowscribe.space` domain switch (82), Resend going live on
-`send.crowscribe.space` (83), and branded email templates (84) via PR #45. Invite email sends
-branded; branded _auth_ (magic-link) email still needs the hosted SMTP/template dashboard setup
-(step 84). See ARCHITECTURE.md's
+`send.crowscribe.space` (83), and branded email templates (84) via PR #45. All email is now
+branded and live — invite email via the Edge Function, auth (magic-link) email via Resend custom
+SMTP + dashboard templates. See ARCHITECTURE.md's
 **Next Up** for current focus and the Build Order for how each feature shipped;
 [docs/BETA_READINESS.md](docs/BETA_READINESS.md)'s original audit is closed out as of Build Order
 step 37, with a separate section for the multi-user surface added since.
