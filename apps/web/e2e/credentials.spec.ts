@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { onlyVisible, openSidebar, signIn, uniqueEmail } from "./helpers";
+import { openWorkspaceMenu, signIn, uniqueEmail } from "./helpers";
 
 // First-time vault setup now shows a one-time, non-dismissable recovery key screen before the
 // vault is usable (Build Order step 58) — every test that creates a vault needs to click through
@@ -21,8 +21,8 @@ test("set up a vault, add a credential, and confirm it re-prompts every time the
   await page.click('button:has-text("Create")');
   await page.waitForURL(/\/workspace\/[^/]+--[^/]+$/, { timeout: 15000 });
 
-  await openSidebar(page);
-  await onlyVisible(page.getByRole("button", { name: "Credentials" })).click();
+  await openWorkspaceMenu(page);
+  await page.getByRole("menuitem", { name: "Credentials Vault" }).click();
   await expect(page.getByText("Set up this workspace's vault")).toBeVisible();
 
   // First open — no vault_salt yet, so this is the "set up" form.
@@ -59,8 +59,8 @@ test("set up a vault, add a credential, and confirm it re-prompts every time the
 
   // Reopen — since it always re-prompts on open (no "unlock once per session" behavior), this must
   // show the unlock form again immediately, with no memory of the just-created vault key.
-  await openSidebar(page);
-  await onlyVisible(page.getByRole("button", { name: "Credentials" })).click();
+  await openWorkspaceMenu(page);
+  await page.getByRole("menuitem", { name: "Credentials Vault" }).click();
   await expect(page.locator("#passphrase")).toBeVisible();
   await expect(page.locator("#confirm")).toHaveCount(0); // vault_salt now exists — "enter passphrase" form
   await page.fill("#passphrase", "correct-horse-battery-staple");
@@ -84,8 +84,8 @@ test("wrong vault passphrase is rejected at the unlock form, not after reaching 
   await page.click('button:has-text("Create")');
   await page.waitForURL(/\/workspace\/[^/]+--[^/]+$/, { timeout: 15000 });
 
-  await openSidebar(page);
-  await onlyVisible(page.getByRole("button", { name: "Credentials" })).click();
+  await openWorkspaceMenu(page);
+  await page.getByRole("menuitem", { name: "Credentials Vault" }).click();
   await page.fill("#passphrase", "the-real-passphrase");
   await page.fill("#confirm", "the-real-passphrase");
   await page.click('button:has-text("Create vault")');
@@ -101,8 +101,8 @@ test("wrong vault passphrase is rejected at the unlock form, not after reaching 
   ).toBeVisible();
 
   await page.click('button[aria-label="Close"]');
-  await openSidebar(page);
-  await onlyVisible(page.getByRole("button", { name: "Credentials" })).click();
+  await openWorkspaceMenu(page);
+  await page.getByRole("menuitem", { name: "Credentials Vault" }).click();
   await page.fill("#passphrase", "a-completely-different-passphrase");
   await page.click('button:has-text("Unlock")');
 
@@ -136,8 +136,8 @@ test("an API key credential shows only the API Key field, not Username/Password"
   await page.click('button:has-text("Create")');
   await page.waitForURL(/\/workspace\/[^/]+--[^/]+$/, { timeout: 15000 });
 
-  await openSidebar(page);
-  await onlyVisible(page.getByRole("button", { name: "Credentials" })).click();
+  await openWorkspaceMenu(page);
+  await page.getByRole("menuitem", { name: "Credentials Vault" }).click();
   await page.fill("#passphrase", "correct-horse-battery-staple");
   await page.fill("#confirm", "correct-horse-battery-staple");
   await page.click('button:has-text("Create vault")');
@@ -166,8 +166,8 @@ test("an API key credential shows only the API Key field, not Username/Password"
 
   // Round-trips through a reload + re-unlock, same as the plaintext-username case above.
   await page.click('button[aria-label="Close"]');
-  await openSidebar(page);
-  await onlyVisible(page.getByRole("button", { name: "Credentials" })).click();
+  await openWorkspaceMenu(page);
+  await page.getByRole("menuitem", { name: "Credentials Vault" }).click();
   await page.fill("#passphrase", "correct-horse-battery-staple");
   await page.click('button:has-text("Unlock")');
   await page.click('button:has-text("Delft Project Token")');
@@ -187,8 +187,8 @@ test("wrong passphrase is rejected even on a brand-new vault with zero credentia
   await page.click('button:has-text("Create")');
   await page.waitForURL(/\/workspace\/[^/]+--[^/]+$/, { timeout: 15000 });
 
-  await openSidebar(page);
-  await onlyVisible(page.getByRole("button", { name: "Credentials" })).click();
+  await openWorkspaceMenu(page);
+  await page.getByRole("menuitem", { name: "Credentials Vault" }).click();
   await page.fill("#passphrase", "the-real-passphrase");
   await page.fill("#confirm", "the-real-passphrase");
   await page.click('button:has-text("Create vault")');
@@ -201,8 +201,8 @@ test("wrong passphrase is rejected even on a brand-new vault with zero credentia
 
   // Close without ever adding a credential, then try to unlock with the wrong passphrase.
   await page.click('button[aria-label="Close"]');
-  await openSidebar(page);
-  await onlyVisible(page.getByRole("button", { name: "Credentials" })).click();
+  await openWorkspaceMenu(page);
+  await page.getByRole("menuitem", { name: "Credentials Vault" }).click();
   await page.fill("#passphrase", "a-completely-different-passphrase");
   await page.click('button:has-text("Unlock")');
 

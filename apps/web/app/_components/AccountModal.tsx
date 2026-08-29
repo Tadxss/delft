@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTheme } from "next-themes";
 import { ChevronLeft, ChevronRight, LogOut, User, X } from "lucide-react";
 import imageCompression from "browser-image-compression";
 import {
@@ -20,7 +21,7 @@ import { Modal } from "./Modal";
 
 const MIN_PASSWORD_LENGTH = 8;
 
-type View = "list" | "password" | "profile";
+type View = "list" | "password" | "profile" | "theme";
 
 export function AccountModal({
   open,
@@ -88,7 +89,11 @@ export function AccountModal({
               <ChevronLeft size={16} />
             </Button>
             <span className="text-sm font-medium text-ink-800">
-              {view === "password" ? "Password" : "Update profile"}
+              {view === "password"
+                ? "Password"
+                : view === "theme"
+                  ? "Dark Mode"
+                  : "Update profile"}
             </span>
           </div>
         )}
@@ -119,6 +124,15 @@ export function AccountModal({
             className="flex w-full items-center justify-between rounded-md border border-paper-200 bg-paper-100 px-4 py-3 text-left text-sm text-ink-800 hover:bg-paper-200"
           >
             Password
+            <ChevronRight size={14} className="text-ink-400" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setView("theme")}
+            className="flex w-full items-center justify-between rounded-md border border-paper-200 bg-paper-100 px-4 py-3 text-left text-sm text-ink-800 hover:bg-paper-200"
+          >
+            Dark Mode
             <ChevronRight size={14} className="text-ink-400" />
           </button>
 
@@ -176,10 +190,76 @@ export function AccountModal({
             )}
           </form>
         </div>
+      ) : view === "theme" ? (
+        <ThemePicker />
       ) : (
         <ProfileForm userId={user?.id} />
       )}
     </Modal>
+  );
+}
+
+const THEME_OPTIONS = [
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
+  { value: "system", label: "System" },
+] as const;
+
+function ThemePicker() {
+  const { theme, setTheme, resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  // `theme` is undefined until next-themes hydrates from localStorage/OS on the client.
+  useEffect(() => setMounted(true), []);
+
+  const current = mounted ? (theme ?? "system") : null;
+
+  return (
+    <div className="flex flex-col gap-4 overflow-y-auto p-4">
+      <p className="text-xs text-ink-500">
+        Choose how CrowScribe looks. “System” follows your device setting.
+      </p>
+      <div
+        role="radiogroup"
+        aria-label="Theme"
+        className="flex flex-col gap-2"
+      >
+        {THEME_OPTIONS.map((option) => {
+          const active = current === option.value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              disabled={!mounted}
+              onClick={() => setTheme(option.value)}
+              className={`flex w-full items-center gap-3 rounded-md border px-4 py-3 text-left text-sm ${
+                active
+                  ? "border-accent-500 text-ink-800"
+                  : "border-paper-200 text-ink-600 hover:bg-paper-100"
+              }`}
+            >
+              <span
+                className={`flex h-4 w-4 items-center justify-center rounded-full border ${
+                  active ? "border-accent-500" : "border-paper-300"
+                }`}
+              >
+                {active && (
+                  <span className="h-2 w-2 rounded-full bg-accent-500" />
+                )}
+              </span>
+              <span className="flex-1">{option.label}</span>
+              {option.value === "system" && mounted && (
+                <span className="text-xs text-ink-400">
+                  {resolvedTheme === "dark" ? "Dark" : "Light"}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

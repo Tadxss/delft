@@ -7,7 +7,6 @@ import { KeyRound, Settings } from "lucide-react";
 import { parseWorkspaceSlug, VaultKeyProvider } from "@crowscribe/shared";
 import { AccountModal } from "../_components/AccountModal";
 import { AuthGate } from "../_components/AuthGate";
-import { ThemeToggle } from "../_components/ThemeToggle";
 import { CredentialsModal } from "./[workspaceSlug]/_components/credentials/CredentialsModal";
 
 function TopBar() {
@@ -50,7 +49,6 @@ function TopBar() {
             <KeyRound size={18} />
           </button>
         )}
-        <ThemeToggle />
         <button
           type="button"
           onClick={() => setAccountOpen(true)}

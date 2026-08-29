@@ -108,10 +108,14 @@ test("create a canvas, draw a shape, and confirm autosave persists it", async ({
     "Whiteboard",
   );
 
-  // Delete and confirm it's gone from the sidebar. Deletion navigates to the bare workspace id
-  // (no slug prefix), same convention as PageEditor's own delete handler.
+  // Delete via the sidebar row's "⋯" menu (the canvas editor header has no Delete button).
+  // Deleting the active canvas navigates to the bare workspace id (no slug prefix).
+  await openSidebar(page);
+  const canvasRow = onlyVisible(page.locator("li", { hasText: "Whiteboard" }));
+  await canvasRow.hover();
+  await canvasRow.getByRole("button", { name: "Canvas actions" }).click();
   page.once("dialog", (dialog) => dialog.accept());
-  await page.click('button:has-text("Delete")');
+  await page.getByRole("menuitem", { name: "Delete" }).click();
   await page.waitForURL(/\/workspace\/[^/]+$/, { timeout: 15000 });
   await openSidebar(page);
   await expect(

@@ -2,8 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 import {
   backToList,
   dragElementOnto,
-  onlyVisible,
-  openSidebar,
+  openWorkspaceMenu,
   reorderStripBefore,
   signIn,
   uniqueEmail,
@@ -14,8 +13,8 @@ async function setUpVault(page: Page) {
   await page.click('button:has-text("Create")');
   await page.waitForURL(/\/workspace\/[^/]+--[^/]+$/, { timeout: 15000 });
 
-  await openSidebar(page);
-  await onlyVisible(page.getByRole("button", { name: "Credentials" })).click();
+  await openWorkspaceMenu(page);
+  await page.getByRole("menuitem", { name: "Credentials Vault" }).click();
   await page.fill("#passphrase", "the-real-passphrase");
   await page.fill("#confirm", "the-real-passphrase");
   await page.click('button:has-text("Create vault")');

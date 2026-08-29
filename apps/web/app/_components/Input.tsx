@@ -8,7 +8,7 @@ import type {
 // (verbatim, at minimum a dozen+ times) before this existed — kept as a single constant so the
 // three tag-specific wrappers below can't drift from each other.
 const FIELD_CLASSES =
-  "rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none focus:border-accent-500";
+  "rounded-md border border-paper-200 bg-paper-50 px-3 py-2 text-sm text-ink-800 outline-none placeholder:text-ink-400 focus:border-accent-500";
 
 export function Input({
   className = "",
