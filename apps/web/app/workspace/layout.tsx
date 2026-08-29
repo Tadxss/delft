@@ -7,6 +7,7 @@ import { KeyRound, Settings } from "lucide-react";
 import { parseWorkspaceSlug, VaultKeyProvider } from "@crowscribe/shared";
 import { AccountModal } from "../_components/AccountModal";
 import { AuthGate } from "../_components/AuthGate";
+import { OnboardingGate } from "../_components/onboarding/OnboardingGate";
 import { CredentialsModal } from "./[workspaceSlug]/_components/credentials/CredentialsModal";
 
 function TopBar() {
@@ -73,12 +74,14 @@ function TopBar() {
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthGate>
-      <VaultKeyProvider>
-        <div className="flex h-screen flex-col overflow-hidden">
-          <TopBar />
-          <div className="flex min-h-0 flex-1">{children}</div>
-        </div>
-      </VaultKeyProvider>
+      <OnboardingGate>
+        <VaultKeyProvider>
+          <div className="flex h-screen flex-col overflow-hidden">
+            <TopBar />
+            <div className="flex min-h-0 flex-1">{children}</div>
+          </div>
+        </VaultKeyProvider>
+      </OnboardingGate>
     </AuthGate>
   );
 }

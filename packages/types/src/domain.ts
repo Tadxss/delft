@@ -104,8 +104,14 @@ export interface Profile {
   middleName: string | null;
   lastName: string | null;
   occupation: string | null;
+  company: string | null;
   bio: string | null;
   avatarUrl: string | null;
+  // How the user plans to use the app — a ", "-joined list of preset labels (see usageOptions.ts),
+  // collected during onboarding.
+  usageIntent: string | null;
+  // Null until the user finishes the first-login onboarding stepper; set once, never cleared.
+  onboardedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }

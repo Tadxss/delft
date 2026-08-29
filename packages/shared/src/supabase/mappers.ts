@@ -153,8 +153,11 @@ export function mapProfileRow(row: ProfileRow): Profile {
     middleName: row.middle_name,
     lastName: row.last_name,
     occupation: row.occupation,
+    company: row.company,
     bio: row.bio,
     avatarUrl: row.avatar_url,
+    usageIntent: row.usage_intent,
+    onboardedAt: row.onboarded_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

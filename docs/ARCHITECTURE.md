@@ -2546,3 +2546,39 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
 
     **Hosted DB needs `supabase db push` + a redeploy** before canvas publishing works on
     `crowscribe.vercel.app` — applied locally via `supabase migration up` only.
+
+    _(shipped since: canvas header padding evened out to `pb-6`/`sm:pt-6`;
+    `20260829000000_canvas_publish.sql` pushed to hosted + re-deployed.)_
+
+78. **Profile `company` field + mandatory first-login onboarding stepper.** ✅ _done_.
+
+    - Migration `20260829120000_profile_company_usage_onboarding.sql`: nullable
+      `profiles.company` (`char_length <= 200`), `profiles.usage_intent` (`<= 500`, a
+      `", "`-joined list of preset labels — see `app/_lib/usageOptions.ts`), and
+      `profiles.onboarded_at timestamptz` (the first-login signal). No RLS/grant change (same
+      as `workspace_description`). The migration **backfills `onboarded_at = now()` for every
+      existing row** so only accounts created afterwards see onboarding. `Profile` type,
+      `mapProfileRow`, and `UpsertProfileInput` (+ patch builder) gain all three; `onboardedAt`
+      is set once by the stepper's final upsert and never cleared.
+    - **`OnboardingGate`** sits just inside `AuthGate` in `app/workspace/layout.tsx` (the single
+      choke-point every authenticated route — bookmarked deep links included — passes through).
+      It reads `useProfile(user.id)` and renders **`OnboardingFlow`** instead of `children`
+      whenever `onboarded_at` is null (a missing profile row counts as not-onboarded — the
+      stepper's upsert creates it).
+    - **`OnboardingFlow`** — a full-screen mandatory 5-step wizard (NOT a `Modal`: no backdrop
+      dismiss, no close): Name (first/last required, middle optional) · Occupation (`OCCUPATIONS`
+      + "Other" custom, required) · Company (optional) · Bio (optional) · Usage
+      (`<UsageCheckboxes>`, ≥1 required). Next/Finish gated on the step's required fields; a
+      `Sign out` link under the card is the only escape. Finish → upsert with
+      `onboardedAt: new Date().toISOString()` → `router.replace("/workspace")`.
+    - **`UsageCheckboxes`** — hand-rolled `role="checkbox"` group (no checkbox primitive in the
+      repo), reused by the stepper and a new "How you use CrowScribe" block in the Account
+      modal's `ProfileForm` (which also gained the `Company` input). So a field onboarding
+      forces once stays editable later.
+    - e2e: `signIn` now runs `completeOnboarding(page)` by default (fills minimal valid data,
+      lands on `/workspace`) so every existing spec sails through the wall; the new
+      `e2e/onboarding.spec.ts` opts out with `signIn(page, email, { onboarding: "leave" })` and
+      drives the 5 steps, the per-step gating, Back-preserves-state, and the profile round-trip.
+
+    **Hosted DB needs `supabase db push` + a redeploy** — applied locally via
+    `supabase migration up` only.
