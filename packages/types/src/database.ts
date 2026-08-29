@@ -347,6 +347,7 @@ export type Database = {
           invited_email: string | null
           invited_user_id: string | null
           invited_username: string | null
+          last_emailed_at: string | null
           responded_at: string | null
           role: string
           status: string
@@ -361,6 +362,7 @@ export type Database = {
           invited_email?: string | null
           invited_user_id?: string | null
           invited_username?: string | null
+          last_emailed_at?: string | null
           responded_at?: string | null
           role: string
           status?: string
@@ -375,6 +377,7 @@ export type Database = {
           invited_email?: string | null
           invited_user_id?: string | null
           invited_username?: string | null
+          last_emailed_at?: string | null
           responded_at?: string | null
           role?: string
           status?: string
@@ -483,6 +486,7 @@ export type Database = {
           invited_by: string
           invited_email: string
           inviter_name: string
+          last_emailed_at: string
           role: string
           status: string
           workspace_name: string
@@ -558,6 +562,7 @@ export type Database = {
           invited_email: string | null
           invited_user_id: string | null
           invited_username: string | null
+          last_emailed_at: string | null
           responded_at: string | null
           role: string
           status: string
@@ -572,6 +577,7 @@ export type Database = {
         }
       }
       leave_workspace: { Args: { p_workspace_id: string }; Returns: undefined }
+      mark_invitation_emailed: { Args: { p_token: string }; Returns: undefined }
       migrate_vault_to_wrapped_key: {
         Args: {
           p_credential_ids: string[]

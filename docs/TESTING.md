@@ -9,13 +9,21 @@ pnpm dev --filter=web
 
 Magic-link email is still the only way to _create_ an account. Locally, "sending an email" lands
 in Mailpit, not a real inbox — open `http://127.0.0.1:54324` and click the link there. The e2e
-suite does this same lookup programmatically via Mailpit's REST API (`e2e/helpers.ts`). Once
-signed in, the header's gear icon opens the Account modal, where a user can set a password for
-future sign-ins and update their profile (name/occupation/bio/avatar/username — see Build Order
-steps 28-29; a set username can be typed on the sign-in page instead of the email), and the login
-page also offers "Continue with Google" (opens as a popup — see
-`docs/ARCHITECTURE.md` Build Order step 15) — Google sign-in needs real OAuth credentials
-configured (step 14) and isn't covered by the automated suite.
+suite does this same lookup programmatically via Mailpit's REST API (`e2e/helpers.ts`). A **fresh
+sign-in now lands on a mandatory 5-step onboarding wall** (name/occupation/company/bio/usage —
+Build Order step 78) before the workspace picker; `signIn` in `helpers.ts` auto-completes it with
+minimal data unless a spec opts out with `signIn(page, email, { onboarding: "leave" })`. Once
+signed in, the sidebar's workspace-name dropdown → "Account settings" opens the Account modal,
+where a user can set a password, pick a theme, and update their profile
+(name/occupation/company/bio/avatar/username — see Build Order steps 28-29 and 78; a set username
+can be typed on the sign-in page instead of the email). The login page also offers "Continue with
+Google" (opens as a popup — `docs/ARCHITECTURE.md` Build Order step 15) — Google sign-in needs
+real OAuth credentials configured (step 14) and isn't covered by the automated suite.
+
+`supabase start` also boots the Edge runtime and serves `send-invitation-email`
+(Build Order step 80). It no-ops without `RESEND_API_KEY`, so the automated suite runs against it
+harmlessly; exercise the real path with
+`npx supabase functions serve send-invitation-email --env-file supabase/functions/.env`.
 
 ## Automated suite
 
@@ -35,11 +43,14 @@ handling), and `@blocknote/mantine` (contentEditable/ProseMirror behavior) — s
 
 Sidebar/credentials-modal content that only renders below the `md` breakpoint (the mobile drawer,
 the credentials list/detail single-pane switch — see Build Order step 31) needs the spec to
-explicitly open it first; `e2e/helpers.ts` exports `openSidebar(page)`, `backToList(page)`, and
-`onlyVisible(locator)` for this (the last one because the drawer's content coexists in the DOM with
-a CSS-hidden desktop copy, so a bare role/text locator matches both). All are no-ops on the desktop
-`chromium`/`webkit` projects, so existing specs don't need per-project branching — just call them at
-every point that touches sidebar/credentials-list content, not only the first.
+explicitly open it first; `e2e/helpers.ts` exports `openSidebar(page)`, `openWorkspaceMenu(page,
+name?)` (opens the workspace-name dropdown), `backToList(page)`, and `onlyVisible(locator)` for
+this (the last one because the drawer's content coexists in the DOM with a CSS-hidden desktop
+copy, so a bare role/text locator matches both). All are no-ops on the desktop `chromium`/`webkit`
+projects, so existing specs don't need per-project branching — just call them at every point that
+touches sidebar/credentials-list content, not only the first. Other exports: `uniqueEmail`,
+`getLatestMagicLink`, `signIn(page, email, { onboarding })`, `completeOnboarding`,
+`dragElementOnto`, `reorderStripBefore/After`.
 
 | `e2e/*.spec.ts`               | Covers                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -52,9 +63,11 @@ every point that touches sidebar/credentials-list content, not only the first.
 | `onboarding.spec.ts`          | First-login stepper: a fresh sign-in lands on the mandatory 5-step onboarding (not the workspace picker); Next/Finish stay disabled until each step's required fields are filled (name, occupation, ≥1 usage checkbox); Back preserves entered values; Finish → workspace picker and it does not reappear on reload; the collected name/occupation/company/usage round-trip into the Account → Update profile form. Every other spec's `signIn` helper auto-completes this wall.                                                                                                                                                       |
 | `workspace-isolation.spec.ts` | A second real user can neither see user A's workspace in their own switcher, nor read anything by navigating directly to user A's workspace URL — RLS-level isolation, not just UI filtering.                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `workspace-invitations.spec.ts` | Two-user flows: owner A invites B by email as **editor** → B accepts the pending invite from the picker → B (editor) creates a page in the shared workspace → A demotes B to **viewer** → B's editor goes read-only (`[contenteditable="false"]`, no "New page") and B has no "Credentials Vault" item → A removes B → B loses access (RLS zero rows). Plus a `@username` invite accepted via the `/invite/[token]` link.                                                                                                                                                                              |
-| `credentials.spec.ts`         | Opens the Credentials **modal** (not a route) → vault setup → add a credential (all fields) → close the modal → reopen it → confirms it re-prompts for the passphrase every time (no session-cached unlock) → decrypt round trip; a wrong-passphrase case confirms it's rejected right at the unlock form (not discovered later via a decrypt failure) for a vault with a credential, and a separate case confirms the same for a brand-new vault with zero credentials; a credential-type case confirms switching to the API Key type swaps the form's fields (no Username/Password) and round-trips through a reload.                                     |
+| `credentials.spec.ts`         | Opens the Credentials **modal** (not a route) → vault setup → add a credential (all fields) → close the modal → reopen it → confirms it re-prompts for the passphrase every time (no session-cached unlock) → decrypt round trip; a wrong-passphrase case confirms it's rejected right at the unlock form (not discovered later via a decrypt failure) for a vault with a credential, and a separate case confirms the same for a brand-new vault with zero credentials; a credential-type case confirms switching to the API Key type swaps the form's fields (no Username/Password) and round-trips through a reload. All single-user (the sole member is the owner); in a shared workspace the vault is owner-only — editors/viewers can't see credential rows at all (covered by `workspace-invitations.spec.ts`).                                     |
 | `credential-folders.spec.ts`  | Create a nested folder (collapsed by default, matching the sidebar's tree), put a credential inside it via the folder's hover "New credential" icon (auto-expands it), confirm collapsing the folder hides the credential and expanding shows it again; move a credential between folders via the edit form's select and a folder via drag-and-drop; delete a folder containing a sub-folder and a credential and confirm the credential survives at root while the sub-folder doesn't; drag-and-drop reordering of sibling folders, and of sibling credentials (including reparenting a credential onto a different folder by dragging it there directly). |
 | `canvas.spec.ts`              | Create a canvas → draw a real rectangle (keyboard shortcut + mouse drag) → confirm autosave actually persisted element data (verified via a direct REST call, since Excalidraw's `<canvas>` has no addressable per-shape DOM to assert against in the UI) → title survives a reload → delete via the sidebar row's "⋯" menu; drag-and-drop reordering of sibling canvases, confirming the new order survives a reload.                                                                                                                                                                                                                                       |
+| `sidebar-sections.spec.ts`    | The sidebar's PAGES / CANVAS section headers collapse and expand, and the collapsed state persists across a reload (localStorage). Skipped on `mobile-safari` — the off-canvas drawer's AnimatePresence remount races the toggle clicks.                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `workspace-settings.spec.ts`  | Owner-only Workspace settings modal (from the sidebar dropdown): rename → the URL slug refreshes, the id after `--` is unchanged, and the new name survives a reload; workspace description saves and persists; a logo (uploaded file) round-trips through a reload and its Storage object is cleaned up on Remove.                                                                                                                                                                                                                                                                                                                                          |
 | `workspace-delete.spec.ts`    | Delete a workspace that has a page in it from the `/workspace` switcher → confirms it disappears from the list and its old URL resolves to "no pages" (RLS-level gone, not just hidden from the UI).                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `profile.spec.ts`             | Account modal's "Update profile" box: name/occupation/bio save and persist across a modal close+reopen; the "Other" occupation option reveals a free-text field whose value is what's actually saved; avatar upload succeeds and a second upload overwrites the same Storage object in place (same path, not a duplicate) rather than accumulating files.                                                                                                                                                                                                                                                                                                   |
 | `vault-recovery.spec.ts`      | First-time vault setup's recovery-key screen (Continue disabled until the "I've saved this" checkbox is checked); a wrong recovery key on "Forgot passphrase?" is rejected with a clear error and a link to the last-resort reset; the correct recovery key lets you set a brand-new passphrase and the original credential still decrypts correctly afterward, both by opening it directly and by confirming the _old_ passphrase no longer works while the _new_ one does.                                                                                                                                                                                |
@@ -65,8 +78,13 @@ scenario 6 below), visual/design polish, the browser's native print-to-PDF outpu
 eyeballing a PDF is a manual step), and **workspace-invitation email delivery** (the
 `send-invitation-email` Edge Function hits Resend's real API, not Mailpit, and no-ops without
 `RESEND_API_KEY` — so `workspace-invitations.spec.ts` covers the in-app accept path but not the
-email itself; manual: with a verified Resend domain, invite a real address → click Accept from a
-fresh browser profile → land signed-in on `/invite/<token>` → become a member). Also the Pages code block toolbar (`apps/web/app/_lib/CodeBlockView.tsx` —
+email itself; it also calls `auth.admin.generateLink`, which depends on the hosted Auth
+redirect-URL allow-list. Iterate locally with `npx supabase functions serve send-invitation-email
+--env-file supabase/functions/.env`; manual smoke test: with a verified Resend domain, invite a
+real address → click Accept from a fresh browser profile → land signed-in on `/invite/<token>` →
+become a member). Also manual: the `/invite/[token]` screen for expired / revoked /
+already-accepted tokens, and inviting an address that has no account yet. Also the Pages code
+block toolbar (`apps/web/app/_lib/CodeBlockView.tsx` —
 syntax highlighting, language search/select, copy button, keyboard navigation, Ctrl+A scoping; see
 `docs/ARCHITECTURE.md` Build Order step 21) — verified via ad-hoc Playwright scripts at
 implementation time, not a permanent spec.

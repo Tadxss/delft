@@ -1,8 +1,13 @@
 # Architecture
 
-CrowScribe is a personal, zero-cost management platform (Pages, Credentials Manager, Excalidraw
-Canvas) built on Next.js + Supabase + Vercel free tiers, with every feature scoped per-workspace
-and isolated via Postgres Row Level Security. See the root [README.md](../README.md) for the
+CrowScribe is a zero-cost management platform (Pages, Credentials Manager, Excalidraw Canvas)
+built on Next.js + Supabase + Vercel free tiers, with every feature scoped per-workspace and
+isolated (or, since Build Order step 79, shared by role) via Postgres Row Level Security. It
+started single-user and has since grown mandatory onboarding, page + canvas publishing, user
+profiles, and multi-user workspaces (owner/editor/viewer invitations). As of step 80 the repo
+also has a small Deno/Edge-Function surface — `supabase/functions/send-invitation-email/`, the
+first server-side code and the first `SUPABASE_SERVICE_ROLE_KEY` use — alongside the otherwise
+client-only Next.js app. See the root [README.md](../README.md) for the
 elevator pitch and local dev setup, [docs/TESTING.md](TESTING.md) for how the e2e suite maps
 to manual test scenarios, and [docs/BETA_READINESS.md](BETA_READINESS.md) for the original
 pre-beta audit (fully closed out as of Build Order step 37 — kept as a historical record, not an
@@ -118,6 +123,30 @@ into `icon.tsx`/`apple-icon.tsx`/`opengraph-image.tsx` and referenced via `<img>
 hero. Domain registration remains the one deliberately-parked item — still an open, not-yet-started
 choice for whoever picks this up next.
 
+**Steps 76–81 (a large feature run, all on `develop`, none deployed yet):** workspace chrome
+moved into a Notion-style in-sidebar switcher + per-workspace logo/description (76); canvas
+publish/share + a Dark Mode radio picker in the Account modal (77); a mandatory 5-step first-login
+onboarding stepper + a `profiles.company` field + the `<Select>` chevron polish (78); **workspace
+invitations + multi-user roles `owner/editor/viewer`** — invite by email or `@username`, a
+Members modal, viewer read-only mode, credentials stay owner-only (79); **invitation emails via
+`supabase/functions/send-invitation-email/`, the repo's first Edge Function** + Resend (80).
+Step 79's deferred follow-ups (ownership transfer, per-member vault-key sharing, a "Resend invite"
+button) are still open. **Per-workspace invitations are unrelated to the global signup-gate that
+was declined above** — that was about who can create an account at all; this is about sharing a
+workspace with someone who already can.
+
+**⚠ Pending hosted-deploy backlog — the most actionable "next up" item.** `supabase migration
+list` shows five local-only migrations not on the hosted project: `20260828033527_workspace_logo`,
+`20260828181053_workspace_description`, `20260829120000_profile_company_usage_onboarding`,
+`20260830000000_workspace_invitations`, `20260831000000_invitation_email_rpc`,
+`20260901000000_invitation_hardening`. Plus:
+`supabase/config.toml` changes (the `[functions.…]` block, the `additional_redirect_urls` entry),
+the Edge Function itself (never `functions deploy`d), its three secrets (`RESEND_API_KEY`,
+`RESEND_FROM`, `SITE_URL`), and the hosted Auth redirect-URL allow-list entry
+(`https://crowscribe.vercel.app/**`) that the `/invite/[token]` accept flow needs. Steps 76/78/79/80
+each carry their own "needs `supabase db push`" note; this is the aggregate. See step 18's
+"recurring gotcha" — a migration silently missing on hosted doesn't error, writes just no-op.
+
 The one recurring (not one-time) item worth keeping an eye on regardless: Storage usage against
 the 1GB free-tier cap as real data accumulates (step 56 added a `maxSizeMB` cap to
 `PageEditor.tsx`'s image compression, but it's still worth periodic monitoring, not a one-time
@@ -125,8 +154,11 @@ fix).
 
 ## Data model
 
-- `workspaces (id, owner_id, name, vault_salt, vault_wrapped_key, vault_wrapped_key_iv,
-  vault_recovery_wrapped_key, vault_recovery_wrapped_key_iv, created_at)` — `vault_salt` is the
+- `workspaces (id, owner_id, name, logo_url, description, vault_salt, vault_wrapped_key,
+  vault_wrapped_key_iv, vault_recovery_wrapped_key, vault_recovery_wrapped_key_iv, created_at)` —
+  `logo_url` (nullable, points at the public `workspace-logos` Storage bucket; falls back to the
+  workspace's initials) and `description` (nullable, ≤2000 char CHECK) are owner-editable in
+  Workspace settings, both added in Build Order step 76. `vault_salt` is the
   Credentials Manager's per-workspace PBKDF2 salt (plaintext; salts aren't secret), null until that
   workspace's vault passphrase is first set up. `vault_wrapped_key`/`_iv` is the Vault Master Key
   wrapped under the passphrase-derived key; `vault_recovery_wrapped_key`/`_iv` is the same VMK
@@ -138,9 +170,24 @@ fix).
 - `vault_reset_requests (id, workspace_id, requested_by, token, expires_at, confirmed_at,
   created_at)` — a single-use, owner-only, 1-hour-expiry token for the last-resort vault reset (both
   passphrase and recovery key lost) — see Build Order step 58.
-- `workspace_members (workspace_id, user_id, role)` — every RLS policy keys off membership rather
-  than `owner_id` directly, so extending to real multi-user sharing later is a data change, not a
-  schema/policy rewrite.
+- `workspace_members (workspace_id, user_id, role, created_at)` — `role` is `owner | editor |
+  viewer` (CHECK-enforced; was `owner | member` until Build Order step 79 turned on real
+  multi-user). Every RLS policy keys off membership rather than `owner_id` directly, which is why
+  multi-user sharing (step 79) was a data + policy change, not a schema rewrite. No client write
+  path at all — the only writers are the `handle_new_workspace()` trigger (enrolls the creator as
+  `owner`) and the `accept_workspace_invitation` SECURITY DEFINER RPC, both bypassing RLS as the
+  function owner.
+- `workspace_invitations (id, workspace_id, invited_by, invited_email, invited_username,
+  invited_user_id, role, token, status, expires_at, created_at, responded_at)` — Build Order
+  step 79. Exactly one of `invited_email` / `invited_username` is set (`num_nonnulls = 1` CHECK);
+  `role` is `editor | viewer` (never `owner` via an invite); `token` is a server-generated 32-byte
+  hex string; `status` is `pending | accepted | revoked | declined`; `expires_at` defaults to
+  `now() + 14 days`. Two partial unique indexes cap it at one *pending* invite per
+  `(workspace, target)`. Written to only via SECURITY DEFINER RPCs (no write grant). SELECT
+  policies: the workspace owner sees all their invites; an invitee sees their own pending ones,
+  matched on `invited_user_id` / their profile username — **not** the raw `auth.jwt() ->> 'email'`
+  claim, because `enable_confirmations = false` means that claim can be an unconfirmed address
+  (the RPCs verify against `auth.users.email_confirmed_at` instead).
 - `pages (id, workspace_id, parent_id, title, content jsonb, is_published, published_slug,
 position, created_at, updated_at)` — `parent_id` self-references `pages` for the sidebar tree.
   `position` (`double precision`) is a manually-settable sibling order — see Build Order step 54.
@@ -157,34 +204,68 @@ updated_at)` — pure containers (name only, no secret of their own), nesting ar
   it). Two triggers (`check_credential_folder_parent`, `check_credential_folder_workspace`) guard
   against cycles and cross-workspace linking, since RLS's flat per-row membership check can't catch
   either on its own. See Build Order step 24; `position` (per `parent_folder_id` group) is step 54.
-- `canvases (id, workspace_id, title, scene jsonb, position, created_at, updated_at)` — flat, no
-  `parent_id` (standalone items, not a tree like `pages`). `scene` is Excalidraw's own
-  `{elements, appState}` shape; the `files` argument from Excalidraw's `onChange` (embedded image
-  binaries) is never persisted. See Build Order step 17; `position` is step 54.
+- `canvases (id, workspace_id, title, scene jsonb, is_published, published_slug, position,
+  created_at, updated_at)` — flat, no `parent_id` (standalone items, not a tree like `pages`).
+  `scene` is Excalidraw's own `{elements, appState}` shape; the `files` argument from Excalidraw's
+  `onChange` (embedded image binaries) is never persisted. `is_published` / `published_slug` back
+  a read-only public `/share/canvas/[slug]` route, mirroring `pages` — Build Order step 77. See
+  step 17; `position` is step 54.
 - **Manual ordering** (`position`, all four tables above, Build Order step 54): `double precision`,
   reordered via a client-computed midpoint between two neighbors
   (`packages/shared/src/lib/positionUtils.ts`) rather than an integer-with-gaps or
   fractional-indexing scheme — deliberately the simplest option that still supports O(1) reorders,
   accepted as fine at this app's realistic write volume (see that step for the
   float-precision-exhaustion tradeoff this implies).
-- `profiles (id, username, first_name, middle_name, last_name, occupation, bio, avatar_url,
-created_at, updated_at)` — the first **non-workspace-scoped** table; `id` is both PK and FK to
-  `auth.users`, one row per user. Auto-created blank on signup via an `AFTER INSERT` trigger on
-  `auth.users` (not a `public` table); a pre-existing account (created before this shipped)
-  self-heals its first row via the client's `upsert`, not a backfill script. `username` is
-  nullable/unique/lowercase-only (CHECK-enforced), letting sign-in accept a username instead of an
-  email — resolved via `get_email_for_username`, an `anon`-callable function (see below). See
-  Build Order steps 28-29.
+- `profiles (id, username, first_name, middle_name, last_name, occupation, company, bio,
+avatar_url, usage_intent, onboarded_at, created_at, updated_at)` — the first
+  **non-workspace-scoped** table; `id` is both PK and FK to `auth.users`, one row per user.
+  Auto-created blank on signup via an `AFTER INSERT` trigger on `auth.users` (not a `public`
+  table); a pre-existing account (created before this shipped) self-heals its first row via the
+  client's `upsert`, not a backfill script. `username` is nullable/unique/lowercase-only
+  (CHECK-enforced), letting sign-in accept a username instead of an email — resolved via
+  `get_email_for_username`, an `anon`-callable function (see below). `company` (≤200),
+  `usage_intent` (≤500, a `", "`-joined list of preset labels), and `onboarded_at` (null until
+  the mandatory first-login stepper completes; the migration backfilled `now()` for every
+  pre-existing row so only new signups see it) were added in Build Order step 78. RLS is
+  `authenticated`-only, `id = auth.uid()` — no anon policy, no membership concept, never shared.
+  See Build Order steps 28-29 and 78.
 
-RLS/grants: every workspace-scoped table requires membership (`workspace_members`) except one
-deliberate hole — `pages_select_published_anon`, readable by `anon`, scoped strictly to
-`is_published = true`. `credentials`, `credential_folders`, and `canvases` have no anon policy or
-grant at all — `profiles`' RLS itself is also `authenticated`-only (`id = auth.uid()`, no anon
-policy), but the standalone `get_email_for_username` function is explicitly `grant execute ... to
-anon` — the one place in this schema an `anon` client can reach into `profiles`/`auth.users` data
-at all, deliberately narrowed to a bare email-or-null return with no other fields ever exposed.
-See Build Order step 29 for the reasoning and tradeoff. See `supabase/migrations/*_rls.sql` for
-the full policy set and its inline reasoning.
+RLS/grants: every workspace-scoped table requires membership. As of Build Order step 79 that
+membership is **role-aware**, expressed through one helper — `has_workspace_access(workspace_id,
+roles[])` (`language sql stable security invoker`):
+
+- `pages` / `canvases` — `SELECT` allows any role (`owner|editor|viewer`); `INSERT`/`UPDATE`/
+  `DELETE` require `owner|editor`. A `viewer` browses but can't write (the editor UI also renders
+  read-only for them — step 79).
+- `credentials` / `credential_folders` — **all four ops require `owner`.** The Credentials vault
+  stays owner-only in a shared workspace: its per-workspace encryption key can't be handed to a
+  new member without a separate crypto design, so editors/viewers never see credential rows at
+  all. A deliberate role-model limit, not an oversight.
+- Storage — `page-images` and `workspace-logos` **write** policies require `owner|editor`; reads
+  stay any-member.
+
+`has_workspace_access` is `SECURITY INVOKER` **on purpose** (see the load-bearing detail in Build
+Order step 2): its inner `workspace_members` read is itself RLS-checked and only ever matches the
+caller's own row (`workspace_members_select_self`), and it is only ever called from policies on
+*other* tables — so there's no `workspace_members`-policy-subqueries-`workspace_members`
+recursion.
+
+**Anon read paths — two deliberate holes**, both `is_published = true`-scoped and nothing else:
+`pages_select_published_anon` and `canvases_select_published_anon` (each paired with a
+`grant select ... to anon`), backing the `/share/[slug]` and `/share/canvas/[slug]` routes.
+`credentials` / `credential_folders` / `workspace_members` / `workspace_invitations` have no anon
+policy or grant. **Anon-callable functions — two:** `get_email_for_username` (username → bare
+email-or-null, for username sign-in) and `get_invitation_preview` (token → workspace name/logo +
+inviter name + role/status/expiry, for the `/invite/[token]` accept screen; token-guarded,
+rate-limited under its own `rpc_rate_limits` key, no email or other PII returned). Both narrowed
+to display-only fields. `get_invitation_for_email` (which *does* return `invited_email`, for the
+invite-email Edge Function) is `grant execute ... to service_role` only.
+
+`profiles` RLS is `authenticated`-only (`id = auth.uid()`, no anon policy, no membership concept).
+
+See Build Order steps 29 and 79 for the reasoning and tradeoffs. Policy set + inline reasoning:
+`supabase/migrations/*_rls.sql` plus `20260830000000_workspace_invitations.sql` (the role rewrite
+and the invitations table) and `20260831000000_invitation_email_rpc.sql`.
 
 ## Build Order
 
@@ -217,6 +298,17 @@ workspace_members` instead of just filtering to zero rows. Fixed by scoping ever
    insert both succeeded. Fixed by adding an `owner_id = auth.uid()` branch to the policy, which
    needs no such row-visibility timing. Found via a failing e2e test
    (`e2e/workspace-pages.spec.ts`), not manual testing — see step 5.
+
+   **Third load-bearing detail, added by step 79's role rewrite — the `workspace_members`
+   recursion footgun:** a policy _on_ `workspace_members` that subqueries `workspace_members`
+   recurses into its own policy evaluation and Postgres errors "infinite recursion detected in
+   policy for relation workspace_members". So `workspace_members` keeps a bare self-only SELECT
+   policy (`user_id = auth.uid()`), and the role-aware `has_workspace_access()` helper the content
+   policies now call is `SECURITY INVOKER` (its inner `workspace_members` read is RLS-checked and
+   only ever matches the caller's own row) and is _only_ ever called from policies on _other_
+   tables. Never call it — or any `workspace_members` subquery — from a `workspace_members`
+   policy. Relatedly, every `workspace_members` write goes through a `SECURITY DEFINER` function
+   (the `handle_new_workspace` trigger, or `accept_workspace_invitation`), never a client insert.
 
    Verified via `supabase db reset` + direct `psql`/REST calls as both `anon` and `authenticated`
    roles, and end-to-end via the e2e suite (step 5).
@@ -737,7 +829,8 @@ false` means the server renders nothing for it, there's no server/client HTML to
       immediately backfills the verifier too, so it's never trust-only a second time. Confirmed via
       an ad-hoc script directly manipulating Postgres (`docker exec ... psql`, since the local
       `service_role` lacks a `workspaces` SELECT grant PostgREST would need — a local-only gap, not
-      touched, since the app itself never uses the service role) to simulate a pre-migration vault
+      touched, since the app itself never used the service role _at the time_ — the
+      `send-invitation-email` Edge Function does, as of step 80) to simulate a pre-migration vault
       in both the with-credential and zero-credential states, confirming rejection, correct-unlock,
       and backfill in each.
 
@@ -1453,7 +1546,9 @@ strict-origin-when-cross-origin`, and a `Permissions-Policy` denying camera/mic/
     no raw-HTML rendering path to sanitize in the first place.
 
     Two real gaps did exist, both because this app's only trust boundary is Postgres/Storage
-    itself (no server sits between the client and Supabase, so the client can always be bypassed):
+    itself (no server sits between the client and Supabase, so the client can always be bypassed —
+    still true for every data path; step 80 added one narrow fire-and-forget email Edge Function,
+    not a data-write server):
     - **New migration `20260818000000_storage_upload_limits.sql`**: `page-images` and `avatars`
       Storage buckets had no `file_size_limit`/`allowed_mime_types` at all — the only thing
       stopping an oversized or non-image upload was the app's own client-side
@@ -2586,8 +2681,10 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
     `supabase migration up` only.
 
 79. **Workspace invitations + multi-user roles (`owner` / `editor` / `viewer`).** ✅ _done_.
-    Turning on the `workspace_members` future-proofing from Build Order step 2. **Phase 1** — the
-    in-app + copy-link flow; the `signInWithOtp` email for brand-new invitees is a follow-up.
+    Turning on the `workspace_members` future-proofing from Build Order step 2. Phase 1 shipped
+    the in-app + copy-link flow; the email delivery followed in step 80.
+    _(shipped since: step 80 — the invite email, an Edge Function using `admin.generateLink`
+    rather than the `signInWithOtp` originally sketched here.)_
 
     - Migration `20260830000000_workspace_invitations.sql`:
       - `workspace_members.role` CHECK `('owner','member')` → `('owner','editor','viewer')` (every
@@ -2610,6 +2707,7 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
         `get_invitation_preview` — anon+authenticated, token-guarded, rate-limited under its own
         `rpc_rate_limits` key). Reviewed by the `rls-reviewer` agent; the one MEDIUM finding
         (unverified-email trust) is fixed by the `email_confirmed_at` checks above.
+        Re-audited more broadly in step 81 (hardening migration `20260901000000`).
     - Shared: `WorkspaceRole` widened; new `WorkspaceInvitation` / `PendingInvitation` /
       `InvitationPreview` / `WorkspaceMemberProfile` types + mappers; ~12 hooks incl.
       `useMyWorkspaceRole` (a plain self-read of `workspace_members`).
@@ -2627,7 +2725,8 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
     **Hosted DB needs `supabase db push` + a redeploy** — applied locally via
     `supabase migration up` only.
 
-    _Follow-ups deferred:_ ownership transfer, per-member vault-key sharing.
+    _Follow-ups deferred:_ ownership transfer; per-member vault-key sharing; a "Resend invite"
+    button in the Members modal.
 
 80. **Workspace-invitation emails — first Edge Function, first service-role use.** ✅ _done_.
     An **email** invite now sends a branded HTML email; `@username` invites still send nothing
@@ -2662,3 +2761,31 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
     **Hosted deploy adds**: `supabase functions deploy send-invitation-email` +
     `supabase secrets set …` + the dashboard redirect-URL allow-list entry, on top of the usual
     `supabase db push` + Vercel re-alias.
+
+81. **Doc audit + multi-user security re-audit.** ✅ _done_. The `docs/`, `CLAUDE.md`, and
+    `README.md` had drifted several steps behind (Data model schema lines, feature-status
+    paragraphs, the e2e spec table, `supabase/functions/` never mentioned) — all brought current.
+    Fixed a real CI bug: `.github/workflows/ci.yml` triggered on a non-existent `main` branch
+    (→ `master`).
+
+    A follow-up security pass (`rls-reviewer` on `20260830000000` + `20260831000000` together;
+    `code-reviewer` on the Edge Function; a manual RPC-write-path review) found the migrations
+    structurally clean but surfaced fixable abuse vectors — closed in
+    **`20260901000000_invitation_hardening.sql`** + Edge Function edits:
+    - **HTML injection** in the invite email (unescaped workspace / inviter names) → an `esc()`
+      helper on every `renderHtml` interpolation.
+    - **Unbounded invite creation** (Resend-quota exhaustion + `auth.users` pollution via the
+      `type: "invite"` fallback) → `invite_to_workspace` now enforces a per-workspace pending cap
+      (100) and a global `rpc_rate_limits` bucket (30 / 60s).
+    - **Owner re-send spam** → `workspace_invitations.last_emailed_at` + `mark_invitation_emailed()`
+      (service_role only); the function 60s-throttles.
+    - **Token-status probing** → the caller-authorization check now runs before the status
+      branches; unauthorized callers get one undifferentiated response.
+    - Recipient email removed from the Resend error log; `get_invitation_for_email` →
+      `SECURITY INVOKER`; `AbortSignal.timeout` on the Resend `fetch`.
+    Everything else (RPC authorization, `has_workspace_access` recursion, `email_confirmed_at`
+    trust, anon `get_invitation_preview` exposure) confirmed clean or accepted — see
+    `docs/BETA_READINESS.md`'s "Post-step-37: multi-user surface" section.
+
+    **Hosted DB needs `supabase db push`** for `20260901000000` (bundled with the step 76–80
+    backlog).

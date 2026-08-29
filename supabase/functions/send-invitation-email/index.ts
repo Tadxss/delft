@@ -27,12 +27,25 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
+// Workspace / inviter names are free text (not sanitized by invite_to_workspace) — escape before
+// interpolating into the HTML email so a workspace named `<a href=…>` can't ride our verified
+// sending domain as a phishing payload.
+function esc(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 interface InvitationRow {
   invited_email: string | null;
   status: string;
   invited_by: string;
   role: string;
   expires_at: string;
+  last_emailed_at: string | null;
   workspace_name: string | null;
   workspace_owner_id: string | null;
   inviter_name: string;
@@ -54,20 +67,20 @@ function renderHtml(o: {
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:12px;border:1px solid #e5e7eb;">
         <tr><td style="padding:28px 32px 8px;font-size:15px;font-weight:600;color:#4b5563;">CrowScribe</td></tr>
         <tr><td style="padding:8px 32px 4px;font-size:18px;font-weight:600;color:#111827;">
-          ${o.inviter} invited you to join ${o.workspace}
+          ${esc(o.inviter)} invited you to join ${esc(o.workspace)}
         </td></tr>
         <tr><td style="padding:4px 32px 20px;font-size:14px;color:#6b7280;">
-          You've been added as <strong style="color:#374151;">${o.role}</strong>.
+          You've been added as <strong style="color:#374151;">${esc(o.role)}</strong>.
         </td></tr>
         <tr><td style="padding:0 32px 24px;">
-          <a href="${o.acceptUrl}" style="display:inline-block;background:#8b5cf6;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:11px 22px;border-radius:8px;">Accept invitation</a>
+          <a href="${esc(o.acceptUrl)}" style="display:inline-block;background:#8b5cf6;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:11px 22px;border-radius:8px;">Accept invitation</a>
         </td></tr>
         <tr><td style="padding:0 32px 24px;font-size:12px;color:#9ca3af;line-height:1.5;">
           Or paste this link into your browser:<br>
-          <span style="color:#6b7280;word-break:break-all;">${o.fallbackUrl}</span>
+          <span style="color:#6b7280;word-break:break-all;">${esc(o.fallbackUrl)}</span>
         </td></tr>
         <tr><td style="padding:16px 32px 28px;border-top:1px solid #f3f4f6;font-size:12px;color:#9ca3af;line-height:1.5;">
-          This invitation expires on ${o.expires}. If you weren't expecting it, you can ignore this email.
+          This invitation expires on ${esc(o.expires)}. If you weren't expecting it, you can ignore this email.
         </td></tr>
       </table>
     </td></tr>
@@ -122,14 +135,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
       | InvitationRow
       | undefined;
 
-    if (!inv) return json({ skipped: "not-found" });
-    if (inv.status !== "pending") return json({ skipped: "not-pending" });
-    if (!inv.invited_email) return json({ skipped: "no-email" });
-
-    // The caller must be the inviter or the workspace owner (defense-in-depth against a
-    // token-holder triggering spurious re-sends).
+    // Authorize FIRST — an unauthorized caller (incl. anon-key JWT) gets one undifferentiated
+    // response whether the token is bogus, not theirs, or a real pending invite. `verify_jwt` is
+    // not the authz boundary here; this getUser() check is.
     const authHeader = req.headers.get("Authorization");
-    if (authHeader) {
+    const authorized = await (async () => {
+      if (!inv || !authHeader) return false;
       const caller = createClient(
         supabaseUrl,
         Deno.env.get("SUPABASE_ANON_KEY")!,
@@ -138,13 +149,24 @@ Deno.serve(async (req: Request): Promise<Response> => {
       const {
         data: { user },
       } = await caller.auth.getUser();
-      const ok =
-        user &&
-        (user.id === inv.invited_by ||
-          user.id === inv.workspace_owner_id);
-      if (!ok) return json({ skipped: "not-authorized" });
-    } else {
-      return json({ skipped: "not-authorized" });
+      return (
+        !!user &&
+        (user.id === inv.invited_by || user.id === inv.workspace_owner_id)
+      );
+    })();
+    if (!authorized) return json({ skipped: "not-authorized" });
+
+    if (inv!.status !== "pending") return json({ skipped: "not-pending" });
+    if (!inv!.invited_email) return json({ skipped: "no-email" });
+
+    const invitation = inv!;
+
+    // Per-invite send throttle: 60s since the last send for this token.
+    if (
+      invitation.last_emailed_at &&
+      Date.now() - Date.parse(invitation.last_emailed_at) < 60_000
+    ) {
+      return json({ skipped: "throttled" });
     }
 
     const siteUrl = (Deno.env.get("SITE_URL") ?? "").replace(/\/$/, "");
@@ -157,7 +179,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       const { data: linkData, error: linkErr } =
         await admin.auth.admin.generateLink({
           type,
-          email: inv.invited_email,
+          email: invitation.invited_email!,
           options: { redirectTo: fallbackUrl },
         });
       if (!linkErr && linkData?.properties?.action_link) {
@@ -172,12 +194,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
 
     const tmpl = {
-      inviter: inv.inviter_name,
-      workspace: inv.workspace_name ?? "a workspace",
-      role: inv.role,
+      inviter: invitation.inviter_name,
+      workspace: invitation.workspace_name ?? "a workspace",
+      role: invitation.role,
       acceptUrl: actionLink,
       fallbackUrl,
-      expires: new Date(inv.expires_at).toLocaleDateString("en-US", {
+      expires: new Date(invitation.expires_at).toLocaleDateString("en-US", {
         year: "numeric",
         month: "long",
         day: "numeric",
@@ -192,18 +214,19 @@ Deno.serve(async (req: Request): Promise<Response> => {
       },
       body: JSON.stringify({
         from: Deno.env.get("RESEND_FROM"),
-        to: [inv.invited_email],
+        to: [invitation.invited_email],
         subject: `${tmpl.inviter} invited you to join ${tmpl.workspace} on CrowScribe`,
         html: renderHtml(tmpl),
         text: renderText(tmpl),
       }),
+      signal: AbortSignal.timeout(10_000),
     });
 
     if (!res.ok) {
-      const body = await res.text();
-      console.error(`[send-invitation-email] Resend ${res.status}: ${body}`);
+      console.error(`[send-invitation-email] Resend ${res.status}`);
       return json({ error: `resend ${res.status}` }, 500);
     }
+    await admin.rpc("mark_invitation_emailed", { p_token: token });
     const sent = (await res.json()) as { id?: string };
     return json({ sent: true, id: sent.id });
   } catch (e) {
