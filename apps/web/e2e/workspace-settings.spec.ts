@@ -1,5 +1,11 @@
 import { test, expect, type Page } from "@playwright/test";
-import { onlyVisible, openSidebar, signIn, uniqueEmail } from "./helpers";
+import {
+  onlyVisible,
+  openSidebar,
+  openWorkspaceMenu,
+  signIn,
+  uniqueEmail,
+} from "./helpers";
 
 // A minimal valid 1x1 PNG, base64-encoded — same fixture pattern as profile.spec.ts; enough for
 // browser-image-compression to accept and process without a real file on disk.
@@ -15,8 +21,7 @@ function workspaceButton(page: Page, nameFragment: string) {
 }
 
 async function openWorkspaceSettings(page: Page, nameFragment: string) {
-  await openSidebar(page);
-  await workspaceButton(page, nameFragment).click();
+  await openWorkspaceMenu(page, nameFragment);
   await page.getByRole("menuitem", { name: "Workspace settings" }).click();
   await expect(page.getByText("Workspace settings")).toBeVisible();
 }

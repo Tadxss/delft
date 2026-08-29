@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ChevronDown, ChevronsLeft, KeyRound, Settings } from "lucide-react";
+import { ChevronDown, ChevronsLeft } from "lucide-react";
 import {
   parseWorkspaceSlug,
   useAuthUser,
@@ -10,20 +10,15 @@ import {
   workspaceInitials,
 } from "@crowscribe/shared";
 import { AccountModal } from "../../../_components/AccountModal";
-import { ThemeToggle } from "../../../_components/ThemeToggle";
 import { CredentialsModal } from "./credentials/CredentialsModal";
 import { WorkspaceSettingsModal } from "./WorkspaceSettingsModal";
 
-// Icon-button styling shared with the (now workspace-picker-only) TopBar — a 28px hit target
-// with a `before:` pseudo-element that pads the clickable area past the visible box.
-const ICON_BUTTON =
-  "relative flex h-8 w-8 items-center justify-center rounded text-ink-500 before:absolute before:-inset-1 before:content-[''] hover:bg-paper-100 hover:text-ink-800";
-
 // The workspace's chrome, moved out of a top header and into the very top of the sidebar
-// (Notion-style): an identity row (workspace name + dropdown, collapse chevron) over a row of
-// action icons (Credentials, theme, account). Rendered by `Sidebar`, so it inherits the
-// `group` hover context from `Sidebar`'s `<nav>` (used by the collapse button's reveal) and
-// stays inside the `VaultKeyProvider` that `CredentialsModal` needs.
+// (Notion-style): an identity row (workspace name + dropdown, collapse chevron). The dropdown
+// carries every workspace/account action — Workspace settings, Switch workspace, Credentials
+// Vault, Account settings. Rendered by `Sidebar`, so it inherits the `group` hover context
+// from `Sidebar`'s `<nav>` (used by the collapse button's reveal) and stays inside the
+// `VaultKeyProvider` that `CredentialsModal` needs.
 export function SidebarHeader({ onCollapse }: { onCollapse: () => void }) {
   const params = useParams<{ workspaceSlug: string }>();
   const workspaceId = parseWorkspaceSlug(params.workspaceSlug);
@@ -113,6 +108,29 @@ export function SidebarHeader({ onCollapse }: { onCollapse: () => void }) {
               >
                 Switch workspace
               </button>
+              <div role="separator" className="my-1 h-px bg-paper-200" />
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setCredentialsOpen(true);
+                }}
+                className="block w-full px-3 py-1.5 text-left text-xs text-ink-700 hover:bg-paper-100"
+              >
+                Credentials Vault
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setAccountOpen(true);
+                }}
+                className="block w-full px-3 py-1.5 text-left text-xs text-ink-700 hover:bg-paper-100"
+              >
+                Account settings
+              </button>
             </div>
           )}
         </div>
@@ -123,26 +141,6 @@ export function SidebarHeader({ onCollapse }: { onCollapse: () => void }) {
           className="relative shrink-0 rounded px-1.5 py-0.5 text-ink-500 opacity-100 before:absolute before:-left-2 before:-right-2.5 before:-top-3 before:-bottom-1 before:content-[''] hover:bg-paper-100 hover:text-ink-800 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100"
         >
           <ChevronsLeft size={14} />
-        </button>
-      </div>
-
-      <div className="flex items-center justify-center gap-1">
-        <button
-          type="button"
-          onClick={() => setCredentialsOpen(true)}
-          aria-label="Credentials"
-          className={ICON_BUTTON}
-        >
-          <KeyRound size={18} />
-        </button>
-        <ThemeToggle />
-        <button
-          type="button"
-          onClick={() => setAccountOpen(true)}
-          aria-label="Account settings"
-          className={ICON_BUTTON}
-        >
-          <Settings size={18} />
         </button>
       </div>
 

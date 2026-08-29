@@ -44,7 +44,7 @@ function GoogleLogo() {
 export default function LoginPage() {
   const router = useRouter();
   const { resolvedTheme } = useTheme();
-  // See ThemeToggle.tsx — resolvedTheme is undefined on the server/first client render, so the
+  // resolvedTheme is undefined on the server/first client render, so the
   // Google button's colors must not depend on it until mounted, or the client's real (possibly
   // "dark") value diverges from the deterministic light-mode SSR output and React flags a
   // hydration mismatch.

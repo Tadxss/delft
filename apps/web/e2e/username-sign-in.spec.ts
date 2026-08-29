@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { onlyVisible, openSidebar, signIn, uniqueEmail } from "./helpers";
+import { openWorkspaceMenu, signIn, uniqueEmail } from "./helpers";
 
 test("set a username, sign in with it, and confirm an unknown username is rejected without a password prompt", async ({
   page,
@@ -13,10 +13,8 @@ test("set a username, sign in with it, and confirm an unknown username is reject
   await page.waitForURL(/\/workspace\/[^/]+--[^/]+$/, { timeout: 15000 });
 
   // Set a username via the profile form.
-  await openSidebar(page);
-  await onlyVisible(
-    page.getByRole("button", { name: "Account settings" }),
-  ).click();
+  await openWorkspaceMenu(page);
+  await page.getByRole("menuitem", { name: "Account settings" }).click();
   await page
     .getByRole("button", { name: "Update profile", exact: true })
     .click();

@@ -88,6 +88,20 @@ export async function openSidebar(page: Page): Promise<void> {
   await page.getByRole("button", { name: "Open sidebar" }).click();
 }
 
+// Credentials Vault, Account settings, and Workspace settings all live in the sidebar's
+// workspace-name dropdown menu now (no standalone icon row). Open the sidebar (mobile drawer
+// no-op on desktop), then click the workspace-name button to open the menu. The menu closes on
+// navigation and on outside click, so callers re-open it per use like `openSidebar`.
+export async function openWorkspaceMenu(
+  page: Page,
+  workspaceName = "Personal",
+): Promise<void> {
+  await openSidebar(page);
+  await onlyVisible(
+    page.getByRole("button", { name: new RegExp(workspaceName) }),
+  ).click();
+}
+
 // Below `md`, CredentialsModal shows one pane at a time (list, or the selected credential's detail
 // with a "← Back" row) rather than side-by-side — this button only renders at all below that
 // breakpoint, so it's a safe no-op on desktop-viewport projects. Needed before any assertion/action
