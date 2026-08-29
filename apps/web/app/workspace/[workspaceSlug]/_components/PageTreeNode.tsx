@@ -29,6 +29,9 @@ export interface PageTreeNodeProps {
   // on/off (see ReorderStrip's own comment for why: it must stay mounted at zero height always, but
   // shouldn't intercept pointer events when nothing is being dragged).
   dragActive: boolean;
+  // False for a `viewer` — hides the add/rename/delete affordances and disables drag (RLS is the
+  // real gate). Threaded down the whole tree.
+  canEdit: boolean;
   onToggle: (pageId: string) => void;
   onCreateChild: (parentId: string) => void;
   depth: number;
@@ -40,6 +43,7 @@ function PageTreeNodeImpl({
   expanded,
   excludedDropIds,
   dragActive,
+  canEdit,
   onToggle,
   onCreateChild,
   depth,
@@ -73,10 +77,10 @@ function PageTreeNodeImpl({
     listeners,
     setNodeRef: setDragRef,
     isDragging,
-  } = useDraggable({ id: page.id });
+  } = useDraggable({ id: page.id, disabled: !canEdit });
   const { setNodeRef: setDropRef, isOver } = useDroppable({
     id: page.id,
-    disabled: excludedDropIds.has(page.id),
+    disabled: !canEdit || excludedDropIds.has(page.id),
   });
   const setRowRef = useCallback(
     (node: HTMLDivElement | null) => {
@@ -203,15 +207,18 @@ function PageTreeNodeImpl({
             {page.title || "Untitled"}
           </Link>
         )}
-        <button
-          type="button"
-          onClick={() => onCreateChild(page.id)}
-          aria-label="Add sub-page"
-          className="relative flex h-4 w-4 shrink-0 items-center justify-center text-ink-400 before:absolute before:-left-1 before:-right-0.5 before:-top-1.5 before:-bottom-1.5 before:content-[''] hover:text-ink-700 md:hidden md:group-hover:flex md:group-focus-within:flex"
-        >
-          <Plus size={14} />
-        </button>
+        {canEdit && (
+          <button
+            type="button"
+            onClick={() => onCreateChild(page.id)}
+            aria-label="Add sub-page"
+            className="relative flex h-4 w-4 shrink-0 items-center justify-center text-ink-400 before:absolute before:-left-1 before:-right-0.5 before:-top-1.5 before:-bottom-1.5 before:content-[''] hover:text-ink-700 md:hidden md:group-hover:flex md:group-focus-within:flex"
+          >
+            <Plus size={14} />
+          </button>
+        )}
         <div ref={menuRef} className="relative">
+          {canEdit && (
           <button
             type="button"
             onClick={() => setMenuOpen((prev) => !prev)}
@@ -221,6 +228,7 @@ function PageTreeNodeImpl({
           >
             <MoreHorizontal size={14} />
           </button>
+          )}
           {menuOpen && (
             <div
               role="menu"
@@ -264,6 +272,7 @@ function PageTreeNodeImpl({
                 expanded={expanded}
                 excludedDropIds={excludedDropIds}
                 dragActive={dragActive}
+                canEdit={canEdit}
                 onToggle={onToggle}
                 onCreateChild={onCreateChild}
                 depth={depth + 1}
@@ -290,6 +299,7 @@ function arePageTreeNodePropsEqual(
     prev.expanded === next.expanded &&
     prev.excludedDropIds === next.excludedDropIds &&
     prev.dragActive === next.dragActive &&
+    prev.canEdit === next.canEdit &&
     prev.onToggle === next.onToggle &&
     prev.onCreateChild === next.onCreateChild &&
     prev.depth === next.depth

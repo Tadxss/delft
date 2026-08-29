@@ -4,7 +4,11 @@ import { useParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useQueryClient } from "@tanstack/react-query";
 import type { PageSummary } from "@crowscribe/types";
-import { parseWorkspaceSlug, usePage } from "@crowscribe/shared";
+import {
+  parseWorkspaceSlug,
+  useMyWorkspaceRole,
+  usePage,
+} from "@crowscribe/shared";
 import { PageEditorLoading } from "./_components/PageEditorLoading";
 import { PageShell } from "./_components/PageShell";
 
@@ -25,6 +29,7 @@ export default function PageRoute() {
   const workspaceId = parseWorkspaceSlug(params.workspaceSlug);
   const queryClient = useQueryClient();
   const { data: page, isLoading, isError, error } = usePage(params.pageId);
+  const canEdit = useMyWorkspaceRole(workspaceId).data !== "viewer";
 
   if (isLoading) {
     // The sidebar's usePages() already has this page's title cached (everything short of
@@ -62,5 +67,5 @@ export default function PageRoute() {
     );
   }
 
-  return <PageEditor page={page} />;
+  return <PageEditor page={page} canEdit={canEdit} />;
 }

@@ -2579,6 +2579,53 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
       lands on `/workspace`) so every existing spec sails through the wall; the new
       `e2e/onboarding.spec.ts` opts out with `signIn(page, email, { onboarding: "leave" })` and
       drives the 5 steps, the per-step gating, Back-preserves-state, and the profile round-trip.
+    - Also: the shared `<Select>` swapped its native OS arrow for a padded lucide chevron
+      (`appearance-none` + `pr-9` + absolute `ChevronDown`).
 
     **Hosted DB needs `supabase db push` + a redeploy** — applied locally via
     `supabase migration up` only.
+
+79. **Workspace invitations + multi-user roles (`owner` / `editor` / `viewer`).** ✅ _done_.
+    Turning on the `workspace_members` future-proofing from Build Order step 2. **Phase 1** — the
+    in-app + copy-link flow; the `signInWithOtp` email for brand-new invitees is a follow-up.
+
+    - Migration `20260830000000_workspace_invitations.sql`:
+      - `workspace_members.role` CHECK `('owner','member')` → `('owner','editor','viewer')` (every
+        existing row is `'owner'`, so it validates instantly) + a `created_at` column.
+      - **`has_workspace_access(uuid, text[])`** — a `security invoker` SQL helper; all 16 content
+        policies (`pages` / `canvases` / `credentials` / `credential_folders`) are dropped &
+        recreated to call it. `pages`/`canvases`: `select` = any role, write = `owner|editor`.
+        `credentials`/`credential_folders`: **all four = `owner` only** (the vault's per-workspace
+        key can't be shared without new crypto — a deliberate v1 limitation). `page-images` +
+        `workspace-logos` storage writes tightened to `owner|editor`.
+      - **`workspace_invitations`** table (token, `invited_email` XOR `invited_username`,
+        `invited_user_id` bound only for a *confirmed* account, role, 14-day expiry, status enum).
+        SELECT policies for the owner + the invitee (matched on `invited_user_id` / username, NOT
+        the raw jwt email — `enable_confirmations = false` means the email claim can be
+        unverified; see the migration comment). No write grant — all writes via RPCs.
+      - 12 SECURITY DEFINER RPCs (`invite_to_workspace`, `accept_workspace_invitation` — the only
+        new `workspace_members` writer — `decline` / `revoke`, `get_my_pending_invitations`,
+        `get_workspace_members` (member emails to the owner only), `get_workspace_invitations`,
+        `set_workspace_member_role`, `remove_workspace_member`, `leave_workspace`,
+        `get_invitation_preview` — anon+authenticated, token-guarded, rate-limited under its own
+        `rpc_rate_limits` key). Reviewed by the `rls-reviewer` agent; the one MEDIUM finding
+        (unverified-email trust) is fixed by the `email_confirmed_at` checks above.
+    - Shared: `WorkspaceRole` widened; new `WorkspaceInvitation` / `PendingInvitation` /
+      `InvitationPreview` / `WorkspaceMemberProfile` types + mappers; ~12 hooks incl.
+      `useMyWorkspaceRole` (a plain self-read of `workspace_members`).
+    - UI: **`WorkspaceMembersModal`** (owner-only, from a new "Members" dropdown item) — invite by
+      email/`@username` + Editor/Viewer, manage roles, revoke pendings, copy invite links.
+      **Pending invitations** section on the `/workspace` picker (`PendingInvitations`), plus a
+      "Leave" affordance on non-owned rows. **`/invite/[token]`** route (own `AuthGate` layout,
+      outside `OnboardingGate`). **Viewer read-only mode**: `canEdit` from `useMyWorkspaceRole`
+      threads to `Sidebar` (hide `+` / `⋯` / drag), `PageEditor` (`editable={false}` + "View
+      only"), `CanvasEditor` (`viewModeEnabled`); the "Credentials Vault" dropdown item is now
+      `isOwner`-gated.
+    - e2e: new `workspace-invitations.spec.ts` (2 two-context flows). RLS rewrite verified
+      regression-free against the full existing suite.
+
+    **Hosted DB needs `supabase db push` + a redeploy** — applied locally via
+    `supabase migration up` only.
+
+    _Follow-ups deferred:_ the invite email (`signInWithOtp` in `useInviteToWorkspace` for
+    `invited_email`), ownership transfer, per-member vault-key sharing.
