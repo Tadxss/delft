@@ -12,8 +12,11 @@ export interface UpsertProfileInput {
   middleName?: string | null;
   lastName?: string | null;
   occupation?: string | null;
+  company?: string | null;
   bio?: string | null;
   avatarUrl?: string | null;
+  usageIntent?: string | null;
+  onboardedAt?: string | null;
 }
 
 // `upsert` rather than plain `update`: the auto-create-on-signup trigger only covers accounts
@@ -31,8 +34,11 @@ export function useUpsertProfile() {
       middleName,
       lastName,
       occupation,
+      company,
       bio,
       avatarUrl,
+      usageIntent,
+      onboardedAt,
     }) => {
       const patch: ProfilesUpsert = { id };
       if (username !== undefined) patch.username = username;
@@ -40,8 +46,11 @@ export function useUpsertProfile() {
       if (middleName !== undefined) patch.middle_name = middleName;
       if (lastName !== undefined) patch.last_name = lastName;
       if (occupation !== undefined) patch.occupation = occupation;
+      if (company !== undefined) patch.company = company;
       if (bio !== undefined) patch.bio = bio;
       if (avatarUrl !== undefined) patch.avatar_url = avatarUrl;
+      if (usageIntent !== undefined) patch.usage_intent = usageIntent;
+      if (onboardedAt !== undefined) patch.onboarded_at = onboardedAt;
 
       const { data, error } = await supabase
         .from("profiles")

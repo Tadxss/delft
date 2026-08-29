@@ -13,6 +13,10 @@ areas below — every finding still holds as originally written.
 non-blocking risk** — see "Fixed" and "Accepted risk" below. Kept as a historical record (not
 deleted) per this doc's own "accumulate, don't delete" convention.
 
+**The original audit was single-user. Build Order steps 79–80 (multi-user workspaces + the first
+Edge Function) added surface it never covered — re-audited in a follow-up pass; see
+"[Post-step-37: multi-user surface](#post-step-37-multi-user-surface)" at the bottom.**
+
 Live app: `https://crowscribe.vercel.app` (`https://delft.vercel.app` still works too, kept as a
 legacy alias). Read [docs/ARCHITECTURE.md](ARCHITECTURE.md) and
 [docs/TESTING.md](TESTING.md) first for the existing architecture/test conventions — every fix
@@ -256,5 +260,95 @@ page, delete the workspace from the switcher) and confirmed the object was gone 
 nor `canvas.spec.ts`'s existing delete flows assert on Storage state, so this also confirmed the
 added Storage calls introduced no new failure mode in the delete mutations themselves).
 
-This closes every finding in this document — everything above is now either fixed or explicitly
-accepted as non-blocking risk.
+This closes every finding from the original (single-user) audit — everything above is now either
+fixed or explicitly accepted as non-blocking risk.
+
+## Post-step-37: multi-user surface
+
+Build Order steps 78–80 added a mandatory onboarding flow, `profiles.company/usage_intent/
+onboarded_at`, **workspace invitations + `owner/editor/viewer` roles**, and the repo's first
+Edge Function (`send-invitation-email`) with the first `SUPABASE_SERVICE_ROLE_KEY` use. A
+follow-up re-audit (`rls-reviewer` on `20260830000000` + `20260831000000`; `code-reviewer` on
+the Edge Function; a manual pass on the new RPC write paths) found the migrations structurally
+clean on every load-bearing invariant. Findings and their disposition:
+
+### Fixed (migration `20260901000000_invitation_hardening.sql` + the Edge Function)
+- **HTML injection in the invite email** — `renderHtml` interpolated the workspace name and
+  inviter display name (both free text, unsanitized) straight into the HTML body. A workspace
+  named `<a href="phish">…</a>` would ride our SPF/DKIM-aligned sending domain as a phishing
+  payload. Fixed: an `esc()` helper HTML-escapes every interpolation in `renderHtml` (and the
+  href-context URLs); `renderText` and the plaintext subject are unaffected.
+- **Unbounded invite creation → Resend-quota exhaustion + `auth.users` pollution.** Any signed-in
+  user could create a workspace and call `invite_to_workspace` with arbitrary emails without
+  limit; each email invite fires the Edge Function, whose `type: "invite"` fallback provisions an
+  `auth.users` row and sends a mail. Fixed: `invite_to_workspace` now enforces a per-workspace
+  pending-invite ceiling (100) and a global `rpc_rate_limits` bucket (30 / 60s, same crude
+  single-bucket shape as `get_email_for_username`).
+- **Owner could replay `send-invitation-email` to spam an invitee.** No standalone "resend"
+  button, but the owner could re-invoke the function from devtools against a still-pending token.
+  Fixed: `workspace_invitations.last_emailed_at` + `mark_invitation_emailed()` (service_role
+  only); the function skips (`{skipped:"throttled"}`) within 60s of the last send.
+- **Token-status probing.** The `{skipped:"not-found"|"not-pending"|"no-email"}` responses were
+  returned before the caller-authorization check, letting anyone with the public anon key
+  distinguish token states. Fixed: the inviter/owner check now runs first; an unauthorized caller
+  gets one undifferentiated `{skipped:"not-authorized"}`.
+- **Recipient email in Edge Function logs** — the Resend error body (which echoes `to`) was
+  `console.error`'d. Fixed: log the status code only.
+- **`get_invitation_for_email` → `SECURITY INVOKER`** (was `DEFINER`) — only `service_role` can
+  call it and `service_role` already bypasses RLS; elevated mode wasn't needed.
+- Added a `signal: AbortSignal.timeout(10_000)` to the Resend `fetch`.
+
+### Confirmed clean
+- **`has_workspace_access` recursion** — `SECURITY INVOKER`, only ever called from policies on
+  tables *other* than `workspace_members`; its inner read resolves through the non-self-subquering
+  `workspace_members_select_self`. No recursion. (Now a documented load-bearing detail — see
+  `docs/ARCHITECTURE.md` Build Order step 2 and `CLAUDE.md`.)
+- **Every new RPC's authorization** — owner-only ones (`invite_to_workspace`,
+  `revoke_workspace_invitation`, `get_workspace_invitations`, `set_workspace_member_role`,
+  `remove_workspace_member`) all gate on `workspaces.owner_id = auth.uid()` as the first check;
+  `accept_workspace_invitation` requires a valid token **and** an identity match, so you can't
+  join a workspace you weren't invited to; `set_workspace_member_role`/`remove_workspace_member`
+  can't target the owner row or escalate anyone to `owner`; `leave_workspace` is self-only and
+  the owner can't leave. `accept_workspace_invitation` is the only new `workspace_members` writer,
+  race-safe via `SELECT … FOR UPDATE` + `ON CONFLICT DO NOTHING`.
+- **`email_confirmed_at` trust** — no code path (RLS policy or RPC) trusts the raw
+  `auth.jwt() ->> 'email'` claim, which can be unconfirmed under `enable_confirmations = false`.
+  Invitee matching is against `invited_user_id` (stamped only for confirmed accounts), the
+  profile username, or `auth.users.email_confirmed_at`.
+- **`get_invitation_preview`** — new `anon`-callable RPC. Token-guarded (256-bit), rate-limited
+  under its own `rpc_rate_limits` key, returns only display fields (workspace name/logo, inviter
+  display name, role, status, expiry) — no email or other PII. Acceptable, same tradeoff as
+  `get_email_for_username`.
+- **Edge Function auth** — `verify_jwt = true` is *not* the authz boundary (the public anon key
+  satisfies it); the in-function `getUser()` + inviter/owner check is. An anon-key or service-key
+  JWT yields no `user` → rejected. `SITE_URL` is a server secret, never caller-supplied.
+- **Storage** — `page-images` / `workspace-logos` write policies now correctly require
+  `role in ('owner','editor')`; the `(storage.foldername(name))[1]` membership idiom preserved.
+- **Service-role key** — still never referenced in browser-shipped code. The Edge Function
+  (`supabase/functions/send-invitation-email/`) is the only user; it's fire-and-forget, not a
+  data-write path, and no-ops without `RESEND_API_KEY`.
+
+### Accepted risk — not a BETA blocker
+- **No application-level mutation rate limiting on `pages`/`canvases`** (the original "Accepted
+  risk" item, now with a real "revisit" trigger — editors hold valid credentials inside a
+  workspace). Still accepted: the same "needs shared cross-request state, which the Vercel
+  runtime doesn't have and an external Redis was declined" reasoning holds; the blast radius is
+  one workspace's own content, editors are people the owner deliberately invited, and Supabase's
+  auth-endpoint limits still apply. Revisit if a workspace ever has untrusted collaborators.
+- **`get_invitation_preview` global rate bucket** — a single shared `rpc_rate_limits` row, so a
+  determined anon caller can throttle the `/invite/[token]` *preview* screen for everyone
+  (accept/decline still work — they're `authenticated`, unthrottled). Same accepted tradeoff as
+  `get_email_for_username`.
+- **`profiles` (+ `company`/`usage_intent`/`onboarded_at`) and the `avatars` bucket** — still not
+  audited to this doc's bar (flagged since Build Order step 28). RLS is `id = auth.uid()`, no
+  membership concept, no anon policy — low risk, but not formally cleared.
+
+### Deploy dependency (not a security finding, but a "won't work in prod without it")
+Invite acceptance for a not-yet-registered user needs `SITE_URL` set and
+`https://crowscribe.vercel.app/**` added to the hosted project's Auth redirect-URL allow-list, or
+`generateLink`'s `redirectTo` is rejected. See `docs/ARCHITECTURE.md` "Next Up" for the full
+pending-deploy checklist.
+
+The multi-user spec surface is now `workspace-invitations.spec.ts` (2 two-context flows), and the
+suite is 17 spec files × 3 projects (the "16 specs" / "48-test suite" figures above are
+frozen-in-time snapshots from the step-30–37 fixes).

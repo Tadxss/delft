@@ -37,7 +37,41 @@ export async function getLatestMagicLink(email: string): Promise<string> {
   throw new Error(`No magic-link email found for ${email}`);
 }
 
-export async function signIn(page: Page, email: string): Promise<void> {
+// Fills the mandatory first-login onboarding stepper with minimal valid data and lands on the
+// workspace picker. A no-op if the stepper isn't showing (existing account). Called by signIn so
+// every spec sails through the wall transparently; the dedicated onboarding.spec.ts opts out with
+// `signIn(page, email, { onboarding: "leave" })` and drives the UI itself.
+export async function completeOnboarding(page: Page): Promise<void> {
+  const card = page.getByTestId("onboarding");
+  const showing = await card
+    .waitFor({ state: "visible", timeout: 3000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!showing) return;
+
+  const next = card.getByRole("button", { name: "Next", exact: true });
+
+  await card.locator("#onboarding-first-name").fill("Test");
+  await card.locator("#onboarding-last-name").fill("User");
+  await next.click();
+
+  await card
+    .locator("#onboarding-occupation")
+    .selectOption({ label: "Software Engineer / Developer" });
+  await next.click(); // occupation → company
+  await next.click(); // company → bio
+  await next.click(); // bio → usage
+
+  await card.getByRole("checkbox", { name: "Work & productivity" }).click();
+  await card.getByRole("button", { name: "Finish" }).click();
+  await page.waitForURL(/\/workspace(\/|$)/, { timeout: 15000 });
+}
+
+export async function signIn(
+  page: Page,
+  email: string,
+  opts: { onboarding?: "complete" | "leave" } = {},
+): Promise<void> {
   await page.goto("/");
   // Real bug found via WebKit e2e coverage (BETA_READINESS.md item 5): `page.fill()` sets the DOM
   // value and returns immediately, with no wait for React to actually attach its hydration event
@@ -56,6 +90,7 @@ export async function signIn(page: Page, email: string): Promise<void> {
   const link = await getLatestMagicLink(email);
   await page.goto(link);
   await page.waitForURL(/\/w/, { timeout: 15000 });
+  if (opts.onboarding !== "leave") await completeOnboarding(page);
 }
 
 // Below `md`, Sidebar.tsx's contents live behind an off-canvas drawer (see

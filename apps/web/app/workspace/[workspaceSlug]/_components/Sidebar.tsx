@@ -37,6 +37,7 @@ import {
   useCreatePage,
   useCanvases,
   useDeleteCanvas,
+  useMyWorkspaceRole,
   usePages,
   useSupabaseClient,
   useUpdateCanvas,
@@ -87,16 +88,19 @@ function CanvasRow({
   canvas,
   href,
   isActive,
+  canEdit,
 }: {
   canvas: CanvasSummary;
   href: string;
   isActive: boolean;
+  canEdit: boolean;
 }) {
   const params = useParams<{ workspaceSlug: string }>();
   const workspaceId = parseWorkspaceSlug(params.workspaceSlug);
   const router = useRouter();
   const { listeners, setNodeRef, isDragging } = useDraggable({
     id: canvas.id,
+    disabled: !canEdit,
   });
   const queryClient = useQueryClient();
   const supabase = useSupabaseClient();
@@ -208,6 +212,7 @@ function CanvasRow({
           </Link>
         )}
         <div ref={menuRef} className="relative">
+          {canEdit && (
           <button
             type="button"
             onClick={() => setMenuOpen((prev) => !prev)}
@@ -217,6 +222,7 @@ function CanvasRow({
           >
             <MoreHorizontal size={14} />
           </button>
+          )}
           {menuOpen && (
             <div
               role="menu"
@@ -269,6 +275,9 @@ export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
   const createCanvas = useCreateCanvas();
   const updatePage = useUpdatePage();
   const updateCanvas = useUpdateCanvas();
+  // Viewers can browse pages/canvases but not create/rename/reorder/delete them (RLS enforces it
+  // server-side; this just hides the affordances). `null` role (loading, or an edge case) → allow.
+  const canEdit = useMyWorkspaceRole(workspaceId).data !== "viewer";
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [excludedDropIds, setExcludedDropIds] = useState<Set<string>>(
@@ -525,6 +534,7 @@ export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
           </button>
           <span className={SECTION_LABEL}>Pages</span>
           <div className="ml-auto flex items-center gap-0.5">
+            {canEdit && (
             <button
               type="button"
               onClick={() => createChild(null)}
@@ -533,6 +543,7 @@ export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
             >
               <Plus size={14} />
             </button>
+            )}
           </div>
         </PagesRootDropZone>
         {dragError && (
@@ -569,6 +580,7 @@ export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
                     expanded={expanded}
                     excludedDropIds={excludedDropIds}
                     dragActive={draggingId !== null}
+                    canEdit={canEdit}
                     onToggle={toggle}
                     onCreateChild={createChild}
                     depth={0}
@@ -604,14 +616,16 @@ export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
           )}
         </button>
         <span className={SECTION_LABEL}>Canvas</span>
-        <button
-          type="button"
-          onClick={createNewCanvas}
-          aria-label="New canvas"
-          className="relative ml-auto rounded px-1.5 py-0.5 text-ink-500 opacity-100 transition-opacity before:absolute before:-left-2 before:-right-2.5 before:-top-3 before:-bottom-2 before:content-[''] hover:bg-paper-100 hover:text-ink-800 md:opacity-0 md:group-hover/canvas:opacity-100 md:group-focus-within/canvas:opacity-100"
-        >
-          <Plus size={14} />
-        </button>
+        {canEdit && (
+          <button
+            type="button"
+            onClick={createNewCanvas}
+            aria-label="New canvas"
+            className="relative ml-auto rounded px-1.5 py-0.5 text-ink-500 opacity-100 transition-opacity before:absolute before:-left-2 before:-right-2.5 before:-top-3 before:-bottom-2 before:content-[''] hover:bg-paper-100 hover:text-ink-800 md:opacity-0 md:group-hover/canvas:opacity-100 md:group-focus-within/canvas:opacity-100"
+          >
+            <Plus size={14} />
+          </button>
+        )}
       </div>
       {!canvasCollapsed &&
         (canvasesLoading ? (
@@ -651,6 +665,7 @@ export function Sidebar({ onCollapse }: { onCollapse: () => void }) {
                   canvas={canvas}
                   href={`/workspace/${params.workspaceSlug}/canvas/${canvas.id}`}
                   isActive={params.canvasId === canvas.id}
+                  canEdit={canEdit}
                 />
               </Fragment>
             ))}

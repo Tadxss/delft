@@ -11,6 +11,7 @@ import {
 } from "@crowscribe/shared";
 import { AccountModal } from "../../../_components/AccountModal";
 import { CredentialsModal } from "./credentials/CredentialsModal";
+import { WorkspaceMembersModal } from "./WorkspaceMembersModal";
 import { WorkspaceSettingsModal } from "./WorkspaceSettingsModal";
 
 // The workspace's chrome, moved out of a top header and into the very top of the sidebar
@@ -31,6 +32,7 @@ export function SidebarHeader({ onCollapse }: { onCollapse: () => void }) {
   const [accountOpen, setAccountOpen] = useState(false);
   const [credentialsOpen, setCredentialsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [membersOpen, setMembersOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Close the dropdown on any outside pointer press — same pattern as CodeBlockView's picker.
@@ -85,17 +87,30 @@ export function SidebarHeader({ onCollapse }: { onCollapse: () => void }) {
               className="absolute left-0 top-full z-20 mt-1 w-48 overflow-hidden rounded-md border border-paper-200 bg-paper-50 py-1 shadow-lg"
             >
               {isOwner && (
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    setSettingsOpen(true);
-                  }}
-                  className="block w-full px-3 py-1.5 text-left text-xs text-ink-700 hover:bg-paper-100"
-                >
-                  Workspace settings
-                </button>
+                <>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      setSettingsOpen(true);
+                    }}
+                    className="block w-full px-3 py-1.5 text-left text-xs text-ink-700 hover:bg-paper-100"
+                  >
+                    Workspace settings
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      setMembersOpen(true);
+                    }}
+                    className="block w-full px-3 py-1.5 text-left text-xs text-ink-700 hover:bg-paper-100"
+                  >
+                    Members
+                  </button>
+                </>
               )}
               <button
                 type="button"
@@ -109,17 +124,19 @@ export function SidebarHeader({ onCollapse }: { onCollapse: () => void }) {
                 Switch workspace
               </button>
               <div role="separator" className="my-1 h-px bg-paper-200" />
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setMenuOpen(false);
-                  setCredentialsOpen(true);
-                }}
-                className="block w-full px-3 py-1.5 text-left text-xs text-ink-700 hover:bg-paper-100"
-              >
-                Credentials Vault
-              </button>
+              {isOwner && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setCredentialsOpen(true);
+                  }}
+                  className="block w-full px-3 py-1.5 text-left text-xs text-ink-700 hover:bg-paper-100"
+                >
+                  Credentials Vault
+                </button>
+              )}
               <button
                 type="button"
                 role="menuitem"
@@ -154,6 +171,11 @@ export function SidebarHeader({ onCollapse }: { onCollapse: () => void }) {
         workspaceId={workspaceId}
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
+      />
+      <WorkspaceMembersModal
+        workspaceId={workspaceId}
+        open={membersOpen}
+        onClose={() => setMembersOpen(false)}
       />
     </div>
   );

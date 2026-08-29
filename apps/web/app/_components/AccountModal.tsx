@@ -18,6 +18,7 @@ import { Button } from "./Button";
 import { FormLabel } from "./FormLabel";
 import { Input, Select, Textarea } from "./Input";
 import { Modal } from "./Modal";
+import { UsageCheckboxes } from "./UsageCheckboxes";
 
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -275,7 +276,9 @@ function ProfileForm({ userId }: { userId: string | undefined }) {
   const [lastName, setLastName] = useState("");
   const [occupation, setOccupation] = useState("");
   const [customOccupation, setCustomOccupation] = useState("");
+  const [company, setCompany] = useState("");
   const [bio, setBio] = useState("");
+  const [usage, setUsage] = useState<string[]>([]);
   const [saved, setSaved] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Guards the seeding effect below to fire exactly once — defends against a *later* background
@@ -294,7 +297,9 @@ function ProfileForm({ userId }: { userId: string | undefined }) {
     setFirstName(profile?.firstName ?? "");
     setMiddleName(profile?.middleName ?? "");
     setLastName(profile?.lastName ?? "");
+    setCompany(profile?.company ?? "");
     setBio(profile?.bio ?? "");
+    setUsage(profile?.usageIntent?.split(", ").filter(Boolean) ?? []);
     const stored = profile?.occupation ?? "";
     if (stored && !(OCCUPATIONS as readonly string[]).includes(stored)) {
       setOccupation("Other");
@@ -334,7 +339,9 @@ function ProfileForm({ userId }: { userId: string | undefined }) {
         middleName: middleName.trim() || null,
         lastName: lastName.trim() || null,
         occupation: finalOccupation || null,
+        company: company.trim() || null,
         bio: bio.trim() || null,
+        usageIntent: usage.join(", ") || null,
       },
       { onSuccess: () => setSaved(true) },
     );
@@ -450,6 +457,14 @@ function ProfileForm({ userId }: { userId: string | undefined }) {
           />
         )}
 
+        <FormLabel htmlFor="company">Company (optional)</FormLabel>
+        <Input
+          id="company"
+          maxLength={200}
+          value={company}
+          onChange={(e) => setCompany(e.target.value)}
+        />
+
         <FormLabel htmlFor="bio">Bio</FormLabel>
         <Textarea
           id="bio"
@@ -459,6 +474,9 @@ function ProfileForm({ userId }: { userId: string | undefined }) {
           rows={3}
           className="resize-none"
         />
+
+        <FormLabel>How you use CrowScribe</FormLabel>
+        <UsageCheckboxes value={usage} onChange={setUsage} />
 
         <Button type="submit" disabled={upsertProfile.isPending} className="mt-1">
           {upsertProfile.isPending ? "Saving…" : "Save profile"}

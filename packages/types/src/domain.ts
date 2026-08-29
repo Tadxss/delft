@@ -20,12 +20,85 @@ export interface Workspace {
   createdAt: string;
 }
 
-export type WorkspaceRole = "owner" | "member";
+export type WorkspaceRole = "owner" | "editor" | "viewer";
+
+// The two roles an invitation can grant (never "owner").
+export type InvitableRole = Exclude<WorkspaceRole, "owner">;
 
 export interface WorkspaceMember {
   workspaceId: string;
   userId: string;
   role: WorkspaceRole;
+}
+
+export type WorkspaceInvitationStatus =
+  | "pending"
+  | "accepted"
+  | "revoked"
+  | "declined";
+
+// A row of `workspace_invitations` (as returned by invite_to_workspace). Exactly one of
+// invitedEmail / invitedUsername is set.
+export interface WorkspaceInvitation {
+  id: string;
+  workspaceId: string;
+  invitedBy: string;
+  invitedEmail: string | null;
+  invitedUsername: string | null;
+  invitedUserId: string | null;
+  role: InvitableRole;
+  token: string;
+  status: WorkspaceInvitationStatus;
+  expiresAt: string;
+  createdAt: string;
+  respondedAt: string | null;
+}
+
+// One pending invite shown to the invitee on their workspace picker (get_my_pending_invitations).
+export interface PendingInvitation {
+  id: string;
+  token: string;
+  workspaceId: string;
+  workspaceName: string;
+  workspaceLogoUrl: string | null;
+  role: InvitableRole;
+  invitedByName: string;
+  expiresAt: string;
+  createdAt: string;
+}
+
+// One pending invite shown to the owner in the manage-members UI (get_workspace_invitations).
+export interface WorkspaceInvitationSummary {
+  id: string;
+  invitedEmail: string | null;
+  invitedUsername: string | null;
+  role: InvitableRole;
+  status: WorkspaceInvitationStatus;
+  token: string;
+  expiresAt: string;
+  createdAt: string;
+}
+
+// Non-sensitive display fields for the /invite/[token] screen (get_invitation_preview).
+export interface InvitationPreview {
+  workspaceName: string;
+  workspaceLogoUrl: string | null;
+  inviterName: string;
+  role: InvitableRole;
+  status: WorkspaceInvitationStatus;
+  expiresAt: string;
+}
+
+// A member row for the manage-members UI (get_workspace_members). `email` is only populated when
+// the caller is the workspace owner.
+export interface WorkspaceMemberProfile {
+  userId: string;
+  role: WorkspaceRole;
+  username: string | null;
+  displayName: string | null;
+  email: string | null;
+  avatarUrl: string | null;
+  joinedAt: string | null;
 }
 
 export interface Page {
@@ -104,8 +177,14 @@ export interface Profile {
   middleName: string | null;
   lastName: string | null;
   occupation: string | null;
+  company: string | null;
   bio: string | null;
   avatarUrl: string | null;
+  // How the user plans to use the app — a ", "-joined list of preset labels (see usageOptions.ts),
+  // collected during onboarding.
+  usageIntent: string | null;
+  // Null until the user finishes the first-login onboarding stepper; set once, never cleared.
+  onboardedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }

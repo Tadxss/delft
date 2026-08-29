@@ -7,6 +7,7 @@ import {
   useAuthUser,
   useCreateWorkspace,
   useDeleteWorkspace,
+  useLeaveWorkspace,
   useWorkspaces,
   workspaceInitials,
 } from "@crowscribe/shared";
@@ -14,6 +15,7 @@ import { Button } from "../_components/Button";
 import { FormLabel } from "../_components/FormLabel";
 import { Heading } from "../_components/Heading";
 import { Input } from "../_components/Input";
+import { PendingInvitations } from "./_components/PendingInvitations";
 
 export default function WorkspaceSwitcherPage() {
   const router = useRouter();
@@ -26,7 +28,18 @@ export default function WorkspaceSwitcherPage() {
   } = useWorkspaces(user?.id);
   const createWorkspace = useCreateWorkspace(user?.id);
   const deleteWorkspace = useDeleteWorkspace(user?.id);
+  const leaveWorkspace = useLeaveWorkspace(user?.id);
   const [name, setName] = useState("");
+
+  function handleLeave(
+    e: React.MouseEvent,
+    workspaceId: string,
+    workspaceName: string,
+  ) {
+    e.stopPropagation();
+    if (!window.confirm(`Leave "${workspaceName}"?`)) return;
+    leaveWorkspace.mutate({ workspaceId });
+  }
 
   function handleDelete(
     e: React.MouseEvent,
@@ -62,6 +75,8 @@ export default function WorkspaceSwitcherPage() {
     <main className="mx-auto flex w-full max-w-lg flex-col gap-8 overflow-y-auto px-6 py-16">
       <Heading level="page">Workspaces</Heading>
 
+      <PendingInvitations userId={user?.id} />
+
       {isLoading ? (
         <p className="text-sm text-ink-500">Loading…</p>
       ) : isError ? (
@@ -91,13 +106,21 @@ export default function WorkspaceSwitcherPage() {
                 </span>
                 <span className="min-w-0 flex-1 truncate">{workspace.name}</span>
               </button>
-              {workspace.ownerId === user?.id && (
+              {workspace.ownerId === user?.id ? (
                 <button
                   type="button"
                   onClick={(e) => handleDelete(e, workspace.id, workspace.name)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 rounded px-2 py-1 text-xs text-ink-400 opacity-100 hover:bg-paper-200 hover:text-red-700 md:opacity-0 md:group-hover:opacity-100"
                 >
                   Delete
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={(e) => handleLeave(e, workspace.id, workspace.name)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded px-2 py-1 text-xs text-ink-400 opacity-100 hover:bg-paper-200 hover:text-red-700 md:opacity-0 md:group-hover:opacity-100"
+                >
+                  Leave
                 </button>
               )}
             </li>
@@ -110,6 +133,9 @@ export default function WorkspaceSwitcherPage() {
       )}
       {deleteWorkspace.isError && (
         <p className="text-xs text-red-700">{deleteWorkspace.error.message}</p>
+      )}
+      {leaveWorkspace.isError && (
+        <p className="text-xs text-red-700">{leaveWorkspace.error.message}</p>
       )}
 
       <form

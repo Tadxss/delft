@@ -32,7 +32,13 @@ function toInitialContent(content: unknown): PartialBlock[] | undefined {
     : undefined;
 }
 
-export function PageEditor({ page }: { page: Page }) {
+export function PageEditor({
+  page,
+  canEdit = true,
+}: {
+  page: Page;
+  canEdit?: boolean;
+}) {
   const { resolvedTheme } = useTheme();
   const updatePage = useUpdatePage();
   const publishPage = usePublishPage();
@@ -159,19 +165,25 @@ export function PageEditor({ page }: { page: Page }) {
   return (
     <div className="flex h-full flex-col">
       <div className="sticky top-0 z-10 flex shrink-0 items-center justify-end gap-3 bg-paper-50 px-4 pb-1.5 pt-5 sm:px-8">
-        <EditedIndicator timestamp={page.updatedAt} />
-        <button
-          type="button"
-          onClick={handlePublishToggle}
-          disabled={publishPage.isPending || unpublishPage.isPending}
-          className={`rounded-md px-3 py-1.5 text-xs font-medium ${
-            page.isPublished
-              ? "bg-accent-500 text-white hover:bg-accent-600"
-              : "border border-paper-300 text-ink-600 hover:bg-paper-100"
-          }`}
-        >
-          {page.isPublished ? "Published" : "Publish"}
-        </button>
+        {canEdit ? (
+          <>
+            <EditedIndicator timestamp={page.updatedAt} />
+            <button
+              type="button"
+              onClick={handlePublishToggle}
+              disabled={publishPage.isPending || unpublishPage.isPending}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium ${
+                page.isPublished
+                  ? "bg-accent-500 text-white hover:bg-accent-600"
+                  : "border border-paper-300 text-ink-600 hover:bg-paper-100"
+              }`}
+            >
+              {page.isPublished ? "Published" : "Publish"}
+            </button>
+          </>
+        ) : (
+          <span className="text-xs text-ink-400">View only</span>
+        )}
       </div>
 
       <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-4 px-4 pb-10 pt-8 sm:px-8">
@@ -182,6 +194,7 @@ export function PageEditor({ page }: { page: Page }) {
           id="page-title"
           value={title}
           onChange={(e) => handleTitleChange(e.target.value)}
+          readOnly={!canEdit}
           placeholder="Untitled"
           maxLength={500}
           className={`w-full border-none bg-transparent outline-none placeholder:text-ink-400 ${HEADING_CLASSES["content-large"]}`}
@@ -211,7 +224,8 @@ export function PageEditor({ page }: { page: Page }) {
         <div className="flex-1">
           <BlockNoteView
             editor={editor}
-            onChange={handleContentChange}
+            editable={canEdit}
+            onChange={canEdit ? handleContentChange : undefined}
             theme={resolveBlockNoteTheme(resolvedTheme)}
           />
         </div>

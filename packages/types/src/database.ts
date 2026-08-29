@@ -238,37 +238,46 @@ export type Database = {
         Row: {
           avatar_url: string | null
           bio: string | null
+          company: string | null
           created_at: string
           first_name: string | null
           id: string
           last_name: string | null
           middle_name: string | null
           occupation: string | null
+          onboarded_at: string | null
           updated_at: string
+          usage_intent: string | null
           username: string | null
         }
         Insert: {
           avatar_url?: string | null
           bio?: string | null
+          company?: string | null
           created_at?: string
           first_name?: string | null
           id: string
           last_name?: string | null
           middle_name?: string | null
           occupation?: string | null
+          onboarded_at?: string | null
           updated_at?: string
+          usage_intent?: string | null
           username?: string | null
         }
         Update: {
           avatar_url?: string | null
           bio?: string | null
+          company?: string | null
           created_at?: string
           first_name?: string | null
           id?: string
           last_name?: string | null
           middle_name?: string | null
           occupation?: string | null
+          onboarded_at?: string | null
           updated_at?: string
+          usage_intent?: string | null
           username?: string | null
         }
         Relationships: []
@@ -329,18 +338,77 @@ export type Database = {
           },
         ]
       }
+      workspace_invitations: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          invited_by: string
+          invited_email: string | null
+          invited_user_id: string | null
+          invited_username: string | null
+          last_emailed_at: string | null
+          responded_at: string | null
+          role: string
+          status: string
+          token: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          invited_by?: string
+          invited_email?: string | null
+          invited_user_id?: string | null
+          invited_username?: string | null
+          last_emailed_at?: string | null
+          responded_at?: string | null
+          role: string
+          status?: string
+          token?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          invited_by?: string
+          invited_email?: string | null
+          invited_user_id?: string | null
+          invited_username?: string | null
+          last_emailed_at?: string | null
+          responded_at?: string | null
+          role?: string
+          status?: string
+          token?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_invitations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_members: {
         Row: {
+          created_at: string
           role: string
           user_id: string
           workspace_id: string
         }
         Insert: {
+          created_at?: string
           role: string
           user_id: string
           workspace_id: string
         }
         Update: {
+          created_at?: string
           role?: string
           user_id?: string
           workspace_id?: string
@@ -402,7 +470,114 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_workspace_invitation: {
+        Args: { p_token: string }
+        Returns: string
+      }
+      decline_workspace_invitation: {
+        Args: { p_token: string }
+        Returns: undefined
+      }
       get_email_for_username: { Args: { p_username: string }; Returns: string }
+      get_invitation_for_email: {
+        Args: { p_token: string }
+        Returns: {
+          expires_at: string
+          invited_by: string
+          invited_email: string
+          inviter_name: string
+          last_emailed_at: string
+          role: string
+          status: string
+          workspace_name: string
+          workspace_owner_id: string
+        }[]
+      }
+      get_invitation_preview: {
+        Args: { p_token: string }
+        Returns: {
+          expires_at: string
+          inviter_name: string
+          role: string
+          status: string
+          workspace_logo_url: string
+          workspace_name: string
+        }[]
+      }
+      get_my_pending_invitations: {
+        Args: never
+        Returns: {
+          created_at: string
+          expires_at: string
+          id: string
+          invited_by_name: string
+          role: string
+          token: string
+          workspace_id: string
+          workspace_logo_url: string
+          workspace_name: string
+        }[]
+      }
+      get_workspace_invitations: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          created_at: string
+          expires_at: string
+          id: string
+          invited_email: string
+          invited_username: string
+          role: string
+          status: string
+          token: string
+        }[]
+      }
+      get_workspace_members: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          avatar_url: string
+          display_name: string
+          email: string
+          joined_at: string
+          role: string
+          user_id: string
+          username: string
+        }[]
+      }
+      has_workspace_access: {
+        Args: { p_roles: string[]; p_workspace_id: string }
+        Returns: boolean
+      }
+      invite_to_workspace: {
+        Args: {
+          p_email: string
+          p_role: string
+          p_username: string
+          p_workspace_id: string
+        }
+        Returns: {
+          created_at: string
+          expires_at: string
+          id: string
+          invited_by: string
+          invited_email: string | null
+          invited_user_id: string | null
+          invited_username: string | null
+          last_emailed_at: string | null
+          responded_at: string | null
+          role: string
+          status: string
+          token: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workspace_invitations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      leave_workspace: { Args: { p_workspace_id: string }; Returns: undefined }
+      mark_invitation_emailed: { Args: { p_token: string }; Returns: undefined }
       migrate_vault_to_wrapped_key: {
         Args: {
           p_credential_ids: string[]
@@ -415,8 +590,20 @@ export type Database = {
         }
         Returns: undefined
       }
+      remove_workspace_member: {
+        Args: { p_user_id: string; p_workspace_id: string }
+        Returns: undefined
+      }
       reset_vault: {
         Args: { p_token: string; p_workspace_id: string }
+        Returns: undefined
+      }
+      revoke_workspace_invitation: {
+        Args: { p_invitation_id: string }
+        Returns: undefined
+      }
+      set_workspace_member_role: {
+        Args: { p_role: string; p_user_id: string; p_workspace_id: string }
         Returns: undefined
       }
     }

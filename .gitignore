@@ -15,3 +15,4 @@ blob-report
 
 .vercel
 .env*
+!supabase/functions/.env.example

@@ -51,7 +51,13 @@ function toInitialData(scene: unknown): Scene | undefined {
   return undefined;
 }
 
-export function CanvasEditor({ canvas }: { canvas: Canvas }) {
+export function CanvasEditor({
+  canvas,
+  canEdit = true,
+}: {
+  canvas: Canvas;
+  canEdit?: boolean;
+}) {
   const { resolvedTheme } = useTheme();
   const updateCanvas = useUpdateCanvas();
   const publishCanvas = usePublishCanvas();
@@ -153,24 +159,31 @@ export function CanvasEditor({ canvas }: { canvas: Canvas }) {
           id="canvas-title"
           value={title}
           onChange={(e) => handleTitleChange(e.target.value)}
+          readOnly={!canEdit}
           placeholder="Untitled"
           maxLength={200}
           className={`min-w-0 flex-1 border-none bg-transparent outline-none placeholder:text-ink-400 ${HEADING_CLASSES["content-compact"]}`}
         />
         <div className="flex shrink-0 items-center gap-3">
-          <EditedIndicator timestamp={canvas.updatedAt} />
-          <button
-            type="button"
-            onClick={handlePublishToggle}
-            disabled={publishCanvas.isPending || unpublishCanvas.isPending}
-            className={`rounded-md px-3 py-1.5 text-xs font-medium ${
-              canvas.isPublished
-                ? "bg-accent-500 text-white hover:bg-accent-600"
-                : "border border-paper-300 text-ink-600 hover:bg-paper-100"
-            }`}
-          >
-            {canvas.isPublished ? "Published" : "Publish"}
-          </button>
+          {canEdit ? (
+            <>
+              <EditedIndicator timestamp={canvas.updatedAt} />
+              <button
+                type="button"
+                onClick={handlePublishToggle}
+                disabled={publishCanvas.isPending || unpublishCanvas.isPending}
+                className={`rounded-md px-3 py-1.5 text-xs font-medium ${
+                  canvas.isPublished
+                    ? "bg-accent-500 text-white hover:bg-accent-600"
+                    : "border border-paper-300 text-ink-600 hover:bg-paper-100"
+                }`}
+              >
+                {canvas.isPublished ? "Published" : "Publish"}
+              </button>
+            </>
+          ) : (
+            <span className="text-xs text-ink-400">View only</span>
+          )}
         </div>
       </div>
 
@@ -200,7 +213,8 @@ export function CanvasEditor({ canvas }: { canvas: Canvas }) {
       <div className="min-h-0 flex-1">
         <Excalidraw
           initialData={toInitialData(canvas.scene)}
-          onChange={handleCanvasChange}
+          onChange={canEdit ? handleCanvasChange : undefined}
+          viewModeEnabled={!canEdit}
           theme={resolvedTheme === "dark" ? "dark" : "light"}
           UIOptions={{ tools: { image: false } }}
         />

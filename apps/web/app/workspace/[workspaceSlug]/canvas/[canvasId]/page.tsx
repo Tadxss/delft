@@ -3,7 +3,11 @@
 import { useParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import type { CanvasSummary } from "@crowscribe/types";
-import { parseWorkspaceSlug, useCanvas } from "@crowscribe/shared";
+import {
+  parseWorkspaceSlug,
+  useCanvas,
+  useMyWorkspaceRole,
+} from "@crowscribe/shared";
 import { CanvasEditor } from "./_components/CanvasEditor";
 import { CanvasShell } from "./_components/CanvasShell";
 
@@ -17,6 +21,7 @@ export default function CanvasRoute() {
     isError,
     error,
   } = useCanvas(params.canvasId);
+  const canEdit = useMyWorkspaceRole(workspaceId).data !== "viewer";
 
   if (isLoading) {
     // Same rationale as p/[pageId]/page.tsx — show the sidebar's already-cached title instead of a
@@ -51,5 +56,5 @@ export default function CanvasRoute() {
     );
   }
 
-  return <CanvasEditor canvas={canvas} />;
+  return <CanvasEditor canvas={canvas} canEdit={canEdit} />;
 }
