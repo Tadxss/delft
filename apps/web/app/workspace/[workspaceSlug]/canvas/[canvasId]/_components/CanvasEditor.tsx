@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import type { Canvas } from "@crowscribe/types";
-import { useDeleteCanvas, useUpdateCanvas } from "@crowscribe/shared";
+import {
+  usePublishCanvas,
+  useUnpublishCanvas,
+  useUpdateCanvas,
+} from "@crowscribe/shared";
+import { EditedIndicator } from "../../../../../_components/EditedIndicator";
 import { HEADING_CLASSES } from "../../../../../_components/Heading";
 import "@excalidraw/excalidraw/index.css";
 
@@ -48,10 +52,10 @@ function toInitialData(scene: unknown): Scene | undefined {
 }
 
 export function CanvasEditor({ canvas }: { canvas: Canvas }) {
-  const router = useRouter();
   const { resolvedTheme } = useTheme();
   const updateCanvas = useUpdateCanvas();
-  const deleteCanvas = useDeleteCanvas();
+  const publishCanvas = usePublishCanvas();
+  const unpublishCanvas = useUnpublishCanvas();
 
   const [title, setTitle] = useState(canvas.title);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -122,17 +126,26 @@ export function CanvasEditor({ canvas }: { canvas: Canvas }) {
     scheduleSave({ scene: { elements, appState: appStateToSave } });
   }
 
-  function handleDelete() {
-    if (!window.confirm("Delete this canvas?")) return;
-    deleteCanvas.mutate(
-      { id: canvas.id, workspaceId: canvas.workspaceId },
-      { onSuccess: () => router.push(`/workspace/${canvas.workspaceId}`) },
-    );
+  const shareUrl = useMemo(() => {
+    if (!canvas.isPublished || !canvas.publishedSlug) return null;
+    if (typeof window === "undefined") return null;
+    return `${window.location.origin}/share/canvas/${canvas.publishedSlug}`;
+  }, [canvas.isPublished, canvas.publishedSlug]);
+
+  function handlePublishToggle() {
+    if (canvas.isPublished) {
+      unpublishCanvas.mutate({ id: canvas.id });
+    } else {
+      publishCanvas.mutate({
+        id: canvas.id,
+        existingSlug: canvas.publishedSlug,
+      });
+    }
   }
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex shrink-0 items-center justify-between gap-4 px-4 pb-2 pt-14 sm:px-6 sm:pt-6">
+      <div className="flex shrink-0 items-center justify-between gap-3 bg-paper-50 px-4 pb-1.5 pt-14 sm:px-8 sm:pt-6">
         <label htmlFor="canvas-title" className="sr-only">
           Title
         </label>
@@ -142,22 +155,46 @@ export function CanvasEditor({ canvas }: { canvas: Canvas }) {
           onChange={(e) => handleTitleChange(e.target.value)}
           placeholder="Untitled"
           maxLength={200}
-          className={`w-full flex-1 border-none bg-transparent outline-none placeholder:text-ink-400 ${HEADING_CLASSES["content-compact"]}`}
+          className={`min-w-0 flex-1 border-none bg-transparent outline-none placeholder:text-ink-400 ${HEADING_CLASSES["content-compact"]}`}
         />
-        <button
-          type="button"
-          onClick={handleDelete}
-          className="shrink-0 rounded-md px-2 py-1.5 text-xs text-ink-400 hover:bg-paper-100 hover:text-red-700"
-        >
-          Delete
-        </button>
+        <div className="flex shrink-0 items-center gap-3">
+          <EditedIndicator timestamp={canvas.updatedAt} />
+          <button
+            type="button"
+            onClick={handlePublishToggle}
+            disabled={publishCanvas.isPending || unpublishCanvas.isPending}
+            className={`rounded-md px-3 py-1.5 text-xs font-medium ${
+              canvas.isPublished
+                ? "bg-accent-500 text-white hover:bg-accent-600"
+                : "border border-paper-300 text-ink-600 hover:bg-paper-100"
+            }`}
+          >
+            {canvas.isPublished ? "Published" : "Publish"}
+          </button>
+        </div>
       </div>
 
       {updateCanvas.isError && (
-        <p className="shrink-0 px-4 text-xs text-red-700 sm:px-6">
+        <p className="shrink-0 px-4 text-xs text-red-700 sm:px-8">
           Couldn&apos;t save your last change
           {updateCanvas.error?.message ? `: ${updateCanvas.error.message}` : ""}
         </p>
+      )}
+
+      {shareUrl && (
+        <div className="shrink-0 px-4 pb-2 sm:px-8">
+          <div className="flex items-center gap-2 rounded-md bg-paper-100 px-3 py-2 text-xs text-ink-600">
+            <span>Live at</span>
+            <a
+              href={shareUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="truncate underline"
+            >
+              {shareUrl}
+            </a>
+          </div>
+        </div>
       )}
 
       <div className="min-h-0 flex-1">

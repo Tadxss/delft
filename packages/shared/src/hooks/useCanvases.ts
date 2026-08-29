@@ -8,7 +8,7 @@ import { GC_TIME_SUMMARY_LIST, STALE_TIME_SUMMARY_LIST } from "../queryConfig";
 // `scene` — same rationale as usePages.ts's PAGE_SUMMARY_COLUMNS. Full scene is only ever needed
 // by useCanvas.ts, for the one canvas currently open.
 const CANVAS_SUMMARY_COLUMNS =
-  "id, workspace_id, title, position, created_at, updated_at";
+  "id, workspace_id, title, is_published, published_slug, position, created_at, updated_at";
 
 // Direct RLS-gated read — canvases_select_member already limits this to the caller's own
 // workspace. Flat list (no parent_id/tree, unlike pages) — canvases are standalone items.

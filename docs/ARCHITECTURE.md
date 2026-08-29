@@ -2517,3 +2517,32 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
     `setQueryData(["page", id])` on every autosave). Dropped `max-w-4xl mx-auto` so content is
     full width. `PageShell` / `PageEditorLoading` mirror the new shape (publish-button-shaped
     skeleton in the bar) to keep the load→editor swap shift-free.
+
+77. **Dropdown menu consolidation + Dark Mode picker; canvas publishing.** ✅ _done_. Two clusters.
+
+    - **Sidebar menu / theme.** The sidebar header's icon row (Credentials key, `ThemeToggle`,
+      Account gear) is gone — `ThemeToggle.tsx` deleted. The workspace-name dropdown is now
+      `Workspace settings` · `Switch workspace` · ─ · `Credentials Vault` · `Account settings`.
+      The light/dark choice moved into the Account modal as a new `"theme"` drill-in view ("Dark
+      Mode", a list row below Password) — a `role="radiogroup"` of Light / Dark / **System**
+      (`next-themes` `setTheme`, `mounted`-guarded; the System row shows `resolvedTheme`). e2e:
+      new `openWorkspaceMenu()` helper; `credentials` / `vault-recovery` / `credential-folders` /
+      `profile` / `username-sign-in` / `workspace-settings` specs drive the menu now
+      (`password-sign-in` still uses the real `/workspace` picker `TopBar` button).
+    - **Canvas publishing** (`20260829000000_canvas_publish.sql`) — mirrors Pages' publish/share
+      model exactly. `canvases.is_published` / `published_slug` (unique), a
+      `canvases_select_published_anon` policy (`to anon`, `using (is_published = true)`) +
+      `grant select on public.canvases to anon` — the second deliberate anon read path in the
+      schema, same caveats as `pages_select_published_anon` (never pair with an anon grant on
+      `workspaces`/`workspace_members`). New `usePublishCanvas` / `useUnpublishCanvas` (byte-for-
+      byte the page hooks). New public route `app/share/canvas/[slug]/` (`getSharedCanvas` anon
+      client + `SharedCanvasView` = `<Excalidraw viewModeEnabled>` via an `ssr:false` lazy wrap;
+      `/share/` is already robots-disallowed). The **canvas editor header was restyled to match
+      the page editor's** — `bg-paper-50`, title input + right-aligned `<EditedIndicator>` +
+      Publish/Published toggle, share-URL banner below when published. Its **Delete button was
+      removed**; canvas delete (and rename) moved to a new hover "⋯" menu on the sidebar
+      `CanvasRow`, mirroring `PageTreeNode`'s — `canvas.spec.ts`'s delete step updated, new
+      `e2e/publish-share-canvas.spec.ts`.
+
+    **Hosted DB needs `supabase db push` + a redeploy** before canvas publishing works on
+    `crowscribe.vercel.app` — applied locally via `supabase migration up` only.

@@ -119,6 +119,8 @@ export interface Canvas {
   workspaceId: string;
   title: string;
   scene: unknown;
+  isPublished: boolean;
+  publishedSlug: string | null;
   position: number;
   createdAt: string;
   updatedAt: string;

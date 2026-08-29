@@ -1,6 +1,13 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
@@ -17,13 +24,19 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { ChevronDown, ChevronRight, Plus } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  MoreHorizontal,
+  Plus,
+} from "lucide-react";
 import type { CanvasSummary, PageSummary } from "@crowscribe/types";
 import {
   canvasQueryOptions,
   useCreateCanvas,
   useCreatePage,
   useCanvases,
+  useDeleteCanvas,
   usePages,
   useSupabaseClient,
   useUpdateCanvas,
@@ -64,10 +77,12 @@ function PagesRootDropZone({ children }: { children: React.ReactNode }) {
   );
 }
 
-// A draggable canvas link — canvases are a flat list (no folders to reparent into), so this only
+// A draggable canvas row — canvases are a flat list (no folders to reparent into), so this only
 // ever needs to be a drag *source*; reordering happens entirely via the ReorderStrips between rows,
 // not by dropping onto another canvas. Listeners go on the wrapping div, not the Link itself, same
-// reasoning as PageTreeNode.tsx's row: keeps ordinary clicks navigating normally.
+// reasoning as PageTreeNode.tsx's row: keeps ordinary clicks navigating normally. The hover "⋯"
+// menu (Rename / Delete) mirrors PageTreeNode's — it's the only place a canvas can be renamed
+// from the sidebar or deleted at all (the canvas editor header has no Delete button).
 function CanvasRow({
   canvas,
   href,
@@ -77,29 +92,155 @@ function CanvasRow({
   href: string;
   isActive: boolean;
 }) {
+  const params = useParams<{ workspaceSlug: string }>();
+  const workspaceId = parseWorkspaceSlug(params.workspaceSlug);
+  const router = useRouter();
   const { listeners, setNodeRef, isDragging } = useDraggable({
     id: canvas.id,
   });
   const queryClient = useQueryClient();
   const supabase = useSupabaseClient();
+  const updateCanvas = useUpdateCanvas();
+  const deleteCanvas = useDeleteCanvas();
   // Same rationale as PageTreeNode.tsx's prefetch — warms the canvas content cache on hover/focus,
   // before the click, so opening it feels instant.
   const prefetch = useCallback(() => {
     queryClient.prefetchQuery(canvasQueryOptions(supabase, canvas.id));
   }, [queryClient, supabase, canvas.id]);
+
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [title, setTitle] = useState(canvas.title);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const renameInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (renaming) {
+      renameInputRef.current?.focus();
+      renameInputRef.current?.select();
+    }
+  }, [renaming]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node))
+        setMenuOpen(false);
+    }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setMenuOpen(false);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [menuOpen]);
+
+  function startRename() {
+    setTitle(canvas.title);
+    setRenaming(true);
+    setMenuOpen(false);
+  }
+
+  function commitRename() {
+    const trimmed = title.trim();
+    if (trimmed && trimmed !== canvas.title) {
+      updateCanvas.mutate({ id: canvas.id, title: trimmed });
+    }
+    setRenaming(false);
+  }
+
+  function cancelRename() {
+    setTitle(canvas.title);
+    setRenaming(false);
+  }
+
+  function handleDelete() {
+    setMenuOpen(false);
+    if (!window.confirm("Delete this canvas?")) return;
+    deleteCanvas.mutate(
+      { id: canvas.id, workspaceId },
+      {
+        onSuccess: () => {
+          if (isActive) router.push(`/workspace/${params.workspaceSlug}`);
+        },
+      },
+    );
+  }
+
   return (
     <li>
-      <div ref={setNodeRef} {...listeners} className={isDragging ? "opacity-40" : ""}>
-        <Link
-          href={href}
-          onMouseEnter={prefetch}
-          onFocus={prefetch}
-          className={`block truncate rounded-md py-1 pl-6 pr-1 text-sm hover:bg-paper-100 ${
-            isActive ? "bg-paper-100 font-medium text-ink-800" : "text-ink-600"
-          }`}
-        >
-          {canvas.title || "Untitled"}
-        </Link>
+      <div
+        ref={setNodeRef}
+        {...listeners}
+        className={`group flex items-center gap-1 rounded-md py-1 pl-6 pr-1 text-sm hover:bg-paper-100 ${
+          isActive ? "bg-paper-100 font-medium text-ink-800" : "text-ink-600"
+        } ${isDragging ? "opacity-40" : ""}`}
+      >
+        {renaming ? (
+          <input
+            ref={renameInputRef}
+            maxLength={200}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onBlur={commitRename}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                commitRename();
+              } else if (e.key === "Escape") {
+                e.preventDefault();
+                cancelRename();
+              }
+            }}
+            className="min-w-0 flex-1 rounded border border-accent-500 bg-paper-50 px-1 text-sm text-ink-800 outline-none"
+          />
+        ) : (
+          <Link
+            href={href}
+            onMouseEnter={prefetch}
+            onFocus={prefetch}
+            className="min-w-0 flex-1 truncate"
+          >
+            {canvas.title || "Untitled"}
+          </Link>
+        )}
+        <div ref={menuRef} className="relative">
+          <button
+            type="button"
+            onClick={() => setMenuOpen((prev) => !prev)}
+            aria-label="Canvas actions"
+            aria-haspopup="menu"
+            className="relative flex h-4 w-4 shrink-0 items-center justify-center text-ink-400 before:absolute before:-left-0.5 before:-right-2.5 before:-top-1.5 before:-bottom-1.5 before:content-[''] hover:text-ink-700 md:hidden md:group-hover:flex md:group-focus-within:flex"
+          >
+            <MoreHorizontal size={14} />
+          </button>
+          {menuOpen && (
+            <div
+              role="menu"
+              className="absolute right-0 top-full z-10 mt-1 w-32 rounded-md border border-paper-200 bg-paper-50 py-1 shadow-lg"
+            >
+              <button
+                type="button"
+                role="menuitem"
+                onClick={startRename}
+                className="block w-full px-3 py-1.5 text-left text-sm text-ink-600 hover:bg-paper-100 hover:text-ink-800"
+              >
+                Rename
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={handleDelete}
+                className="block w-full px-3 py-1.5 text-left text-sm text-red-700 hover:bg-paper-100"
+              >
+                Delete
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </li>
   );
