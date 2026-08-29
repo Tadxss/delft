@@ -40,6 +40,11 @@ pnpm dev                  # runs the web app's dev server via turbo
 Copy `apps/web/.env.local.example` → `apps/web/.env.local`, filling in the anon key from
 `supabase start`'s output (the URL is already the local default, `http://127.0.0.1:54321`).
 
+Optional free-tier services (both no-op when unconfigured): Sentry (`NEXT_PUBLIC_SENTRY_DSN` in
+`.env.local`) for error tracking, and Resend for workspace-invitation emails — copy
+`supabase/functions/.env.example` → `supabase/functions/.env` and set `RESEND_API_KEY` (leave it
+blank and the `send-invitation-email` function is inert; restart the stack after editing).
+
 ## Build / Lint / Typecheck
 
 ```sh

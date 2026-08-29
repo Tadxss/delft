@@ -476,6 +476,19 @@ export type Database = {
         Returns: undefined
       }
       get_email_for_username: { Args: { p_username: string }; Returns: string }
+      get_invitation_for_email: {
+        Args: { p_token: string }
+        Returns: {
+          expires_at: string
+          invited_by: string
+          invited_email: string
+          inviter_name: string
+          role: string
+          status: string
+          workspace_name: string
+          workspace_owner_id: string
+        }[]
+      }
       get_invitation_preview: {
         Args: { p_token: string }
         Returns: {

@@ -2627,5 +2627,38 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
     **Hosted DB needs `supabase db push` + a redeploy** — applied locally via
     `supabase migration up` only.
 
-    _Follow-ups deferred:_ the invite email (`signInWithOtp` in `useInviteToWorkspace` for
-    `invited_email`), ownership transfer, per-member vault-key sharing.
+    _Follow-ups deferred:_ ownership transfer, per-member vault-key sharing.
+
+80. **Workspace-invitation emails — first Edge Function, first service-role use.** ✅ _done_.
+    An **email** invite now sends a branded HTML email; `@username` invites still send nothing
+    (that person sees it in-app). Resend free tier — same accepted-zero-cost category as Sentry.
+
+    - **`supabase/functions/send-invitation-email/`** (Deno) — the repo's first Edge Function.
+      `verify_jwt = true`. Flow: no-op `200 {skipped:"no-api-key"}` when `RESEND_API_KEY` is unset
+      (local + CI stay inert); else service-role client → `get_invitation_for_email(token)` RPC
+      (`20260831000000`, `grant execute to service_role` only — nothing client-facing resolves a
+      token to an email) → verify the caller (from the request JWT) is the inviter or workspace
+      owner → `admin.auth.admin.generateLink({ type: "magiclink" })` (falls back to `"invite"` for
+      a brand-new recipient; **returns** the link, sends nothing) → embed that `action_link` as the
+      Accept button in a `fetch` to `api.resend.com/emails`. Whole handler in try/catch, every
+      path returns swallow-safe JSON + CORS headers (browser `functions.invoke` preflights).
+    - **Trigger**: `useInviteToWorkspace.onSuccess` fires
+      `void supabase.functions.invoke("send-invitation-email", { body: { token } }).catch(()=>{})`
+      only when `variables.email` is set — fire-and-forget, the RPC insert is the source of truth.
+    - **Secrets** (`supabase/functions/.env` local, `supabase secrets set` hosted):
+      `RESEND_API_KEY` (unset ⇒ inert), `RESEND_FROM` (verified sender), `SITE_URL` (the origin
+      for the accept link — read as a secret, never from the caller). `.env.example` committed
+      (`.gitignore` gained `!supabase/functions/.env.example`).
+    - **`config.toml`**: `[functions.send-invitation-email] verify_jwt = true`;
+      `additional_redirect_urls` gained `http://127.0.0.1:3000/**` so `generateLink`'s `redirectTo`
+      is accepted. Hosted needs `https://crowscribe.vercel.app/**` added in the dashboard.
+    - **Local env-loading gotcha**: `supabase/functions/.env` is picked up on a full
+      `supabase stop && supabase start`, **not** on `supabase db reset` alone — restart the stack
+      after editing it.
+    - e2e: unchanged — the email invite in `workspace-invitations.spec.ts` now hits the function,
+      which no-ops without a key; the fire-and-forget `.catch()` keeps a cold-start/500 from
+      affecting the spec. Delivery itself is manual-only (hits Resend's real API, not Mailpit).
+
+    **Hosted deploy adds**: `supabase functions deploy send-invitation-email` +
+    `supabase secrets set …` + the dashboard redirect-URL allow-list entry, on top of the usual
+    `supabase db push` + Vercel re-alias.

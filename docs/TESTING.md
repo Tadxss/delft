@@ -60,9 +60,13 @@ every point that touches sidebar/credentials-list content, not only the first.
 | `vault-recovery.spec.ts`      | First-time vault setup's recovery-key screen (Continue disabled until the "I've saved this" checkbox is checked); a wrong recovery key on "Forgot passphrase?" is rejected with a clear error and a link to the last-resort reset; the correct recovery key lets you set a brand-new passphrase and the original credential still decrypts correctly afterward, both by opening it directly and by confirming the _old_ passphrase no longer works while the _new_ one does.                                                                                                                                                                                |
 
 Not covered by the automated suite (manual-only): Google OAuth (needs real credentials, see
-scenario 6 below), visual/design polish, and the browser's native print-to-PDF output from a
+scenario 6 below), visual/design polish, the browser's native print-to-PDF output from a
 `/share/[slug]` page (Playwright can assert the page renders correctly; actually producing and
-eyeballing a PDF is a manual step). Also the Pages code block toolbar (`apps/web/app/_lib/CodeBlockView.tsx` —
+eyeballing a PDF is a manual step), and **workspace-invitation email delivery** (the
+`send-invitation-email` Edge Function hits Resend's real API, not Mailpit, and no-ops without
+`RESEND_API_KEY` — so `workspace-invitations.spec.ts` covers the in-app accept path but not the
+email itself; manual: with a verified Resend domain, invite a real address → click Accept from a
+fresh browser profile → land signed-in on `/invite/<token>` → become a member). Also the Pages code block toolbar (`apps/web/app/_lib/CodeBlockView.tsx` —
 syntax highlighting, language search/select, copy button, keyboard navigation, Ctrl+A scoping; see
 `docs/ARCHITECTURE.md` Build Order step 21) — verified via ad-hoc Playwright scripts at
 implementation time, not a permanent spec.

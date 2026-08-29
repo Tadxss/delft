@@ -18,8 +18,9 @@ import { Input, Select } from "../../../_components/Input";
 import { Modal } from "../../../_components/Modal";
 
 // Owner-only. Opened from the SidebarHeader dropdown. Invite people by email or @username, manage
-// existing members' roles / removal, and revoke pending invites. The magic-link email for
-// brand-new invitees is a later pass — for now the owner shares the copy-link.
+// existing members' roles / removal, and revoke pending invites. An email invite also sends a
+// branded email (see useInviteToWorkspace → the send-invitation-email Edge Function); the
+// copy-link stays as a fallback / for `@username` invites.
 export function WorkspaceMembersModal({
   workspaceId,
   open,
