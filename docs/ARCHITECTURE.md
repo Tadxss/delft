@@ -2840,3 +2840,35 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
       within it. Same accepted category as Sentry.
     - Still deferred: a "Resend invite" button in the Members modal (step 79 follow-up); DMARC
       stays at `p=none` (monitor before enforcing).
+
+84. **Branded transactional email templates.** ✅ _partial_ (code done; hosted dashboard actions
+    pending). The app sends exactly two emails — the Supabase magic-link email (sign-in, implicit
+    signup, and the vault-reset confirmation all use it) and the Resend invitation email — and
+    both were unbranded: GoTrue's default template on Supabase's shared SMTP (~2–4/hr, a
+    `supabase.io` sender), and the invite email in Tailwind stock grays that don't match the
+    app's slate/violet palette.
+    - **`supabase/functions/_shared/email.ts`** (new) — one hand-built HTML layout
+      (`emailLayout`/`emailText`/`esc`) for the Resend-sent emails. Light card on `#f4f5f7`,
+      electric-violet CTA (`#6d28d9` — the app's `--accent-500`), logo pulled from the existing
+      `https://crowscribe.space/apple-icon` route (no new asset), a `prefers-color-scheme: dark`
+      block flipping surfaces to the obsidian palette, `color-scheme` meta so light-mode isn't
+      auto-inverted. `_shared/` is the Supabase convention for function-imported-but-not-deployed
+      code. `send-invitation-email/index.ts` now calls it instead of its inline builders.
+    - **`supabase/templates/{magic_link,confirmation,recovery}.html`** (new) — static GoTrue
+      templates (Go `{{ .ConfirmationURL }}` vars) hand-kept visually identical to
+      `_shared/email.ts`. Wired via `[auth.email.template.*]` `content_path` in `config.toml`, so
+      **local dev + CI render the real template** and the e2e suite exercises it. The raw
+      `{{ .ConfirmationURL }}` stays printed as visible text — required by
+      `apps/web/e2e/helpers.ts` `getLatestMagicLink` (regex-extracts the URL from the body) and
+      good practice regardless. Only `magic_link` fires today; the other two are styled as
+      insurance against `enable_confirmations` ever flipping.
+    - **Hosted dashboard actions (pending, user):** same "repo is canonical, hosted is applied by
+      hand" constraint as step 18/82 — `config.toml`'s `[auth]` is local-only (`supabase config
+      push` would clobber it). (a) Authentication → Emails → SMTP Settings: custom SMTP via
+      Resend — `smtp.resend.com:465`, user `resend`, pass = the existing `RESEND_API_KEY`, sender
+      `CrowScribe <noreply@send.crowscribe.space>`. (b) Authentication → Emails → Templates: paste
+      the three templates + subjects. (c) Authentication → Rate Limits: raise emails/hour from
+      the default to ~30 now that Resend backs it.
+    - Zero-cost: Resend SMTP is on the free tier (shares the 100/day, 3,000/mo cap with the API).
+    - Out of scope: a dedicated vault-reset email (would need its own service-role function — it
+      still piggybacks the magic-link template); adding `react-email` (not doing it).

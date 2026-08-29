@@ -13,6 +13,7 @@
 // Auto-injected by the platform: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { emailLayout, emailText, esc } from "../_shared/email.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -27,18 +28,6 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-// Workspace / inviter names are free text (not sanitized by invite_to_workspace) — escape before
-// interpolating into the HTML email so a workspace named `<a href=…>` can't ride our verified
-// sending domain as a phishing payload.
-function esc(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
 interface InvitationRow {
   invited_email: string | null;
   status: string;
@@ -49,60 +38,6 @@ interface InvitationRow {
   workspace_name: string | null;
   workspace_owner_id: string | null;
   inviter_name: string;
-}
-
-function renderHtml(o: {
-  inviter: string;
-  workspace: string;
-  role: string;
-  acceptUrl: string;
-  fallbackUrl: string;
-  expires: string;
-}): string {
-  return `<!doctype html>
-<html>
-<body style="margin:0;padding:0;background:#f4f4f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 12px;">
-    <tr><td align="center">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:12px;border:1px solid #e5e7eb;">
-        <tr><td style="padding:28px 32px 8px;font-size:15px;font-weight:600;color:#4b5563;">CrowScribe</td></tr>
-        <tr><td style="padding:8px 32px 4px;font-size:18px;font-weight:600;color:#111827;">
-          ${esc(o.inviter)} invited you to join ${esc(o.workspace)}
-        </td></tr>
-        <tr><td style="padding:4px 32px 20px;font-size:14px;color:#6b7280;">
-          You've been added as <strong style="color:#374151;">${esc(o.role)}</strong>.
-        </td></tr>
-        <tr><td style="padding:0 32px 24px;">
-          <a href="${esc(o.acceptUrl)}" style="display:inline-block;background:#8b5cf6;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:11px 22px;border-radius:8px;">Accept invitation</a>
-        </td></tr>
-        <tr><td style="padding:0 32px 24px;font-size:12px;color:#9ca3af;line-height:1.5;">
-          Or paste this link into your browser:<br>
-          <span style="color:#6b7280;word-break:break-all;">${esc(o.fallbackUrl)}</span>
-        </td></tr>
-        <tr><td style="padding:16px 32px 28px;border-top:1px solid #f3f4f6;font-size:12px;color:#9ca3af;line-height:1.5;">
-          This invitation expires on ${esc(o.expires)}. If you weren't expecting it, you can ignore this email.
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
-}
-
-function renderText(o: {
-  inviter: string;
-  workspace: string;
-  role: string;
-  acceptUrl: string;
-  expires: string;
-}): string {
-  return [
-    `${o.inviter} invited you to join ${o.workspace} on CrowScribe as ${o.role}.`,
-    ``,
-    `Accept: ${o.acceptUrl}`,
-    ``,
-    `This invitation expires on ${o.expires}. If you weren't expecting it, you can ignore this email.`,
-  ].join("\n");
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
@@ -193,18 +128,15 @@ Deno.serve(async (req: Request): Promise<Response> => {
       }
     }
 
-    const tmpl = {
-      inviter: invitation.inviter_name,
-      workspace: invitation.workspace_name ?? "a workspace",
-      role: invitation.role,
-      acceptUrl: actionLink,
-      fallbackUrl,
-      expires: new Date(invitation.expires_at).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      }),
-    };
+    const inviter = invitation.inviter_name;
+    const workspace = invitation.workspace_name ?? "a workspace";
+    const role = invitation.role;
+    const expires = new Date(invitation.expires_at).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+    const footerNote = `This invitation expires on ${expires}. If you weren't expecting it, you can ignore this email.`;
 
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -215,9 +147,20 @@ Deno.serve(async (req: Request): Promise<Response> => {
       body: JSON.stringify({
         from: Deno.env.get("RESEND_FROM"),
         to: [invitation.invited_email],
-        subject: `${tmpl.inviter} invited you to join ${tmpl.workspace} on CrowScribe`,
-        html: renderHtml(tmpl),
-        text: renderText(tmpl),
+        subject: `${inviter} invited you to join ${workspace} on CrowScribe`,
+        html: emailLayout({
+          preview: `${inviter} invited you to join ${workspace} on CrowScribe`,
+          heading: `${esc(inviter)} invited you to join ${esc(workspace)}`,
+          bodyHtml: `You've been added as <strong>${esc(role)}</strong>.`,
+          cta: { label: "Accept invitation", url: actionLink },
+          footerNote,
+        }),
+        text: emailText({
+          heading: `${inviter} invited you to join ${workspace} on CrowScribe as ${role}.`,
+          body: "Open the link below to accept:",
+          url: actionLink,
+          footerNote,
+        }),
       }),
       signal: AbortSignal.timeout(10_000),
     });

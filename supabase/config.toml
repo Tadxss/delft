@@ -235,20 +235,25 @@ otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
 
-# Use a production-ready SMTP server
-# [auth.email.smtp]
-# enabled = true
-# host = "smtp.sendgrid.net"
-# port = 587
-# user = "apikey"
-# pass = "env(SENDGRID_API_KEY)"
-# admin_email = "admin@email.com"
-# sender_name = "Admin"
+# Production SMTP is NOT configured here on purpose. Local dev uses Mailpit (see [local_smtp]).
+# Hosted routes auth email through Resend via custom SMTP set in the dashboard (Authentication ->
+# Emails -> SMTP Settings) — kept out of config.toml for the same reason as the [auth] URL block:
+# `supabase config push` would clobber local-only values. See docs/ARCHITECTURE.md step 84.
 
-# Uncomment to customize email template
-# [auth.email.template.invite]
-# subject = "You have been invited"
-# content_path = "./supabase/templates/invite.html"
+# Branded auth email templates. These `content_path` files ARE the canonical source, and they
+# apply to local dev + CI (so e2e exercises the real template). The hosted project's templates
+# are dashboard-managed — paste changes there by hand. The app only ever triggers magic_link
+# today (enable_confirmations = false, no password-reset call); confirmation/recovery are styled
+# anyway so a default can never leak. Keep in sync with supabase/functions/_shared/email.ts.
+[auth.email.template.magic_link]
+subject = "Sign in to CrowScribe"
+content_path = "./supabase/templates/magic_link.html"
+[auth.email.template.confirmation]
+subject = "Confirm your email for CrowScribe"
+content_path = "./supabase/templates/confirmation.html"
+[auth.email.template.recovery]
+subject = "Reset your CrowScribe password"
+content_path = "./supabase/templates/recovery.html"
 
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]
