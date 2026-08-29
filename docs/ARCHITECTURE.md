@@ -137,21 +137,16 @@ button) are still open. **Per-workspace invitations are unrelated to the global 
 was declined above** — that was about who can create an account at all; this is about sharing a
 workspace with someone who already can.
 
-**Deploy status (post-PR-#44 merge to `master`):** all migrations through
-`20260901000000_invitation_hardening` are now on hosted (`supabase db push` — needed one fix,
-`extensions.gen_random_bytes`, since pgcrypto isn't on the hosted migration search_path). The
-Edge Function is `functions deploy`d (inert — no `RESEND_API_KEY` yet). Vercel `master` deploy is
-live. **Still pending, all user dashboard/registrar actions:**
-- **Domain switch to `crowscribe.space`** (step 82) — `crowscribe.space` + `www` are added to the
-  Vercel project; Namecheap nameservers must be pointed at `ns1/ns2.vercel-dns.com`; then update
-  the hosted **Supabase Auth → URL Configuration** (Site URL → `https://crowscribe.space`,
-  Redirect URLs → add `https://crowscribe.space/**`). The `metadataBase` code change is committed
-  on `develop`, ships next `master` deploy.
-- **Resend / invite email** — verify a sending domain, then
-  `supabase secrets set RESEND_API_KEY=… RESEND_FROM=… SITE_URL=https://crowscribe.space` and add
-  the Resend DKIM/SPF records in Vercel's DNS UI.
-`supabase/config.toml`'s `[auth]` block stays local-only by design (hosted auth config is
-dashboard-managed; `supabase config push` would clobber the local values).
+**Deploy status:** all migrations through `20260901000000_invitation_hardening` are on hosted
+(`supabase db push` — needed one fix, `extensions.gen_random_bytes`, since pgcrypto isn't on the
+hosted migration search_path). Vercel `master` deploy is live. **Domain switch to
+`crowscribe.space` (step 82) is done** — NS → Vercel, certs issued, hosted Supabase Auth URL
+config updated, Google OAuth + magic-link verified end-to-end. **Invitation emails are live
+(step 83)** — Resend sending domain `send.crowscribe.space` verified, DNS auto-configured into
+Vercel via Resend's Vercel integration, the three Edge-Function secrets (`RESEND_API_KEY`,
+`RESEND_FROM`, `SITE_URL`) set + function redeployed.
+Nothing is pending here now. `supabase/config.toml`'s `[auth]` block stays local-only by design
+(hosted auth config is dashboard-managed; `supabase config push` would clobber the local values).
 
 The one recurring (not one-time) item worth keeping an eye on regardless: Storage usage against
 the 1GB free-tier cap as real data accumulates (step 56 added a `maxSizeMB` cap to
@@ -2801,8 +2796,7 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
     migration search_path, `db push` failed without the schema qualifier; local dev happened to
     include it); the Edge Function `functions deploy`d — inert without secrets.)_
 
-82. **Primary domain → `crowscribe.space`.** ✅ _partial_ (code + Vercel config done; DNS +
-    Supabase Auth config are user dashboard actions). Replaces the auto-generated
+82. **Primary domain → `crowscribe.space`.** ✅ _done_. Replaces the auto-generated
     `crowscribe.vercel.app` / `delft.vercel.app`, which had to be `vercel alias set`-re-pointed on
     every deploy (see step 64 and the recurring gotcha at step 18/25/64). A real custom domain
     Vercel assigns to production **auto-tracks every deploy** and isn't `*.vercel.app`
@@ -2822,3 +2816,27 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
     - The `.vercel.app` aliases are **retired** — not re-pointed going forward (they'll serve
       whatever deploy they were last aliased to; nothing links to them). This ends the manual
       re-alias chore the deploy-procedure memory documented.
+
+    _(shipped since: Namecheap NS → Vercel, propagated + verified; Let's Encrypt certs issued for
+    apex + `www`; hosted Supabase Auth Site URL / redirect allow-list updated by the user;
+    verified end-to-end on `crowscribe.space` — Google OAuth round-trip and magic-link sign-in
+    both land back on `crowscribe.space` signed in. `metadataBase` change shipped via PR #45.
+    Still optional: `www` → apex is served directly, not 301-redirected.)_
+
+83. **Invitation emails live — Resend sending domain `send.crowscribe.space`.** ✅ _done_. Turns on
+    the step-80 Edge Function that had shipped inert (no `RESEND_API_KEY`). No code change — pure
+    ops:
+    - Resend account + domain `send.crowscribe.space` (region `us-east-1`, click-tracking off so
+      the Supabase accept link isn't rewritten). Resend's native **Vercel integration**
+      ("Auto configure") pushed the DKIM + SPF (TXT) + SPF (MX) records straight into Vercel DNS;
+      a `_dmarc` TXT (`v=DMARC1; p=none;`) was added manually. Domain verified in ~3 min.
+    - Hosted secrets set (`supabase secrets set`): `RESEND_API_KEY` (Sending-access key scoped to
+      the domain), `RESEND_FROM=CrowScribe <invites@send.crowscribe.space>`,
+      `SITE_URL=https://crowscribe.space`. Function redeployed to pick them up.
+    - Smoke-checked: the deployed function now returns `{skipped:"not-authorized"}` for a bogus
+      token + anon JWT (previously `{skipped:"no-api-key"}`) — the key is live and the
+      authorization check is the boundary, as designed.
+    - Zero-cost: Resend free tier (3,000/mo, 100/day, 1 domain) — best-effort invite email is well
+      within it. Same accepted category as Sentry.
+    - Still deferred: a "Resend invite" button in the Members modal (step 79 follow-up); DMARC
+      stays at `p=none` (monitor before enforcing).
