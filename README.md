@@ -22,8 +22,8 @@ vault, nested folders), auth (password + Google), a mandatory first-login onboar
 user profile (name/company/occupation/bio/avatar), **multi-user workspaces** (invite by email or
 `@username`, owner/editor/viewer roles, best-effort invitation emails via a Supabase Edge
 Function + Resend), and a Notion-style dark/light UI (hover-affordance sidebar,
-`/workspace/{slug}--{id}` URLs). Live at `https://crowscribe.vercel.app`
-(`https://delft.vercel.app` is a kept legacy alias), auto-deploying on push to `master`. See
+`/workspace/{slug}--{id}` URLs). Live at `https://crowscribe.space`, auto-deploying on push to
+`master`. See
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)'s numbered Build Order for how each shipped, and its
 "Next Up" section for current focus (including a pending hosted-deploy backlog).
 
@@ -79,10 +79,9 @@ npx supabase db reset     # reapply all migrations from scratch (destructive to 
 npx supabase gen types typescript --local > packages/types/src/database.ts
 ```
 
-This repo is linked (`supabase link`) to a hosted project, live at `https://crowscribe.vercel.app`
-(`https://delft.vercel.app` still works too) — see
-`docs/ARCHITECTURE.md` Build Order step 18 for the deployment setup and what's still manual (git
-auto-deploy, hosted auth URL/Google provider config). `npx supabase db push` applies local
+This repo is linked (`supabase link`) to a hosted project, live at `https://crowscribe.space` —
+see `docs/ARCHITECTURE.md` Build Order steps 18 and 82 for the deployment setup and what's still
+manual (hosted auth URL / Google provider config, Edge Function deploy + secrets). `npx supabase db push` applies local
 migrations to the hosted database. See `packages/types/src/database.ts`'s header comment for the
 type-regeneration command, and `supabase/migrations/` for the schema and its RLS/grants reasoning.
 

@@ -9,7 +9,13 @@ pnpm dev --filter=web
 
 Magic-link email is still the only way to _create_ an account. Locally, "sending an email" lands
 in Mailpit, not a real inbox — open `http://127.0.0.1:54324` and click the link there. The e2e
-suite does this same lookup programmatically via Mailpit's REST API (`e2e/helpers.ts`). A **fresh
+suite does this same lookup programmatically via Mailpit's REST API (`e2e/helpers.ts`). Since
+Build Order step 84 the magic-link email is a **custom branded template**
+(`supabase/templates/magic_link.html`, wired via `[auth.email.template.magic_link]` in
+`config.toml`) — so CI renders the real template, and `getLatestMagicLink` depends on the raw
+`{{ .ConfirmationURL }}` staying present as visible text in the body (don't remove the "paste
+this link" line). A full `supabase stop && supabase start` is needed to pick up template edits,
+not `db reset`. A **fresh
 sign-in now lands on a mandatory 5-step onboarding wall** (name/occupation/company/bio/usage —
 Build Order step 78) before the workspace picker; `signIn` in `helpers.ts` auto-completes it with
 minimal data unless a spec opts out with `signIn(page, email, { onboarding: "leave" })`. Once

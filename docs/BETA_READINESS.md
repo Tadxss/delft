@@ -17,8 +17,8 @@ deleted) per this doc's own "accumulate, don't delete" convention.
 Edge Function) added surface it never covered — re-audited in a follow-up pass; see
 "[Post-step-37: multi-user surface](#post-step-37-multi-user-surface)" at the bottom.**
 
-Live app: `https://crowscribe.vercel.app` (`https://delft.vercel.app` still works too, kept as a
-legacy alias). Read [docs/ARCHITECTURE.md](ARCHITECTURE.md) and
+Live app: `https://crowscribe.space` (the `*.vercel.app` URLs are retired — see ARCHITECTURE.md
+Build Order step 82). Read [docs/ARCHITECTURE.md](ARCHITECTURE.md) and
 [docs/TESTING.md](TESTING.md) first for the existing architecture/test conventions — every fix
 below should follow those same patterns (RLS policy naming, `useX`/`useUpdateX` hook shape,
 `window.confirm` for destructive actions, e2e specs per feature, etc.), not introduce new ones.
@@ -63,7 +63,7 @@ covers it, rather than deleting it — same "accumulate, don't delete" conventio
   Deliberately left open rather than adding a paid device-lab service (BrowserStack etc., which
   would also mean routing a credentials app's traffic through a third party) or a real-Safari CI
   toolchain (macOS runner + `safaridriver`/Appium — a genuinely separate setup from the rest of the
-  e2e suite). The cheapest real coverage here is manual: open `https://crowscribe.vercel.app` on an
+  e2e suite). The cheapest real coverage here is manual: open `https://crowscribe.space` on an
   iPhone/iPad you own and walk through Pages/Canvas/Credentials once in a while.
 
 ## Fixed
@@ -345,7 +345,7 @@ clean on every load-bearing invariant. Findings and their disposition:
 
 ### Deploy dependency (not a security finding, but a "won't work in prod without it")
 Invite acceptance for a not-yet-registered user needs `SITE_URL` set and
-`https://crowscribe.vercel.app/**` added to the hosted project's Auth redirect-URL allow-list, or
+`https://crowscribe.space/**` added to the hosted project's Auth redirect-URL allow-list, or
 `generateLink`'s `redirectTo` is rejected. See `docs/ARCHITECTURE.md` "Next Up" for the full
 pending-deploy checklist.
 

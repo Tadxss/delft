@@ -252,7 +252,9 @@ create table public.workspace_invitations (
   invited_user_id  uuid references auth.users(id) on delete cascade,
 
   role             text not null check (role in ('editor','viewer')),   -- never 'owner' via invite
-  token            text not null unique default encode(gen_random_bytes(32), 'hex'),
+  -- schema-qualified: pgcrypto lives in `extensions`, which isn't on the search_path a hosted
+  -- `supabase db push` runs migrations under (local dev happens to include it).
+  token            text not null unique default encode(extensions.gen_random_bytes(32), 'hex'),
   status           text not null default 'pending'
                      check (status in ('pending','accepted','revoked','declined')),
   expires_at       timestamptz not null default (now() + interval '14 days'),

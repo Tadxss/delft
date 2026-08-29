@@ -22,10 +22,11 @@ a mandatory first-login onboarding stepper, page + canvas publishing (`/share/[s
 `/share/canvas/[slug]`), user profiles, and **multi-user workspaces** — invite by email or
 `@username`, owner/editor/viewer roles, best-effort invitation emails through the repo's first
 Supabase Edge Function (`supabase/functions/send-invitation-email/`). All covered by an e2e suite.
-Live at `https://crowscribe.vercel.app` (`https://delft.vercel.app` is a kept legacy alias;
-auto-deploys on push to `master`). **The last ~4 feature commits (Build Order steps 78–80) are on
-`develop` and NOT deployed** — 5 migrations aren't on hosted and the Edge Function has never been
-`functions deploy`d (see ARCHITECTURE.md "Next Up" for the full backlog). See ARCHITECTURE.md's
+Live at `https://crowscribe.space` (a Namecheap domain on Vercel nameservers, auto-tracking every
+`master` deploy — the old `crowscribe.vercel.app` / `delft.vercel.app` URLs are no longer
+maintained). Auto-deploys on push to `master`. Build Order steps 78–83 shipped: multi-user workspaces + invitation emails (PR #44), the
+`crowscribe.space` domain switch (step 82, PR #45), and Resend going live on
+`send.crowscribe.space` (step 83) — invite emails now actually send. See ARCHITECTURE.md's
 **Next Up** for current focus and the Build Order for how each feature shipped;
 [docs/BETA_READINESS.md](docs/BETA_READINESS.md)'s original audit is closed out as of Build Order
 step 37, with a separate section for the multi-user surface added since.
