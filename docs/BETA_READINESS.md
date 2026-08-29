@@ -346,8 +346,10 @@ clean on every load-bearing invariant. Findings and their disposition:
 ### Deploy dependency (not a security finding, but a "won't work in prod without it")
 Invite acceptance for a not-yet-registered user needs `SITE_URL` set and
 `https://crowscribe.space/**` added to the hosted project's Auth redirect-URL allow-list, or
-`generateLink`'s `redirectTo` is rejected. See `docs/ARCHITECTURE.md` "Next Up" for the full
-pending-deploy checklist.
+`generateLink`'s `redirectTo` is rejected. Both are done as of Build Order step 82–83.
+Remaining (cosmetic, not blocking): the hosted magic-link email still uses Supabase's default
+sender + template until the step-84 dashboard SMTP/template setup is done. See
+`docs/ARCHITECTURE.md` "Next Up".
 
 The multi-user spec surface is now `workspace-invitations.spec.ts` (2 two-context flows), and the
 suite is 17 spec files × 3 projects (the "16 specs" / "48-test suite" figures above are

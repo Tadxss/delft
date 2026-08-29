@@ -24,9 +24,11 @@ a mandatory first-login onboarding stepper, page + canvas publishing (`/share/[s
 Supabase Edge Function (`supabase/functions/send-invitation-email/`). All covered by an e2e suite.
 Live at `https://crowscribe.space` (a Namecheap domain on Vercel nameservers, auto-tracking every
 `master` deploy — the old `crowscribe.vercel.app` / `delft.vercel.app` URLs are no longer
-maintained). Auto-deploys on push to `master`. Build Order steps 78–83 shipped: multi-user workspaces + invitation emails (PR #44), the
-`crowscribe.space` domain switch (step 82, PR #45), and Resend going live on
-`send.crowscribe.space` (step 83) — invite emails now actually send. See ARCHITECTURE.md's
+maintained). Auto-deploys on push to `master`. Build Order steps 78–84 shipped: multi-user workspaces +
+invitation emails (PR #44); the `crowscribe.space` domain switch (82), Resend going live on
+`send.crowscribe.space` (83), and branded email templates (84) via PR #45. Invite email sends
+branded; branded _auth_ (magic-link) email still needs the hosted SMTP/template dashboard setup
+(step 84). See ARCHITECTURE.md's
 **Next Up** for current focus and the Build Order for how each feature shipped;
 [docs/BETA_READINESS.md](docs/BETA_READINESS.md)'s original audit is closed out as of Build Order
 step 37, with a separate section for the multi-user surface added since.
@@ -70,12 +72,21 @@ npx supabase gen types typescript --local > packages/types/src/database.ts
 ```
 
 Edge Functions live in `supabase/functions/` (currently just `send-invitation-email`, the invite
-email). `supabase start` serves them; iterate a single one with
+email; shared code in `supabase/functions/_shared/` — currently `email.ts`, the branded email
+layout). `supabase start` serves them; iterate a single one with
 `supabase functions serve send-invitation-email --env-file supabase/functions/.env`. Local
 secrets: `supabase/functions/.env` (gitignored; copy from `.env.example`; the function no-ops
 when `RESEND_API_KEY` is blank — the default for local/CI). **Gotcha**: that `.env` is reloaded
 on `supabase stop && supabase start`, **not** on `supabase db reset`. Hosted:
 `supabase functions deploy send-invitation-email` + `supabase secrets set RESEND_API_KEY=… RESEND_FROM=… SITE_URL=…`.
+
+Auth email templates: `supabase/templates/{magic_link,confirmation,recovery}.html` (branded,
+Build Order step 84), wired via `[auth.email.template.*]` in `config.toml` so local dev + CI
+render the real template. A full `supabase stop && supabase start` picks up template edits;
+`supabase db reset` does not. Keep them visually in sync with `_shared/email.ts`. The **hosted**
+copies are dashboard-only (Authentication → Emails → Templates) — same as the `[auth]` URL config,
+`supabase config push` is never run. Hosted also routes auth email through Resend custom SMTP set
+in the dashboard.
 
 Linked (`supabase link`) to the hosted project (its ref is still `delft`; display name renamed to
 crowscribe) — new migrations do **not** apply to it automatically, they need an explicit
@@ -118,7 +129,10 @@ from the invitation spec is harmless).
   Order step 80), the **first server-side code** in the repo and the **first
   `SUPABASE_SERVICE_ROLE_KEY` use**. `verify_jwt = true`; it bypasses RLS as the service role and
   re-checks the caller is the inviter/owner in TS. Everything else in the app is still
-  browser-client + anon key + RLS.
+  browser-client + anon key + RLS. `_shared/email.ts` (step 84) is the branded HTML/text email
+  layout, imported by the function but not itself deployed (the `_`-prefix convention).
+- `supabase/templates/` — branded GoTrue auth email templates (step 84), kept visually in sync
+  with `_shared/email.ts`. Applied to hosted by hand (dashboard-only).
 - No `packages/ui` yet — deliberately deferred until a second app needs shared components.
 
 **Schema/RLS/build history**: fully specified in `docs/ARCHITECTURE.md` — read that before
