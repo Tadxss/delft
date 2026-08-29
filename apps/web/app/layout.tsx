@@ -7,7 +7,7 @@ import { Providers } from "./providers";
 const DESCRIPTION = "A private, personal records and notes workspace.";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://crowscribe.vercel.app"),
+  metadataBase: new URL("https://crowscribe.space"),
   title: "CrowScribe",
   description: DESCRIPTION,
   openGraph: {

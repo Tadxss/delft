@@ -22,10 +22,12 @@ when something ships. Entries accumulate; don't edit or delete old ones, append 
 
 Read this section first in a new session — it's the answer to "what should I work on."
 
-**Every originally-planned feature has shipped** — Pages, auth (password + Google), Credentials
-Manager, Excalidraw Canvas, and hosted deployment (live at `https://crowscribe.vercel.app`,
-`https://delft.vercel.app` still works too, auto-deploying on push to `master`). See Build Order
-below for how each shipped.
+**The originally-planned feature set shipped** — Pages, auth (password + Google), Credentials
+Manager, Excalidraw Canvas, hosted deployment — and the app has since grown onboarding, page +
+canvas publishing, user profiles, and multi-user workspaces (see the steps-76–81 paragraph
+below). Live at `https://crowscribe.space` (a Namecheap domain on Vercel nameservers,
+auto-tracking every `master` deploy — step 82; the old `*.vercel.app` URLs are retired). See
+Build Order below for how each shipped.
 
 **[docs/BETA_READINESS.md](BETA_READINESS.md) is now fully closed out, as of Build Order step 37**
 — every finding from the original audit (silent autosave failures, no mobile layout, `Modal.tsx`
@@ -68,12 +70,12 @@ deliberately declined:**
 tagline, Tailwind palette, and primary CTA color, per a brand handoff doc. Step 63 closed out that
 step's empty-state copy deferral (nest/canvas/vault metaphor language), narrowly scoped — the
 "Workspace" label and "Publish" wording were deliberately left alone. Step 64 then renamed the
-Vercel project and moved the live URL to `https://crowscribe.vercel.app` (`https://delft.vercel.app`
-still works too, kept as a legacy alias), and step 65 closed out the Supabase Auth dashboard config
+Vercel project and moved the live URL to `https://crowscribe.vercel.app` (later superseded by the
+real `https://crowscribe.space` domain in step 82 — the `*.vercel.app` URLs are now retired), and
+step 65 closed out the Supabase Auth dashboard config
 and the Supabase project's display-name rename, both done by the user. Step 66 then renamed the
 `@delft/*` workspace package scopes to `@crowscribe/*`. Still open: a custom logo/icon (still a
-text-monogram favicon) and domain registration, deliberately parked as the project's final touch
-rather than something to do now.
+text-monogram favicon). Domain registration landed in step 82 (`crowscribe.space`).
 
 **A UI/UX + animation pass ran across steps 67-69 and is now complete.** Step 67 (Phase 1,
 foundation) added `motion`, a real modal open/close animation (previously no exit animation at
@@ -135,17 +137,21 @@ button) are still open. **Per-workspace invitations are unrelated to the global 
 was declined above** — that was about who can create an account at all; this is about sharing a
 workspace with someone who already can.
 
-**⚠ Pending hosted-deploy backlog — the most actionable "next up" item.** `supabase migration
-list` shows five local-only migrations not on the hosted project: `20260828033527_workspace_logo`,
-`20260828181053_workspace_description`, `20260829120000_profile_company_usage_onboarding`,
-`20260830000000_workspace_invitations`, `20260831000000_invitation_email_rpc`,
-`20260901000000_invitation_hardening`. Plus:
-`supabase/config.toml` changes (the `[functions.…]` block, the `additional_redirect_urls` entry),
-the Edge Function itself (never `functions deploy`d), its three secrets (`RESEND_API_KEY`,
-`RESEND_FROM`, `SITE_URL`), and the hosted Auth redirect-URL allow-list entry
-(`https://crowscribe.vercel.app/**`) that the `/invite/[token]` accept flow needs. Steps 76/78/79/80
-each carry their own "needs `supabase db push`" note; this is the aggregate. See step 18's
-"recurring gotcha" — a migration silently missing on hosted doesn't error, writes just no-op.
+**Deploy status (post-PR-#44 merge to `master`):** all migrations through
+`20260901000000_invitation_hardening` are now on hosted (`supabase db push` — needed one fix,
+`extensions.gen_random_bytes`, since pgcrypto isn't on the hosted migration search_path). The
+Edge Function is `functions deploy`d (inert — no `RESEND_API_KEY` yet). Vercel `master` deploy is
+live. **Still pending, all user dashboard/registrar actions:**
+- **Domain switch to `crowscribe.space`** (step 82) — `crowscribe.space` + `www` are added to the
+  Vercel project; Namecheap nameservers must be pointed at `ns1/ns2.vercel-dns.com`; then update
+  the hosted **Supabase Auth → URL Configuration** (Site URL → `https://crowscribe.space`,
+  Redirect URLs → add `https://crowscribe.space/**`). The `metadataBase` code change is committed
+  on `develop`, ships next `master` deploy.
+- **Resend / invite email** — verify a sending domain, then
+  `supabase secrets set RESEND_API_KEY=… RESEND_FROM=… SITE_URL=https://crowscribe.space` and add
+  the Resend DKIM/SPF records in Vercel's DNS UI.
+`supabase/config.toml`'s `[auth]` block stays local-only by design (hosted auth config is
+dashboard-managed; `supabase config push` would clobber the local values).
 
 The one recurring (not one-time) item worth keeping an eye on regardless: Storage usage against
 the 1GB free-tier cap as real data accumulates (step 56 added a `maxSizeMB` cap to
@@ -2750,7 +2756,7 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
       (`.gitignore` gained `!supabase/functions/.env.example`).
     - **`config.toml`**: `[functions.send-invitation-email] verify_jwt = true`;
       `additional_redirect_urls` gained `http://127.0.0.1:3000/**` so `generateLink`'s `redirectTo`
-      is accepted. Hosted needs `https://crowscribe.vercel.app/**` added in the dashboard.
+      is accepted. Hosted needs `https://crowscribe.space/**` added in the dashboard (step 82).
     - **Local env-loading gotcha**: `supabase/functions/.env` is picked up on a full
       `supabase stop && supabase start`, **not** on `supabase db reset` alone — restart the stack
       after editing it.
@@ -2789,3 +2795,30 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
 
     **Hosted DB needs `supabase db push`** for `20260901000000` (bundled with the step 76–80
     backlog).
+
+    _(shipped since: PR #44 merged to `master`; all migrations through `20260901000000` pushed to
+    hosted — `20260830000000` needed `extensions.gen_random_bytes` (pgcrypto isn't on the hosted
+    migration search_path, `db push` failed without the schema qualifier; local dev happened to
+    include it); the Edge Function `functions deploy`d — inert without secrets.)_
+
+82. **Primary domain → `crowscribe.space`.** ✅ _partial_ (code + Vercel config done; DNS +
+    Supabase Auth config are user dashboard actions). Replaces the auto-generated
+    `crowscribe.vercel.app` / `delft.vercel.app`, which had to be `vercel alias set`-re-pointed on
+    every deploy (see step 64 and the recurring gotcha at step 18/25/64). A real custom domain
+    Vercel assigns to production **auto-tracks every deploy** and isn't `*.vercel.app`
+    SSO-deployment-protection-gated.
+
+    - Domain (Namecheap) `crowscribe.space` + `www.crowscribe.space` added to the Vercel
+      `crowscribe` project (`www` 301-redirects to apex). Nameserver method: Namecheap NS →
+      `ns1.vercel-dns.com` / `ns2.vercel-dns.com` (Vercel manages DNS; future records incl. a
+      Resend sending subdomain go in Vercel's DNS UI). **The NS change and the Supabase Auth →
+      URL Configuration update (Site URL → `https://crowscribe.space`, Redirect URLs → add
+      `https://crowscribe.space/**`) are user dashboard actions.**
+    - Code: the only origin literal, `apps/web/app/layout.tsx`'s
+      `metadataBase: new URL("https://crowscribe.space")` — share URLs and magic-link `redirectTo`
+      already derive from `window.location.origin`, so they follow automatically. Google OAuth
+      needs no change (its Supabase callback is on the `*.supabase.co` domain, not the app
+      domain).
+    - The `.vercel.app` aliases are **retired** — not re-pointed going forward (they'll serve
+      whatever deploy they were last aliased to; nothing links to them). This ends the manual
+      re-alias chore the deploy-procedure memory documented.
