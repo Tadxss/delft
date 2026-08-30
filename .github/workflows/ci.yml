@@ -28,6 +28,7 @@ jobs:
           cat <<'EOF' > apps/web/.env.local
           NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
           NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY=1x00000000000000000000AA
           EOF
       - run: pnpm build
 
@@ -43,6 +44,10 @@ jobs:
       fail-fast: false
       matrix:
         shard: [1, 2, 3]
+    env:
+      # Turnstile always-pass test secret — `supabase start` substitutes this into
+      # supabase/config.toml's [auth.captcha] so the e2e sign-in flow works.
+      SUPABASE_AUTH_CAPTCHA_SECRET: "1x0000000000000000000000000000000AA"
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -61,6 +66,7 @@ jobs:
           cat <<'EOF' > apps/web/.env.local
           NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
           NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY=1x00000000000000000000AA
           EOF
       - run: pnpm --filter web exec playwright test --shard=${{ matrix.shard }}/3
       - uses: actions/upload-artifact@v4

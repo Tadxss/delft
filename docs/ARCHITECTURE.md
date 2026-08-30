@@ -2989,6 +2989,17 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
       `EXCALIDRAW_ASSET_PATH` doesn't redirect 0.18's server-font loads (its font worker bypasses
       the window global), so `https://esm.sh` stays in `font-src`/`connect-src` (a font load
       can't exfil). `csp.spec.ts` asserts the enforcing header + walks editor/canvas/vault.
-    - Still in this milestone: C3 CAPTCHA; C4 data export; C5 ownership transfer; C6
-      `profiles`/`avatars` RLS audit; C7 Sentry source-maps (may defer — Next 16 Turbopack
-      builds don't upload maps in the current SDK).
+    - **C3 — CAPTCHA on signup (Cloudflare Turnstile)** ✅ — `app/_components/Turnstile.tsx`
+      (explicit render, hidden entirely when `NEXT_PUBLIC_TURNSTILE_SITE_KEY` is unset) on the
+      login page's password step; `captchaToken` threads through `useSignInWithMagicLink`
+      (`signInWithOtp` — the real account-creation call) and `useSignInWithPassword`. Google
+      OAuth is unchanged (no captcha option). CSP `script-src`/`connect-src`/`frame-src` add
+      `https://challenges.cloudflare.com`. `supabase/config.toml` `[auth.captcha]` enabled;
+      local + CI use Turnstile's always-pass **test keys** (site `1x00000000000000000000AA`,
+      secret via `SUPABASE_AUTH_CAPTCHA_SECRET`), so the `signIn` e2e helper's button click just
+      auto-waits for the widget. e2e `captcha.spec.ts`. **User (hosted):** create a Cloudflare
+      Turnstile widget, set the real site key in Vercel env + the secret in Supabase Auth → Bot
+      & Abuse Protection.
+    - Still in this milestone: C4 data export; C5 ownership transfer; C6 `profiles`/`avatars`
+      RLS audit; C7 Sentry source-maps (may defer — Next 16 Turbopack builds don't upload maps
+      in the current SDK).

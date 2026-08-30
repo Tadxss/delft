@@ -8,11 +8,21 @@ import { useSupabaseClient } from "../supabase/context";
 export function useSignInWithMagicLink() {
   const supabase = useSupabaseClient();
 
-  return useMutation<void, Error, { email: string; redirectTo?: string }>({
-    mutationFn: async ({ email, redirectTo }) => {
+  return useMutation<
+    void,
+    Error,
+    { email: string; redirectTo?: string; captchaToken?: string }
+  >({
+    mutationFn: async ({ email, redirectTo, captchaToken }) => {
+      // signInWithOtp is the real account-creation call (magic link creates the user), so the
+      // Turnstile token gates here when hosted has captcha enabled. Omit `options` entirely when
+      // neither field is set so behaviour is unchanged where captcha isn't configured.
+      const options: { emailRedirectTo?: string; captchaToken?: string } = {};
+      if (redirectTo) options.emailRedirectTo = redirectTo;
+      if (captchaToken) options.captchaToken = captchaToken;
       const { error } = await supabase.auth.signInWithOtp({
         email,
-        options: redirectTo ? { emailRedirectTo: redirectTo } : undefined,
+        options: Object.keys(options).length > 0 ? options : undefined,
       });
       if (error) throw error;
     },

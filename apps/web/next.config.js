@@ -40,13 +40,16 @@ try {
   // malformed DSN — skip the report-uri, the policy still enforces
 }
 
+// Cloudflare Turnstile (the login-page CAPTCHA) — its api.js and the widget iframe.
+const turnstile = "https://challenges.cloudflare.com";
 const CSP = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${devEval} https://va.vercel-scripts.com`,
+  `script-src 'self' 'unsafe-inline'${devEval} https://va.vercel-scripts.com ${turnstile}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:",
   "font-src 'self' https://esm.sh",
-  `connect-src 'self' ${httpProto}://${supabaseHost} ${wsProto}://${supabaseHost} https://esm.sh https://*.ingest.sentry.io https://*.ingest.de.sentry.io https://vitals.vercel-insights.com`,
+  `connect-src 'self' ${httpProto}://${supabaseHost} ${wsProto}://${supabaseHost} https://esm.sh https://*.ingest.sentry.io https://*.ingest.de.sentry.io https://vitals.vercel-insights.com ${turnstile}`,
+  `frame-src ${turnstile}`,
   "worker-src 'self' blob:",
   "frame-ancestors 'none'",
   "base-uri 'self'",
