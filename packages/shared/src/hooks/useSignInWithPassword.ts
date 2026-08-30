@@ -6,11 +6,16 @@ import { useSupabaseClient } from "../supabase/context";
 export function useSignInWithPassword() {
   const supabase = useSupabaseClient();
 
-  return useMutation<void, Error, { email: string; password: string }>({
-    mutationFn: async ({ email, password }) => {
+  return useMutation<
+    void,
+    Error,
+    { email: string; password: string; captchaToken?: string }
+  >({
+    mutationFn: async ({ email, password, captchaToken }) => {
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
+        options: captchaToken ? { captchaToken } : undefined,
       });
       if (error) throw error;
     },

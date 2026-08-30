@@ -18,7 +18,7 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
@@ -28,38 +28,64 @@ jobs:
           cat <<'EOF' > apps/web/.env.local
           NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
           NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY=1x00000000000000000000AA
           EOF
       - run: pnpm build
 
-  e2e:
+  # Sharded so a growing suite doesn't creep past the timeout. Each shard is fully isolated —
+  # its own runner + its own local Supabase — so the `workers: 1` / `fullyParallel: false` in
+  # playwright.config.ts (there to avoid cross-spec contention against one shared DB) still holds
+  # per shard while the wall-clock drops ~3x.
+  e2e-shard:
+    name: e2e-shard
     runs-on: ubuntu-latest
-    # The suite runs ~15-18 min; 20 was tight enough to flake on a slow runner. This is a
-    # required status check for the `master` deploy (branch protection), so a spurious timeout
-    # blocks releases — give it headroom.
-    timeout-minutes: 30
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    env:
+      # Turnstile always-pass test secret — `supabase start` substitutes this into
+      # supabase/config.toml's [auth.captcha] so the e2e sign-in flow works.
+      SUPABASE_AUTH_CAPTCHA_SECRET: "1x0000000000000000000000000000000AA"
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter web exec playwright install --with-deps chromium webkit
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.116.0
       - run: supabase start
       - name: Write apps/web/.env.local
         run: |
           cat <<'EOF' > apps/web/.env.local
           NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
           NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY=1x00000000000000000000AA
           EOF
-      - run: pnpm --filter web test:e2e
+      - run: pnpm --filter web exec playwright test --shard=${{ matrix.shard }}/4
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: playwright-report
+          name: playwright-report-shard-${{ matrix.shard }}
           path: apps/web/playwright-report/
           retention-days: 7
+
+  # Stable status-check name for branch protection — passes only if every shard passed.
+  e2e:
+    name: e2e
+    runs-on: ubuntu-latest
+    needs: e2e-shard
+    if: always()
+    steps:
+      - name: Gate on shard results
+        run: |
+          if [ "${{ needs.e2e-shard.result }}" != "success" ]; then
+            echo "one or more e2e shards failed"
+            exit 1
+          fi

@@ -14,6 +14,15 @@ export function uniqueEmail(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 100000)}@example.com`;
 }
 
+// First-time vault setup shows a one-time, non-dismissable recovery-key screen (Build Order step
+// 58) — every spec that creates a vault clicks through it to reach the unlocked view.
+export async function confirmRecoveryKey(page: Page): Promise<void> {
+  await page
+    .getByRole("checkbox", { name: "I've saved this recovery key" })
+    .check();
+  await page.getByRole("button", { name: "Continue" }).click();
+}
+
 // Delft uses magic-link email (not an OTP code like votero) — the emailed message contains a
 // GoTrue `/auth/v1/verify?token=...&type=magiclink&redirect_to=...` URL, which is what we
 // navigate to directly. It's long enough that Mailpit's list-view `Snippet` preview can truncate

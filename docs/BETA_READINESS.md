@@ -339,9 +339,15 @@ clean on every load-bearing invariant. Findings and their disposition:
   determined anon caller can throttle the `/invite/[token]` *preview* screen for everyone
   (accept/decline still work — they're `authenticated`, unthrottled). Same accepted tradeoff as
   `get_email_for_username`.
-- **`profiles` (+ `company`/`usage_intent`/`onboarded_at`) and the `avatars` bucket** — still not
-  audited to this doc's bar (flagged since Build Order step 28). RLS is `id = auth.uid()`, no
-  membership concept, no anon policy — low risk, but not formally cleared.
+- **`profiles` (+ `company`/`usage_intent`/`onboarded_at`) and the `avatars` bucket** — ✅
+  **cleared** in the Milestone C / step 87 audit (`rls-reviewer`). `profiles` SELECT is self-only
+  (`id = auth.uid()`, `to authenticated`); the only cross-user exposure is via `SECURITY DEFINER`
+  RPCs which each project a fixed non-sensitive column list (name / username / avatar, + email to
+  the owner only) — `company`/`bio`/`occupation`/`usage_intent` are never read cross-user. The
+  `avatars` bucket is public-read but writes are `(storage.foldername(name))[1] = auth.uid()::text`
+  scoped with a 5 MiB + `{webp,png,jpeg}` clamp (no SVG). One follow-up applied:
+  `20260904000000` enables RLS on `rpc_rate_limits` (belt-and-suspenders — it has no client
+  grant, so a future accidental grant can't expose it).
 
 ### Deploy dependency (not a security finding, but a "won't work in prod without it")
 Invite acceptance for a not-yet-registered user needs `SITE_URL` set and

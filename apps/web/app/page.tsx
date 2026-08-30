@@ -14,8 +14,13 @@ import { Button } from "./_components/Button";
 import { FormLabel } from "./_components/FormLabel";
 import { Heading } from "./_components/Heading";
 import { Input } from "./_components/Input";
+import { Turnstile } from "./_components/Turnstile";
 
 type Step = "email" | "password" | "sent";
+
+// The CAPTCHA gates the two auth calls that create/authenticate an account (magic link +
+// password) — both happen from the "password" step. Google OAuth doesn't take a captcha token.
+const HAS_CAPTCHA = Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY);
 
 // Google's official four-color "G" logomark, per Google's Sign In branding guidelines.
 function GoogleLogo() {
@@ -76,6 +81,14 @@ export default function LoginPage() {
   const [step, setStep] = useState<Step>("email");
   const [awaitingGooglePopup, setAwaitingGooglePopup] = useState(false);
   const popupPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Turnstile token is single-use — bump `captchaNonce` after each attempt to remount the widget.
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaNonce, setCaptchaNonce] = useState(0);
+  const captchaReady = !HAS_CAPTCHA || Boolean(captchaToken);
+  function resetCaptcha() {
+    setCaptchaToken(null);
+    setCaptchaNonce((n) => n + 1);
+  }
 
   // A popup we opened for Google sign-in lands back here (see handleGoogleClick's redirectTo) with
   // its own fresh session once auth completes — self-close instead of taking over that small
@@ -137,18 +150,26 @@ export default function LoginPage() {
 
   function handlePasswordSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!password) return;
-    signInWithPassword.mutate({ email, password });
+    if (!password || !captchaReady) return;
+    signInWithPassword.mutate(
+      { email, password, captchaToken: captchaToken ?? undefined },
+      { onSettled: resetCaptcha },
+    );
   }
 
   function handleMagicLinkClick() {
+    if (!captchaReady) return;
     signIn.mutate(
       {
         email,
         redirectTo:
           typeof window !== "undefined" ? window.location.origin : undefined,
+        captchaToken: captchaToken ?? undefined,
       },
-      { onSuccess: () => setStep("sent") },
+      {
+        onSuccess: () => setStep("sent"),
+        onSettled: resetCaptcha,
+      },
     );
   }
 
@@ -293,7 +314,9 @@ export default function LoginPage() {
               />
               <Button
                 type="submit"
-                disabled={signInWithPassword.isPending || !password}
+                disabled={
+                  signInWithPassword.isPending || !password || !captchaReady
+                }
               >
                 {signInWithPassword.isPending ? "Signing in…" : "Continue"}
               </Button>
@@ -304,10 +327,16 @@ export default function LoginPage() {
               )}
             </form>
 
+            <Turnstile
+              onVerify={setCaptchaToken}
+              onExpire={() => setCaptchaToken(null)}
+              resetKey={captchaNonce}
+            />
+
             <Button
               variant="secondary"
               onClick={handleMagicLinkClick}
-              disabled={signIn.isPending}
+              disabled={signIn.isPending || !captchaReady}
             >
               {signIn.isPending
                 ? "Sending…"

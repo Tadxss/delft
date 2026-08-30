@@ -7,15 +7,19 @@ import { ChevronLeft, ChevronRight, LogOut, User, X } from "lucide-react";
 import imageCompression from "browser-image-compression";
 import {
   AccountDeletionBlockedError,
+  buildAccountExport,
   useAuthUser,
   useDeleteAccount,
   useProfile,
   useSetPassword,
   useSignOut,
+  useSupabaseClient,
   useUploadAvatar,
   useUpsertProfile,
+  useVaultKeys,
 } from "@crowscribe/shared";
 import { OCCUPATIONS } from "../_lib/occupations";
+import { downloadJson } from "../_lib/downloadJson";
 import { Button } from "./Button";
 import { FormLabel } from "./FormLabel";
 import { Input, Select, Textarea } from "./Input";
@@ -37,11 +41,35 @@ export function AccountModal({
   const router = useRouter();
   const signOut = useSignOut();
   const setPassword = useSetPassword();
+  const supabase = useSupabaseClient();
+  const { getKey } = useVaultKeys();
   const [view, setView] = useState<View>("list");
   const [password, setPasswordValue] = useState("");
   const [confirm, setConfirm] = useState("");
   const [saved, setSaved] = useState(false);
   const [mismatch, setMismatch] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  async function handleExport() {
+    setExporting(true);
+    setExportError(null);
+    try {
+      const data = await buildAccountExport(
+        supabase,
+        user?.email ?? null,
+        getKey,
+      );
+      downloadJson(
+        `crowscribe-export-${new Date().toISOString().slice(0, 10)}.json`,
+        data,
+      );
+    } catch (e) {
+      setExportError(e instanceof Error ? e.message : "Export failed");
+    } finally {
+      setExporting(false);
+    }
+  }
 
   // Never resume mid-drill-down on reopen — same reset-on-close pattern CredentialsModal uses.
   useEffect(() => {
@@ -143,6 +171,19 @@ export function AccountModal({
             Dark Mode
             <ChevronRight size={14} className="text-ink-400" />
           </button>
+
+          <button
+            type="button"
+            onClick={handleExport}
+            disabled={exporting}
+            className="flex w-full items-center justify-between rounded-md border border-paper-200 bg-paper-100 px-4 py-3 text-left text-sm text-ink-800 hover:bg-paper-200 disabled:opacity-60"
+          >
+            {exporting ? "Preparing…" : "Export my data"}
+            <ChevronRight size={14} className="text-ink-400" />
+          </button>
+          {exportError && (
+            <p className="-mt-2 text-xs text-red-700">{exportError}</p>
+          )}
 
           <button
             type="button"
@@ -321,7 +362,9 @@ function DeleteAccountPanel({
           You still own {blocked.workspaces.length === 1 ? "a" : ""} shared
           workspace{blocked.workspaces.length > 1 ? "s" : ""}:{" "}
           <span className="font-medium">{blocked.workspaces.join(", ")}</span>.
-          Remove the other members, or delete{" "}
+          Transfer{" "}
+          {blocked.workspaces.length > 1 ? "them" : "it"} to another member
+          (Members → Make owner), remove the other members, or delete{" "}
           {blocked.workspaces.length > 1 ? "those workspaces" : "that workspace"}
           , then try again.
         </div>

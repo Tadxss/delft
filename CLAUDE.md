@@ -106,10 +106,12 @@ hydrating and clicks silently fall through to native form submits. See
 ### CI
 
 `.github/workflows/ci.yml` runs on every push/PR to `master`/`develop`: a `checks` job
-(`pnpm lint`, `pnpm check-types`, `pnpm build`) and an `e2e` job (boots a real local Supabase
-stack via `supabase/setup-cli`, then runs the full `apps/web/e2e/` suite against it — that stack
-now also serves the Edge Functions, which no-op without their secrets, so `functions.invoke`
-from the specs is harmless).
+(`pnpm lint`, `pnpm check-types`, `pnpm build`) and `e2e-shard` — a 3-way matrix
+(`playwright test --shard=k/3`), each shard on its own runner with its own `supabase start`, so
+the wall-clock stays well under the timeout as the suite grows. A tiny `e2e` gate job `needs` all
+shards and is the stable status-check name for branch protection. Node 22. `supabase/setup-cli`
+is pinned (not `latest`). `.github/dependabot.yml` opens weekly grouped npm + github-actions
+update PRs.
 
 `master` is **branch-protected** (Build Order step 85): all changes land via PR with `checks` +
 `e2e` green and the branch up to date; `enforce_admins` is off so the owner can force through in

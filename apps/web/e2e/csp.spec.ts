@@ -1,18 +1,23 @@
 import { test, expect } from "@playwright/test";
 import { openSidebar, openWorkspaceMenu, signIn, uniqueEmail } from "./helpers";
 
-// Content-Security-Policy (Milestone B / item 10). Shipped report-only first — this spec both
-// asserts the header is present and walks the heavy surfaces (BlockNote editor, Excalidraw
-// canvas, credentials vault) collecting any CSP violation the browser reports, so the allowlist
-// is validated against real usage before a follow-up flips it to enforcing.
+// Content-Security-Policy (Milestone B item 10, enforcing as of Milestone C / step 87). Asserts
+// the enforcing header is present and walks the heavy surfaces (BlockNote editor, Excalidraw
+// canvas, credentials vault) — now real blocks, so any violation here means the app is broken,
+// not just noisy.
 
-test("the CSP report-only header is present on public and app routes", async ({
+test("the enforcing CSP header is present on public and app routes", async ({
   page,
 }) => {
   for (const path of ["/", "/privacy"]) {
     const res = await page.goto(path);
-    const csp = res?.headers()["content-security-policy-report-only"];
-    expect(csp, `CSP-Report-Only header on ${path}`).toBeTruthy();
+    const headers = res?.headers() ?? {};
+    expect(
+      headers["content-security-policy-report-only"],
+      `should be enforcing, not report-only, on ${path}`,
+    ).toBeUndefined();
+    const csp = headers["content-security-policy"];
+    expect(csp, `CSP header on ${path}`).toBeTruthy();
     expect(csp).toContain("default-src 'self'");
     expect(csp).toContain("object-src 'none'");
   }
@@ -21,9 +26,7 @@ test("the CSP report-only header is present on public and app routes", async ({
 test("no CSP violations across the editor, canvas, and vault", async ({
   page,
 }) => {
-  // Only actual blocks/refusals — not WebKit's advisory that a report-only policy without a
-  // `report-to` "will have no effect" (true on Safari; the report-only phase is a Chrome-side
-  // allowlist check, and there's no report collector yet).
+  // Ignore WebKit's advisory noise; count only real blocks.
   const violations: string[] = [];
   page.on("console", (msg) => {
     const t = msg.text();

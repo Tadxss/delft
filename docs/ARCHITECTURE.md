@@ -2966,5 +2966,70 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
       Milestone C follow-up). e2e `csp.spec.ts` asserts the header and walks editor/canvas/vault
       with zero violations. **Follow-up:** flip `-Report-Only` → enforcing after a clean week;
       nonce-based `script-src` (drop `'unsafe-inline'`, needs a `middleware.ts`) is Milestone C.
-    - Milestone B remaining: none of the code items. Source-map upload, a CAPTCHA/Turnstile, the
-      enforcing-CSP flip, and nonce-based CSP carry into Milestone C.
+86. (cont.) Milestone B is deployed (`supabase db push` of `20260902000000`, Vercel `master`
+    live, prod CSP report-only header verified). Source-map upload, CAPTCHA/Turnstile, the
+    enforcing-CSP flip, and nonce-based CSP carried into Milestone C.
+
+87. **Production-readiness — Milestone C (hardening + deferred features).** _in progress_. The
+    infra hardening set plus the three deferred features the owner opted into (CAPTCHA on signup,
+    data export, workspace ownership transfer), and flipping the CSP to enforcing. Shipped as one
+    sub-PR per slice.
+    - **C1 — CI / infra** ✅ — `.github/workflows/ci.yml`: the `e2e` job is now `e2e-shard`, a
+      3-way `playwright test --shard=k/3` matrix (each shard its own runner + `supabase start`,
+      so `workers:1`/`fullyParallel:false` still hold per shard while wall-clock drops ~3×); a
+      tiny `e2e` gate job `needs` all shards and keeps the stable branch-protection check name.
+      Node 20 → 22 (CI, `.nvmrc`, root + `apps/web` `engines`). `supabase/setup-cli` pinned
+      (`2.116.0`) in both workflows. `.github/dependabot.yml` (weekly grouped npm +
+      github-actions). New error boundaries `app/share/error.tsx` + `app/invite/error.tsx`
+      (unauth-safe, Sentry capture) — a throw there no longer escalates to the root boundary.
+    - **C2 — CSP enforcing** ✅ — `next.config.js`'s `Content-Security-Policy-Report-Only` →
+      `Content-Security-Policy` (ran report-only through Milestone B with zero violations + e2e
+      coverage). Added a `report-uri` derived from the Sentry DSN so violation telemetry
+      survives. **Self-hosting Excalidraw's fonts was attempted and deferred** — setting
+      `EXCALIDRAW_ASSET_PATH` doesn't redirect 0.18's server-font loads (its font worker bypasses
+      the window global), so `https://esm.sh` stays in `font-src`/`connect-src` (a font load
+      can't exfil). `csp.spec.ts` asserts the enforcing header + walks editor/canvas/vault.
+    - **C3 — CAPTCHA on signup (Cloudflare Turnstile)** ✅ — `app/_components/Turnstile.tsx`
+      (explicit render, hidden entirely when `NEXT_PUBLIC_TURNSTILE_SITE_KEY` is unset) on the
+      login page's password step; `captchaToken` threads through `useSignInWithMagicLink`
+      (`signInWithOtp` — the real account-creation call) and `useSignInWithPassword`. Google
+      OAuth is unchanged (no captcha option). CSP `script-src`/`connect-src`/`frame-src` add
+      `https://challenges.cloudflare.com`. `supabase/config.toml` `[auth.captcha]` enabled;
+      local + CI use Turnstile's always-pass **test keys** (site `1x00000000000000000000AA`,
+      secret via `SUPABASE_AUTH_CAPTCHA_SECRET`), so the `signIn` e2e helper's button click just
+      auto-waits for the widget. e2e `captcha.spec.ts`. **User (hosted):** create a Cloudflare
+      Turnstile widget, set the real site key in Vercel env + the secret in Supabase Auth → Bot
+      & Abuse Protection.
+    - **C4 — Data export** ✅ — `buildAccountExport` (`packages/shared/src/lib/`) → a single
+      `crowscribe-export-<date>.json` with every RLS-visible workspace's pages (full BlockNote
+      content), canvases (full scene), folders, and credentials. Credential secrets ship
+      **encrypted** (`secretCiphertext` + `secretIv` + the workspace `vaultSalt`) always — the
+      user decrypts offline with their passphrase — plus decrypted inline when that vault is
+      unlocked in memory at export time. `downloadJson` helper (Blob, no dep). "Export my data"
+      in `AccountModal`. `useVaultKeys()` multi-workspace context accessor. e2e
+      `data-export.spec.ts`.
+    - **C5 — Workspace ownership transfer** ✅ — `20260903000000_transfer_ownership.sql`:
+      `transfer_workspace_ownership(p_workspace_id, p_new_owner_id)` `SECURITY DEFINER` (client
+      `UPDATE workspaces SET owner_id` is blocked by `workspaces_update_owner`'s `WITH CHECK`).
+      Caller must be the current owner; target an existing member; re-checks the 50-workspace cap
+      (its `BEFORE INSERT` trigger doesn't fire on this UPDATE); **refuses while
+      `vault_wrapped_key IS NOT NULL`** — the vault key is bound to the original owner's
+      passphrase and can't transfer. Caller → `editor`, target → `owner` (both member rows
+      written directly — `set_workspace_member_role`/`remove_workspace_member` all refuse the
+      owner row). `useTransferWorkspaceOwnership` + a "Make owner" action in
+      `WorkspaceMembersModal`; the `delete-account` "blocked" message now suggests transferring.
+      e2e `ownership-transfer.spec.ts`.
+    - **C7 — Sentry source maps** — **deferred.** `next build` on Next 16.2 uses Turbopack, and
+      `@sentry/nextjs@10.70` does not upload source maps for Turbopack builds. Options (opt out
+      of Turbopack for the prod build, or bump the SDK once Turbopack support is solid) aren't
+      worth the risk in a hardening pass — minified prod traces still carry error
+      type/message/breadcrumbs/URL. Revisit when the SDK supports it cleanly.
+    - **C6 — `profiles` / `avatars` RLS audit** ✅ — `rls-reviewer` pass came back **clean** (no
+      high/medium findings): `profiles` SELECT is self-only, cross-user exposure is only via
+      `SECURITY DEFINER` RPCs projecting fixed non-sensitive columns; `avatars` writes are
+      uid-folder-scoped with a MIME/size clamp. One follow-up: `20260904000000` enables RLS on
+      `rpc_rate_limits` (it has no client grant — belt-and-suspenders). `BETA_READINESS.md`'s
+      "not formally cleared" item is closed.
+    - **Milestone C complete** except the deferred C7 (Sentry source maps) and the user's hosted
+      dashboard actions (Cloudflare Turnstile widget + keys, Node 22 on Vercel, `db push` of the
+      two new migrations, `functions deploy delete-account` for the message tweak).
