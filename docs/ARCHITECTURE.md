@@ -2942,7 +2942,29 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
     - **Sentry not-dark check** ✅ — `NEXT_PUBLIC_SENTRY_DSN` confirmed set in Vercel Production
       (`vercel env ls`), so error reporting is live. Added a `console.warn` in
       `instrumentation-client.ts` for the case a future prod build ships without it.
-    - Still in this milestone: `beforeunload` + flush-on-nav guard for the editors (B2), an
-      `updated_at` optimistic-concurrency check on autosave with a conflict banner (B3), and a
-      report-only Content-Security-Policy (B4). Source-map upload, a CAPTCHA, and nonce-based CSP
-      are Milestone C.
+    - **Editor unsaved-changes guard** ✅ (B2) — `_lib/useBeforeUnloadWarning.ts` fires the native
+      "Leave site?" prompt while a save is pending/in-flight/retrying/errored;
+      `PageEditor`/`CanvasEditor` also flush the pending patch in their `[id]` unmount cleanup
+      (covers in-app SPA nav, which `beforeunload` misses) instead of dropping it. Fixed a latent
+      bug: `saveTimer`/`retryTimer` refs were never nulled after firing. e2e
+      `editor-unsaved-guard.spec.ts`.
+    - **Concurrent-edit stale-write detection** ✅ (B3) — `useUpdatePage`/`useUpdateCanvas` take an
+      optional `expectedUpdatedAt` → adds `.eq("updated_at", …)` to the autosave PATCH; a 0-row
+      result throws `StaleWriteError` (new, in `packages/shared/src/lib/`). The editor tracks a
+      `baseUpdatedAt` ref (seeded from the row, advanced on each save) and on `StaleWriteError`
+      shows a blocking "changed elsewhere — Reload" banner instead of retrying or merging the
+      local edit over the other writer's. Structural callers (reorder/reparent/publish) omit the
+      token, keeping last-write-wins. A `titleDirty` ref stops a background refetch wiping an
+      unsaved title. e2e `concurrent-edit.spec.ts` (two tabs).
+    - **Content-Security-Policy (report-only)** ✅ (B4) — `Content-Security-Policy-Report-Only` in
+      `next.config.js`, built from `NEXT_PUBLIC_SUPABASE_URL`. `script-src 'self' 'unsafe-inline'`
+      (+ `'unsafe-eval'` **dev only** — Turbopack HMR; a prod build has zero eval violations),
+      `style-src 'unsafe-inline'` (BlockNote/Mantine/Excalidraw), `img-src … https:` (users paste
+      external image URLs), `connect-src` allowlist (Supabase http+ws, Sentry ingest, Vercel
+      vitals), `worker-src blob:` + `font-src … https://esm.sh` (**real finding:** Excalidraw
+      0.18 loads its fonts from esm.sh at runtime — self-hosting via `EXCALIDRAW_ASSET_PATH` is a
+      Milestone C follow-up). e2e `csp.spec.ts` asserts the header and walks editor/canvas/vault
+      with zero violations. **Follow-up:** flip `-Report-Only` → enforcing after a clean week;
+      nonce-based `script-src` (drop `'unsafe-inline'`, needs a `middleware.ts`) is Milestone C.
+    - Milestone B remaining: none of the code items. Source-map upload, a CAPTCHA/Turnstile, the
+      enforcing-CSP flip, and nonce-based CSP carry into Milestone C.
