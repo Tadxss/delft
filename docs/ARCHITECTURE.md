@@ -5,9 +5,10 @@ built on Next.js + Supabase + Vercel free tiers, with every feature scoped per-w
 isolated (or, since Build Order step 79, shared by role) via Postgres Row Level Security. It
 started single-user and has since grown mandatory onboarding, page + canvas publishing, user
 profiles, and multi-user workspaces (owner/editor/viewer invitations). As of step 80 the repo
-also has a small Deno/Edge-Function surface — `supabase/functions/send-invitation-email/`, the
-first server-side code and the first `SUPABASE_SERVICE_ROLE_KEY` use — alongside the otherwise
-client-only Next.js app. See the root [README.md](../README.md) for the
+also has a small Deno/Edge-Function surface — `supabase/functions/send-invitation-email/` (with a
+shared `supabase/functions/_shared/email.ts` email layout as of step 84), the first server-side
+code and the first `SUPABASE_SERVICE_ROLE_KEY` use — alongside the otherwise client-only Next.js
+app. Auth email templates live in `supabase/templates/` (step 84). See the root [README.md](../README.md) for the
 elevator pitch and local dev setup, [docs/TESTING.md](TESTING.md) for how the e2e suite maps
 to manual test scenarios, and [docs/BETA_READINESS.md](BETA_READINESS.md) for the original
 pre-beta audit (fully closed out as of Build Order step 37 — kept as a historical record, not an
@@ -122,29 +123,33 @@ new OG image needed one to resolve correctly in production.
 **Step 75 then swapped that hand-drawn mark for the user's actual reference image** —
 `apps/web/public/logo.png` is now the real source of truth for the logo, embedded (not redrawn)
 into `icon.tsx`/`apple-icon.tsx`/`opengraph-image.tsx` and referenced via `<img>` in the TopBar/
-hero. Domain registration remains the one deliberately-parked item — still an open, not-yet-started
-choice for whoever picks this up next.
+hero. (Domain registration, the other parked item, landed later as step 82 — `crowscribe.space`.)
 
-**Steps 76–81 (a large feature run, all on `develop`, none deployed yet):** workspace chrome
-moved into a Notion-style in-sidebar switcher + per-workspace logo/description (76); canvas
-publish/share + a Dark Mode radio picker in the Account modal (77); a mandatory 5-step first-login
-onboarding stepper + a `profiles.company` field + the `<Select>` chevron polish (78); **workspace
-invitations + multi-user roles `owner/editor/viewer`** — invite by email or `@username`, a
-Members modal, viewer read-only mode, credentials stay owner-only (79); **invitation emails via
-`supabase/functions/send-invitation-email/`, the repo's first Edge Function** + Resend (80).
-Step 79's deferred follow-ups (ownership transfer, per-member vault-key sharing, a "Resend invite"
-button) are still open. **Per-workspace invitations are unrelated to the global signup-gate that
-was declined above** — that was about who can create an account at all; this is about sharing a
-workspace with someone who already can.
+**Steps 76–84 (a large feature run, all shipped):** workspace chrome moved into a Notion-style
+in-sidebar switcher + per-workspace logo/description (76); canvas publish/share + a Dark Mode
+radio picker in the Account modal (77); a mandatory 5-step first-login onboarding stepper + a
+`profiles.company` field + the `<Select>` chevron polish (78); **workspace invitations +
+multi-user roles `owner/editor/viewer`** — invite by email or `@username`, a Members modal,
+viewer read-only mode, credentials stay owner-only (79); **invitation emails via
+`supabase/functions/send-invitation-email/`, the repo's first Edge Function** + Resend (80);
+doc audit + multi-user security re-audit (81); primary domain → `crowscribe.space` (82); Resend
+invite emails live on `send.crowscribe.space` (83); branded transactional email templates —
+shared `_shared/email.ts` layout + custom GoTrue templates in `supabase/templates/` (84).
+Steps 76–81 shipped via PR #44, 82–84 via PR #45. Step 79's deferred follow-ups (ownership
+transfer, per-member vault-key sharing, a "Resend invite" button) are still open. **Per-workspace
+invitations are unrelated to the global signup-gate that was declined above** — that was about who
+can create an account at all; this is about sharing a workspace with someone who already can.
 
 **Deploy status:** all migrations through `20260901000000_invitation_hardening` are on hosted
 (`supabase db push` — needed one fix, `extensions.gen_random_bytes`, since pgcrypto isn't on the
-hosted migration search_path). Vercel `master` deploy is live. **Domain switch to
-`crowscribe.space` (step 82) is done** — NS → Vercel, certs issued, hosted Supabase Auth URL
-config updated, Google OAuth + magic-link verified end-to-end. **Invitation emails are live
-(step 83)** — Resend sending domain `send.crowscribe.space` verified, DNS auto-configured into
-Vercel via Resend's Vercel integration, the three Edge-Function secrets (`RESEND_API_KEY`,
-`RESEND_FROM`, `SITE_URL`) set + function redeployed.
+hosted migration search_path). Vercel `master` deploy is live at `https://crowscribe.space`
+(step 82 — NS → Vercel, certs issued, hosted Supabase Auth URL config updated, Google OAuth +
+magic-link verified end-to-end). Invitation emails are live (step 83) — Resend sending domain
+`send.crowscribe.space` verified, the three Edge-Function secrets set, `send-invitation-email`
+deployed with the branded `_shared/email.ts` layout (step 84).
+Branded auth email is also live (step 84) — hosted routes magic-link/confirmation/recovery
+through Resend custom SMTP (`noreply@send.crowscribe.space`) with the
+`supabase/templates/*.html` templates pasted into the dashboard; verified end-to-end.
 Nothing is pending here now. `supabase/config.toml`'s `[auth]` block stays local-only by design
 (hosted auth config is dashboard-managed; `supabase config push` would clobber the local values).
 
@@ -2805,9 +2810,9 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
     - Domain (Namecheap) `crowscribe.space` + `www.crowscribe.space` added to the Vercel
       `crowscribe` project (`www` 301-redirects to apex). Nameserver method: Namecheap NS →
       `ns1.vercel-dns.com` / `ns2.vercel-dns.com` (Vercel manages DNS; future records incl. a
-      Resend sending subdomain go in Vercel's DNS UI). **The NS change and the Supabase Auth →
+      Resend sending subdomain go in Vercel's DNS UI). The NS change and the Supabase Auth →
       URL Configuration update (Site URL → `https://crowscribe.space`, Redirect URLs → add
-      `https://crowscribe.space/**`) are user dashboard actions.**
+      `https://crowscribe.space/**`) were user dashboard actions, done at cutover.
     - Code: the only origin literal, `apps/web/app/layout.tsx`'s
       `metadataBase: new URL("https://crowscribe.space")` — share URLs and magic-link `redirectTo`
       already derive from `window.location.origin`, so they follow automatically. Google OAuth
@@ -2841,8 +2846,8 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
     - Still deferred: a "Resend invite" button in the Members modal (step 79 follow-up); DMARC
       stays at `p=none` (monitor before enforcing).
 
-84. **Branded transactional email templates.** ✅ _partial_ (code done; hosted dashboard actions
-    pending). The app sends exactly two emails — the Supabase magic-link email (sign-in, implicit
+84. **Branded transactional email templates.** ✅ _done_. The app sends exactly two emails — the
+    Supabase magic-link email (sign-in, implicit
     signup, and the vault-reset confirmation all use it) and the Resend invitation email — and
     both were unbranded: GoTrue's default template on Supabase's shared SMTP (~2–4/hr, a
     `supabase.io` sender), and the invite email in Tailwind stock grays that don't match the
@@ -2862,13 +2867,16 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
       `apps/web/e2e/helpers.ts` `getLatestMagicLink` (regex-extracts the URL from the body) and
       good practice regardless. Only `magic_link` fires today; the other two are styled as
       insurance against `enable_confirmations` ever flipping.
-    - **Hosted dashboard actions (pending, user):** same "repo is canonical, hosted is applied by
-      hand" constraint as step 18/82 — `config.toml`'s `[auth]` is local-only (`supabase config
-      push` would clobber it). (a) Authentication → Emails → SMTP Settings: custom SMTP via
-      Resend — `smtp.resend.com:465`, user `resend`, pass = the existing `RESEND_API_KEY`, sender
-      `CrowScribe <noreply@send.crowscribe.space>`. (b) Authentication → Emails → Templates: paste
-      the three templates + subjects. (c) Authentication → Rate Limits: raise emails/hour from
-      the default to ~30 now that Resend backs it.
+    - **Hosted dashboard actions (done by the user, dashboard-only — same "repo is canonical,
+      hosted applied by hand" constraint as step 18/82; `config.toml`'s `[auth]` is local-only,
+      `supabase config push` would clobber it):** (a) Authentication → Emails → SMTP Settings:
+      custom SMTP via Resend — `smtp.resend.com:465`, user `resend`, pass = the existing
+      `RESEND_API_KEY`, sender `CrowScribe <noreply@send.crowscribe.space>`. (b) Authentication →
+      Emails → Templates: the three templates + subjects pasted in. (c) Authentication → Rate
+      Limits: emails/hour raised to 30 now that Resend backs it.
     - Zero-cost: Resend SMTP is on the free tier (shares the 100/day, 3,000/mo cap with the API).
     - Out of scope: a dedicated vault-reset email (would need its own service-role function — it
       still piggybacks the magic-link template); adding `react-email` (not doing it).
+    - _(verified: real sign-in on `https://crowscribe.space` — email arrives from
+      `CrowScribe <noreply@send.crowscribe.space>`, subject "Sign in to CrowScribe", branded
+      layout, link signs in. Invite email already branded via the step-83 function deploy.)_

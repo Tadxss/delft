@@ -20,12 +20,12 @@ client-side compression, publish/share to a public read-only `/share/[slug]` rou
 (Excalidraw-style, also publishable at `/share/canvas/[slug]`), a Credentials Manager (encrypted
 vault, nested folders), auth (password + Google), a mandatory first-login onboarding stepper, a
 user profile (name/company/occupation/bio/avatar), **multi-user workspaces** (invite by email or
-`@username`, owner/editor/viewer roles, best-effort invitation emails via a Supabase Edge
-Function + Resend), and a Notion-style dark/light UI (hover-affordance sidebar,
+`@username`, owner/editor/viewer roles, branded invitation emails via a Supabase Edge Function +
+Resend on `send.crowscribe.space`), and a Notion-style dark/light UI (hover-affordance sidebar,
 `/workspace/{slug}--{id}` URLs). Live at `https://crowscribe.space`, auto-deploying on push to
 `master`. See
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)'s numbered Build Order for how each shipped, and its
-"Next Up" section for current focus (including a pending hosted-deploy backlog).
+"Next Up" section for current focus.
 
 Everything here runs on free tiers by design — Supabase Storage in particular caps out at 1GB, so
 image uploads are compressed/resized client-side (1920px max, WebP, EXIF stripped) before they ever
