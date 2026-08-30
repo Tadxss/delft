@@ -9,6 +9,7 @@ import {
   useRemoveWorkspaceMember,
   useRevokeWorkspaceInvitation,
   useSetWorkspaceMemberRole,
+  useTransferWorkspaceOwnership,
   useWorkspaceInvitations,
   useWorkspaceMembers,
 } from "@crowscribe/shared";
@@ -37,6 +38,7 @@ export function WorkspaceMembersModal({
   const setRole = useSetWorkspaceMemberRole(workspaceId);
   const removeMember = useRemoveWorkspaceMember(workspaceId);
   const revoke = useRevokeWorkspaceInvitation(workspaceId);
+  const transferOwnership = useTransferWorkspaceOwnership(workspaceId);
 
   const [target, setTarget] = useState("");
   const [role, setRoleValue] = useState<InvitableRole>("editor");
@@ -202,6 +204,26 @@ export function WorkspaceMembersModal({
                       <button
                         type="button"
                         onClick={() => {
+                          const who =
+                            m.displayName ?? m.username ?? "this member";
+                          if (
+                            window.confirm(
+                              `Make ${who} the owner of this workspace? You'll become an editor. This can't be undone by you.`,
+                            )
+                          ) {
+                            transferOwnership.mutate(
+                              { newOwnerId: m.userId },
+                              { onSuccess: onClose },
+                            );
+                          }
+                        }}
+                        className="shrink-0 rounded px-1.5 py-1 text-xs text-ink-400 hover:bg-paper-100 hover:text-ink-800"
+                      >
+                        Make owner
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
                           if (
                             window.confirm(
                               `Remove ${m.displayName ?? m.username ?? "this member"} from the workspace?`,
@@ -220,9 +242,13 @@ export function WorkspaceMembersModal({
               ))}
             </ul>
           )}
-          {(setRole.isError || removeMember.isError) && (
+          {(setRole.isError ||
+            removeMember.isError ||
+            transferOwnership.isError) && (
             <p className="text-xs text-red-700">
-              {setRole.error?.message ?? removeMember.error?.message}
+              {setRole.error?.message ??
+                removeMember.error?.message ??
+                transferOwnership.error?.message}
             </p>
           )}
         </div>

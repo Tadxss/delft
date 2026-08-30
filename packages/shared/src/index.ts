@@ -34,6 +34,7 @@ export * from "./hooks/useDeclineWorkspaceInvitation";
 export * from "./hooks/useRevokeWorkspaceInvitation";
 export * from "./hooks/useSetWorkspaceMemberRole";
 export * from "./hooks/useRemoveWorkspaceMember";
+export * from "./hooks/useTransferWorkspaceOwnership";
 export * from "./hooks/useLeaveWorkspace";
 export * from "./hooks/usePages";
 export * from "./hooks/usePage";

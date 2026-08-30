@@ -606,6 +606,10 @@ export type Database = {
         Args: { p_role: string; p_user_id: string; p_workspace_id: string }
         Returns: undefined
       }
+      transfer_workspace_ownership: {
+        Args: { p_new_owner_id: string; p_workspace_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

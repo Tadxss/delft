@@ -362,7 +362,9 @@ function DeleteAccountPanel({
           You still own {blocked.workspaces.length === 1 ? "a" : ""} shared
           workspace{blocked.workspaces.length > 1 ? "s" : ""}:{" "}
           <span className="font-medium">{blocked.workspaces.join(", ")}</span>.
-          Remove the other members, or delete{" "}
+          Transfer{" "}
+          {blocked.workspaces.length > 1 ? "them" : "it"} to another member
+          (Members → Make owner), remove the other members, or delete{" "}
           {blocked.workspaces.length > 1 ? "those workspaces" : "that workspace"}
           , then try again.
         </div>
