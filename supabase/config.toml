@@ -408,6 +408,11 @@ deno_version = 2
 [functions.send-invitation-email]
 verify_jwt = true
 
+# Self-serve account deletion (Build Order step 85). verify_jwt only gates on a valid anon key;
+# the function re-checks the caller's own token and only ever deletes that user.
+[functions.delete-account]
+verify_jwt = true
+
 [analytics]
 enabled = true
 port = 54327

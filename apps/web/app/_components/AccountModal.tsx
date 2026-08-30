@@ -6,7 +6,9 @@ import { useTheme } from "next-themes";
 import { ChevronLeft, ChevronRight, LogOut, User, X } from "lucide-react";
 import imageCompression from "browser-image-compression";
 import {
+  AccountDeletionBlockedError,
   useAuthUser,
+  useDeleteAccount,
   useProfile,
   useSetPassword,
   useSignOut,
@@ -22,7 +24,7 @@ import { UsageCheckboxes } from "./UsageCheckboxes";
 
 const MIN_PASSWORD_LENGTH = 8;
 
-type View = "list" | "password" | "profile" | "theme";
+type View = "list" | "password" | "profile" | "theme" | "delete";
 
 export function AccountModal({
   open,
@@ -75,6 +77,15 @@ export function AccountModal({
     });
   }
 
+  const headerTitle =
+    view === "password"
+      ? "Password"
+      : view === "theme"
+        ? "Dark Mode"
+        : view === "delete"
+          ? "Delete account"
+          : "Update profile";
+
   return (
     <Modal open={open} onClose={onClose} widthClassName="max-w-sm">
       <div className="flex shrink-0 items-center justify-between border-b border-paper-200 px-4 py-2">
@@ -90,11 +101,7 @@ export function AccountModal({
               <ChevronLeft size={16} />
             </Button>
             <span className="text-sm font-medium text-ink-800">
-              {view === "password"
-                ? "Password"
-                : view === "theme"
-                  ? "Dark Mode"
-                  : "Update profile"}
+              {headerTitle}
             </span>
           </div>
         )}
@@ -145,7 +152,18 @@ export function AccountModal({
             <LogOut size={14} />
             Sign out
           </button>
+
+          <button
+            type="button"
+            onClick={() => setView("delete")}
+            className="mt-2 flex w-full items-center justify-between rounded-md border border-red-200 px-4 py-3 text-left text-sm text-red-700 hover:bg-red-50 dark:border-red-900/50 dark:hover:bg-red-950/30"
+          >
+            Delete account
+            <ChevronRight size={14} className="opacity-60" />
+          </button>
         </div>
+      ) : view === "delete" ? (
+        <DeleteAccountPanel email={user?.email} onDeleted={onClose} />
       ) : view === "password" ? (
         <div className="flex flex-col gap-2 overflow-y-auto p-4">
           <p className="text-xs text-ink-500">
@@ -260,6 +278,79 @@ function ThemePicker() {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function DeleteAccountPanel({
+  email,
+  onDeleted,
+}: {
+  email: string | undefined;
+  onDeleted: () => void;
+}) {
+  const deleteAccount = useDeleteAccount();
+  const [confirmText, setConfirmText] = useState("");
+  const armed = confirmText.trim().toLowerCase() === "delete";
+
+  const blocked =
+    deleteAccount.error instanceof AccountDeletionBlockedError
+      ? deleteAccount.error
+      : null;
+
+  function handleDelete() {
+    if (!armed) return;
+    deleteAccount.mutate(undefined, { onSuccess: onDeleted });
+  }
+
+  return (
+    <div className="flex flex-col gap-3 overflow-y-auto p-4">
+      <p className="text-sm text-ink-700">
+        This permanently deletes{" "}
+        <span className="font-medium text-ink-800">{email}</span>, your profile,
+        and every workspace you own along with its pages, canvases, and
+        credentials vault.
+      </p>
+      <p className="text-xs text-ink-500">
+        This cannot be undone. Workspaces where you&apos;re a member (not the
+        owner) are unaffected — you&apos;re simply removed from them.
+      </p>
+
+      {blocked ? (
+        <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+          You still own {blocked.workspaces.length === 1 ? "a" : ""} shared
+          workspace{blocked.workspaces.length > 1 ? "s" : ""}:{" "}
+          <span className="font-medium">{blocked.workspaces.join(", ")}</span>.
+          Remove the other members, or delete{" "}
+          {blocked.workspaces.length > 1 ? "those workspaces" : "that workspace"}
+          , then try again.
+        </div>
+      ) : (
+        deleteAccount.isError && (
+          <p className="text-xs text-red-700">{deleteAccount.error.message}</p>
+        )
+      )}
+
+      <FormLabel htmlFor="delete-confirm">
+        Type <span className="font-semibold">delete</span> to confirm
+      </FormLabel>
+      <Input
+        id="delete-confirm"
+        autoComplete="off"
+        value={confirmText}
+        onChange={(e) => setConfirmText(e.target.value)}
+      />
+
+      <button
+        type="button"
+        onClick={handleDelete}
+        disabled={!armed || deleteAccount.isPending}
+        className="mt-1 rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+      >
+        {deleteAccount.isPending
+          ? "Deleting…"
+          : "Permanently delete my account"}
+      </button>
     </div>
   );
 }

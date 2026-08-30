@@ -14,6 +14,7 @@ export * from "./hooks/useSignInWithPassword";
 export * from "./hooks/useSetPassword";
 export * from "./hooks/useSignInWithGoogle";
 export * from "./hooks/useSignOut";
+export * from "./hooks/useDeleteAccount";
 export * from "./hooks/useWorkspaces";
 export * from "./hooks/useWorkspace";
 export * from "./hooks/useCreateWorkspace";

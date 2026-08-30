@@ -2894,6 +2894,19 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
       Linked from the login page (footer + a "By continuing you agree…" line) and cross-linked.
       `title` template added to `layout.tsx`. e2e: `legal-pages.spec.ts`. **These are plain app
       routes, not dashboard-managed** — edit the files, bump `LAST_UPDATED`.
-    - Still in this milestone: self-serve account deletion (Edge Function + `AccountModal` flow +
-      owner-deletion policy), a scheduled DB-backup GitHub Action, and making CI a required gate
+    - **Self-serve account deletion** ✅ — `supabase/functions/delete-account/` (repo's 2nd Edge
+      Function, 2nd service-role use; `verify_jwt = true`, real check is the in-function
+      `getUser()` on the caller's own token — a user can only delete themselves). Deletes the
+      `auth.users` row → cascades `profiles` + every owned workspace (pages/credentials/canvases/
+      members/invitations); best-effort purges the `page-images` / `workspace-logos` / `avatars`
+      Storage prefixes first (Storage isn't FK'd). **Guard:** blocked (`200 {blocked:
+      "shared-workspaces"}`) if the caller solely owns a workspace with other members — no
+      ownership transfer yet (roadmap item 12), so destroying invited members' content isn't
+      allowed; they must remove members / delete those workspaces first. Client:
+      `useDeleteAccount` + `AccountDeletionBlockedError`, a "Delete account" danger view in
+      `AccountModal.tsx` (type "delete" to arm), then a `sessionStorage` one-shot flag → login
+      page shows "Your account has been deleted" (AuthGate redirects to `/` the moment the
+      session clears, so a query param wouldn't survive). e2e: `account-deletion.spec.ts`
+      (solo delete + blocked-by-shared-workspace).
+    - Still in this milestone: a scheduled DB-backup GitHub Action, and making CI a required gate
       on the `master` deploy. See the readiness plan for the full item list.

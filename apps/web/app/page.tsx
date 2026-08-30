@@ -49,7 +49,18 @@ export default function LoginPage() {
   // "dark") value diverges from the deterministic light-mode SSR output and React flags a
   // hydration mismatch.
   const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const [justDeleted, setJustDeleted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+    try {
+      if (sessionStorage.getItem("crowscribe:account-deleted")) {
+        setJustDeleted(true);
+        sessionStorage.removeItem("crowscribe:account-deleted");
+      }
+    } catch {
+      // storage disabled — no banner, no harm
+    }
+  }, []);
   const { user, loading } = useAuthUser();
   const signIn = useSignInWithMagicLink();
   const signInWithPassword = useSignInWithPassword();
@@ -180,6 +191,12 @@ export default function LoginPage() {
           Where ideas take flight.
         </p>
       </div>
+
+      {justDeleted && (
+        <p className="max-w-sm rounded-md border border-paper-200 bg-paper-100 px-4 py-3 text-center text-sm text-ink-600">
+          Your account has been deleted. Thanks for trying CrowScribe.
+        </p>
+      )}
 
       <div className="flex w-full max-w-sm flex-col gap-4 rounded-lg border border-paper-200 bg-paper-100 p-6 shadow-sm">
         {step === "email" && (
