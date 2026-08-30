@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useTheme } from "next-themes";
 import type { Canvas } from "@crowscribe/types";
@@ -11,6 +11,7 @@ import {
 } from "@crowscribe/shared";
 import { EditedIndicator } from "../../../../../_components/EditedIndicator";
 import { HEADING_CLASSES } from "../../../../../_components/Heading";
+import { useBeforeUnloadWarning } from "../../../../../_lib/useBeforeUnloadWarning";
 import "@excalidraw/excalidraw/index.css";
 
 const AUTOSAVE_DEBOUNCE_MS = 800;
@@ -78,12 +79,32 @@ export function CanvasEditor({
     setTitle(canvas.title);
   }, [canvas.id, canvas.title]);
 
+  // See PageEditor's isDirty — same imperative-only "there are unpersisted edits" check.
+  const isDirty = useCallback(
+    () =>
+      Object.keys(pendingPatch.current).length > 0 ||
+      saveTimer.current !== null ||
+      retryTimer.current !== null ||
+      saving.current ||
+      updateCanvas.isError,
+    [updateCanvas.isError],
+  );
+  useBeforeUnloadWarning(isDirty);
+
   useEffect(() => {
+    const canvasId = canvas.id;
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
       if (retryTimer.current) clearTimeout(retryTimer.current);
+      // beforeunload covers tab close; this covers in-app navigation (unmount without a page
+      // unload) — fire the pending patch directly, the app stays alive to complete it.
+      const pending = pendingPatch.current;
+      if (Object.keys(pending).length > 0) {
+        updateCanvas.mutate({ id: canvasId, ...pending });
+      }
       pendingPatch.current = {};
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canvas.id]);
 
   function flush() {
@@ -99,7 +120,10 @@ export function CanvasEditor({
         onError: () => {
           hadError = true;
           pendingPatch.current = { ...toSave, ...pendingPatch.current };
-          retryTimer.current = setTimeout(flush, AUTOSAVE_RETRY_MS);
+          retryTimer.current = setTimeout(() => {
+            retryTimer.current = null;
+            flush();
+          }, AUTOSAVE_RETRY_MS);
         },
         onSettled: () => {
           saving.current = false;
@@ -112,7 +136,10 @@ export function CanvasEditor({
   function scheduleSave(patch: { title?: string; scene?: unknown }) {
     pendingPatch.current = { ...pendingPatch.current, ...patch };
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(flush, AUTOSAVE_DEBOUNCE_MS);
+    saveTimer.current = setTimeout(() => {
+      saveTimer.current = null;
+      flush();
+    }, AUTOSAVE_DEBOUNCE_MS);
   }
 
   function handleTitleChange(value: string) {

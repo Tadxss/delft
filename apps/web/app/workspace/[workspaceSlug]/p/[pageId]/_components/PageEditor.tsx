@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import { BlockNoteView } from "@blocknote/mantine";
 import { useCreateBlockNote } from "@blocknote/react";
@@ -19,6 +19,7 @@ import { EditedIndicator } from "../../../../../_components/EditedIndicator";
 import { HEADING_CLASSES } from "../../../../../_components/Heading";
 import { resolveBlockNoteTheme } from "../../../../../_lib/blocknoteTheme";
 import { restrictedBlockSchema } from "../../../../../_lib/blocknoteSchema";
+import { useBeforeUnloadWarning } from "../../../../../_lib/useBeforeUnloadWarning";
 
 const AUTOSAVE_DEBOUNCE_MS = 800;
 const AUTOSAVE_RETRY_MS = 2000;
@@ -93,12 +94,36 @@ export function PageEditor({
     setTitle(page.title);
   }, [page.id, page.title]);
 
+  // "There are edits not yet persisted" — a debounce pending, an in-flight save, a queued retry,
+  // an unsent patch, or the last save errored. None of these are React state, so this is only
+  // read imperatively (beforeunload handler, unmount flush).
+  const isDirty = useCallback(
+    () =>
+      Object.keys(pendingPatch.current).length > 0 ||
+      saveTimer.current !== null ||
+      retryTimer.current !== null ||
+      saving.current ||
+      updatePage.isError,
+    [updatePage.isError],
+  );
+  useBeforeUnloadWarning(isDirty);
+
   useEffect(() => {
+    const pageId = page.id;
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
       if (retryTimer.current) clearTimeout(retryTimer.current);
+      // beforeunload covers tab close; this covers in-app navigation, which unmounts the editor
+      // without a page unload. Fire the pending patch directly — the app stays alive so the
+      // request completes normally; the editor just won't be here to see the result.
+      const pending = pendingPatch.current;
+      if (Object.keys(pending).length > 0) {
+        updatePage.mutate({ id: pageId, ...pending });
+      }
       pendingPatch.current = {};
     };
+    // updatePage is a stable hook object; keying on page.id keeps this a per-page teardown.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page.id]);
 
   // Sends whatever's accumulated in pendingPatch, serialized so at most one mutate() is ever in
@@ -119,7 +144,10 @@ export function PageEditor({
         onError: () => {
           hadError = true;
           pendingPatch.current = { ...toSave, ...pendingPatch.current };
-          retryTimer.current = setTimeout(flush, AUTOSAVE_RETRY_MS);
+          retryTimer.current = setTimeout(() => {
+            retryTimer.current = null;
+            flush();
+          }, AUTOSAVE_RETRY_MS);
         },
         onSettled: () => {
           saving.current = false;
@@ -136,7 +164,10 @@ export function PageEditor({
   function scheduleSave(patch: { title?: string; content?: unknown }) {
     pendingPatch.current = { ...pendingPatch.current, ...patch };
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(flush, AUTOSAVE_DEBOUNCE_MS);
+    saveTimer.current = setTimeout(() => {
+      saveTimer.current = null;
+      flush();
+    }, AUTOSAVE_DEBOUNCE_MS);
   }
 
   function handleTitleChange(value: string) {
