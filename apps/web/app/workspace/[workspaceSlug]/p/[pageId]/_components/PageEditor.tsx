@@ -10,6 +10,7 @@ import "@blocknote/mantine/style.css";
 import imageCompression from "browser-image-compression";
 import type { Page } from "@crowscribe/types";
 import {
+  StaleWriteError,
   usePublishPage,
   useUnpublishPage,
   useUpdatePage,
@@ -47,6 +48,15 @@ export function PageEditor({
   const uploadImage = useUploadPageImage();
 
   const [title, setTitle] = useState(page.title);
+  // Set true once a stale-write is detected — a hard conflict (another tab / editor wrote this
+  // page). Autosave stops; the user must reload. Not merged/retried: retry would loop, merge
+  // would clobber the other writer.
+  const [conflict, setConflict] = useState(false);
+  // The `updated_at` this editor believes the row is at — seeded from the loaded page, advanced
+  // on every successful save, sent as the optimistic-concurrency token on the next one.
+  const baseUpdatedAt = useRef(page.updatedAt);
+  // Guards the background title re-seed from wiping an in-progress unsaved title edit.
+  const titleDirty = useRef(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // scheduleSave can be called for title and content independently (e.g. typing the title, then
@@ -90,9 +100,20 @@ export function PageEditor({
     [page.id],
   );
 
+  // On navigating to a different page: adopt its title, reset the per-page conflict/dirty/version
+  // state.
   useEffect(() => {
     setTitle(page.title);
-  }, [page.id, page.title]);
+    setConflict(false);
+    titleDirty.current = false;
+    baseUpdatedAt.current = page.updatedAt;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page.id]);
+  // A background change to the SAME page's title (another tab renamed it) — adopt it only if the
+  // user isn't mid-edit in the title field.
+  useEffect(() => {
+    if (!titleDirty.current) setTitle(page.title);
+  }, [page.title]);
 
   // "There are edits not yet persisted" — a debounce pending, an in-flight save, a queued retry,
   // an unsent patch, or the last save errored. None of these are React state, so this is only
@@ -103,8 +124,9 @@ export function PageEditor({
       saveTimer.current !== null ||
       retryTimer.current !== null ||
       saving.current ||
-      updatePage.isError,
-    [updatePage.isError],
+      updatePage.isError ||
+      conflict,
+    [updatePage.isError, conflict],
   );
   useBeforeUnloadWarning(isDirty);
 
@@ -132,17 +154,27 @@ export function PageEditor({
   // indefinitely against a possibly-offline connection; updatePage.isError still surfaces the
   // failure below if that retry doesn't land either.
   function flush() {
-    if (saving.current) return;
+    if (saving.current || conflict) return;
     const toSave = pendingPatch.current;
     if (Object.keys(toSave).length === 0) return;
     pendingPatch.current = {};
     saving.current = true;
     let hadError = false;
     updatePage.mutate(
-      { id: page.id, ...toSave },
+      { id: page.id, ...toSave, expectedUpdatedAt: baseUpdatedAt.current },
       {
-        onError: () => {
+        onSuccess: (updated) => {
+          baseUpdatedAt.current = updated.updatedAt;
+          if (toSave.title !== undefined) titleDirty.current = false;
+        },
+        onError: (error) => {
           hadError = true;
+          // Stale write = another tab/editor won. Stop — don't retry, don't merge the local
+          // edit back over theirs; surface the conflict so the user reloads.
+          if (error instanceof StaleWriteError) {
+            setConflict(true);
+            return;
+          }
           pendingPatch.current = { ...toSave, ...pendingPatch.current };
           retryTimer.current = setTimeout(() => {
             retryTimer.current = null;
@@ -172,6 +204,7 @@ export function PageEditor({
 
   function handleTitleChange(value: string) {
     setTitle(value);
+    titleDirty.current = true;
     scheduleSave({ title: value });
   }
 
@@ -231,11 +264,29 @@ export function PageEditor({
           className={`w-full border-none bg-transparent outline-none placeholder:text-ink-400 ${HEADING_CLASSES["content-large"]}`}
         />
 
-        {updatePage.isError && (
-          <p className="text-xs text-red-700">
-            Couldn&apos;t save your last change
-            {updatePage.error?.message ? `: ${updatePage.error.message}` : ""}
-          </p>
+        {conflict ? (
+          <div className="flex items-center justify-between gap-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+            <span>
+              This page was changed in another tab or by another editor.
+              Reload to get the latest — unsaved changes here will be lost.
+            </span>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="shrink-0 rounded bg-amber-600 px-2.5 py-1 font-medium text-white hover:bg-amber-700"
+            >
+              Reload
+            </button>
+          </div>
+        ) : (
+          updatePage.isError && (
+            <p className="text-xs text-red-700">
+              Couldn&apos;t save your last change
+              {updatePage.error?.message
+                ? `: ${updatePage.error.message}`
+                : ""}
+            </p>
+          )
         )}
 
         {shareUrl && (

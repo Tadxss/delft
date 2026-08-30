@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { useTheme } from "next-themes";
 import type { Canvas } from "@crowscribe/types";
 import {
+  StaleWriteError,
   usePublishCanvas,
   useUnpublishCanvas,
   useUpdateCanvas,
@@ -65,6 +66,10 @@ export function CanvasEditor({
   const unpublishCanvas = useUnpublishCanvas();
 
   const [title, setTitle] = useState(canvas.title);
+  // Hard conflict: another tab / editor wrote this canvas. Autosave stops; user must reload.
+  const [conflict, setConflict] = useState(false);
+  const baseUpdatedAt = useRef(canvas.updatedAt);
+  const titleDirty = useRef(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Same accumulate-don't-replace pattern as PageEditor's scheduleSave — title and scene changes
@@ -77,7 +82,14 @@ export function CanvasEditor({
 
   useEffect(() => {
     setTitle(canvas.title);
-  }, [canvas.id, canvas.title]);
+    setConflict(false);
+    titleDirty.current = false;
+    baseUpdatedAt.current = canvas.updatedAt;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canvas.id]);
+  useEffect(() => {
+    if (!titleDirty.current) setTitle(canvas.title);
+  }, [canvas.title]);
 
   // See PageEditor's isDirty — same imperative-only "there are unpersisted edits" check.
   const isDirty = useCallback(
@@ -86,8 +98,9 @@ export function CanvasEditor({
       saveTimer.current !== null ||
       retryTimer.current !== null ||
       saving.current ||
-      updateCanvas.isError,
-    [updateCanvas.isError],
+      updateCanvas.isError ||
+      conflict,
+    [updateCanvas.isError, conflict],
   );
   useBeforeUnloadWarning(isDirty);
 
@@ -108,17 +121,25 @@ export function CanvasEditor({
   }, [canvas.id]);
 
   function flush() {
-    if (saving.current) return;
+    if (saving.current || conflict) return;
     const toSave = pendingPatch.current;
     if (Object.keys(toSave).length === 0) return;
     pendingPatch.current = {};
     saving.current = true;
     let hadError = false;
     updateCanvas.mutate(
-      { id: canvas.id, ...toSave },
+      { id: canvas.id, ...toSave, expectedUpdatedAt: baseUpdatedAt.current },
       {
-        onError: () => {
+        onSuccess: (updated) => {
+          baseUpdatedAt.current = updated.updatedAt;
+          if (toSave.title !== undefined) titleDirty.current = false;
+        },
+        onError: (error) => {
           hadError = true;
+          if (error instanceof StaleWriteError) {
+            setConflict(true);
+            return;
+          }
           pendingPatch.current = { ...toSave, ...pendingPatch.current };
           retryTimer.current = setTimeout(() => {
             retryTimer.current = null;
@@ -144,6 +165,7 @@ export function CanvasEditor({
 
   function handleTitleChange(value: string) {
     setTitle(value);
+    titleDirty.current = true;
     scheduleSave({ title: value });
   }
 
@@ -214,11 +236,29 @@ export function CanvasEditor({
         </div>
       </div>
 
-      {updateCanvas.isError && (
-        <p className="shrink-0 px-4 text-xs text-red-700 sm:px-8">
-          Couldn&apos;t save your last change
-          {updateCanvas.error?.message ? `: ${updateCanvas.error.message}` : ""}
-        </p>
+      {conflict ? (
+        <div className="mx-4 flex shrink-0 items-center justify-between gap-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 sm:mx-8 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+          <span>
+            This canvas was changed in another tab or by another editor.
+            Reload to get the latest — unsaved changes here will be lost.
+          </span>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="shrink-0 rounded bg-amber-600 px-2.5 py-1 font-medium text-white hover:bg-amber-700"
+          >
+            Reload
+          </button>
+        </div>
+      ) : (
+        updateCanvas.isError && (
+          <p className="shrink-0 px-4 text-xs text-red-700 sm:px-8">
+            Couldn&apos;t save your last change
+            {updateCanvas.error?.message
+              ? `: ${updateCanvas.error.message}`
+              : ""}
+          </p>
+        )
       )}
 
       {shareUrl && (
