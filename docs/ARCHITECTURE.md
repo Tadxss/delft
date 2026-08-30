@@ -2982,6 +2982,13 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
       (`2.116.0`) in both workflows. `.github/dependabot.yml` (weekly grouped npm +
       github-actions). New error boundaries `app/share/error.tsx` + `app/invite/error.tsx`
       (unauth-safe, Sentry capture) — a throw there no longer escalates to the root boundary.
-    - Still in this milestone: C2 self-host Excalidraw fonts + flip CSP to enforcing; C3 CAPTCHA;
-      C4 data export; C5 ownership transfer; C6 `profiles`/`avatars` RLS audit; C7 Sentry
-      source-maps (may defer — Next 16 Turbopack builds don't upload maps in the current SDK).
+    - **C2 — CSP enforcing** ✅ — `next.config.js`'s `Content-Security-Policy-Report-Only` →
+      `Content-Security-Policy` (ran report-only through Milestone B with zero violations + e2e
+      coverage). Added a `report-uri` derived from the Sentry DSN so violation telemetry
+      survives. **Self-hosting Excalidraw's fonts was attempted and deferred** — setting
+      `EXCALIDRAW_ASSET_PATH` doesn't redirect 0.18's server-font loads (its font worker bypasses
+      the window global), so `https://esm.sh` stays in `font-src`/`connect-src` (a font load
+      can't exfil). `csp.spec.ts` asserts the enforcing header + walks editor/canvas/vault.
+    - Still in this milestone: C3 CAPTCHA; C4 data export; C5 ownership transfer; C6
+      `profiles`/`avatars` RLS audit; C7 Sentry source-maps (may defer — Next 16 Turbopack
+      builds don't upload maps in the current SDK).
