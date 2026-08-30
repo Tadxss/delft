@@ -43,7 +43,7 @@
     "@crowscribe/eslint-config": "workspace:*",
     "@crowscribe/typescript-config": "workspace:*",
     "@playwright/test": "^1.62.1",
-    "@types/node": "^22.15.3",
+    "@types/node": "^26.4.0",
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
     "autoprefixer": "^10.5.4",
