@@ -2908,5 +2908,19 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
       page shows "Your account has been deleted" (AuthGate redirects to `/` the moment the
       session clears, so a query param wouldn't survive). e2e: `account-deletion.spec.ts`
       (solo delete + blocked-by-shared-workspace).
-    - Still in this milestone: a scheduled DB-backup GitHub Action, and making CI a required gate
-      on the `master` deploy. See the readiness plan for the full item list.
+    - **Scheduled DB backup** ✅ — `.github/workflows/db-backup.yml`, daily `supabase db dump`
+      (roles + schema + data), AES-256-encrypted (`openssl enc -pbkdf2`), kept as a 30-day
+      GitHub Actions artifact. Free-tier Supabase has no self-serve restore, so this is _the_
+      recovery path. **Needs two repo secrets:** `SUPABASE_DB_URL` (hosted connection string) and
+      `BACKUP_PASSPHRASE` (stored outside GitHub — without it the dumps are unrecoverable, by
+      design). Restore recipe is in the workflow header.
+    - **CI gates the `master` deploy** ✅ — branch protection on `master`: all changes via PR,
+      `checks` + `e2e` must pass, branch must be up to date; `enforce_admins: false` so the owner
+      can force through in an emergency. e2e `timeout-minutes` bumped 20 → 30 (it's now a release
+      gate, a spurious timeout shouldn't block a deploy). Vercel still builds `master` on its own
+      Git integration — but `master` now only ever receives PR-merged, CI-green code. A
+      fully workflow-driven deploy (disconnect Vercel auto-deploy, `vercel deploy --prod` from
+      the Action after CI) is deferred — the branch gate covers the practical risk.
+    - Milestone A remaining: none of the hard blockers. Legal pages, account deletion, backups,
+      CI gate all shipped; the readiness plan's "should-fix" (Milestone B) and "later" items are
+      still open.

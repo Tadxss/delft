@@ -108,8 +108,17 @@ hydrating and clicks silently fall through to native form submits. See
 `.github/workflows/ci.yml` runs on every push/PR to `master`/`develop`: a `checks` job
 (`pnpm lint`, `pnpm check-types`, `pnpm build`) and an `e2e` job (boots a real local Supabase
 stack via `supabase/setup-cli`, then runs the full `apps/web/e2e/` suite against it — that stack
-now also serves the Edge Function, which no-ops without `RESEND_API_KEY`, so `functions.invoke`
-from the invitation spec is harmless).
+now also serves the Edge Functions, which no-op without their secrets, so `functions.invoke`
+from the specs is harmless).
+
+`master` is **branch-protected** (Build Order step 85): all changes land via PR with `checks` +
+`e2e` green and the branch up to date; `enforce_admins` is off so the owner can force through in
+an emergency. Vercel still auto-deploys `master` on its own Git integration, but `master` only
+ever receives CI-green code now.
+
+`.github/workflows/db-backup.yml` runs daily: `supabase db dump` → AES-256-encrypted → 30-day
+GitHub artifact. Needs repo secrets `SUPABASE_DB_URL` + `BACKUP_PASSPHRASE` (the latter stored
+outside GitHub). This is the only restore path — free-tier Supabase has none.
 
 ## Architecture
 
