@@ -35,7 +35,7 @@ jobs:
     steps:
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.116.0
       - name: Dump and encrypt
         id: dump
         env:

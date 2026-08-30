@@ -1,0 +1,23 @@
+# Weekly dependency + action update PRs (production-readiness Milestone C / item 16 — the repo
+# had no automated dependency scanning). Minor/patch bumps are grouped into one PR per ecosystem
+# to keep the noise low; majors arrive as individual PRs to review deliberately.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions:
+        patterns: ["*"]

@@ -2966,5 +2966,22 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
       Milestone C follow-up). e2e `csp.spec.ts` asserts the header and walks editor/canvas/vault
       with zero violations. **Follow-up:** flip `-Report-Only` → enforcing after a clean week;
       nonce-based `script-src` (drop `'unsafe-inline'`, needs a `middleware.ts`) is Milestone C.
-    - Milestone B remaining: none of the code items. Source-map upload, a CAPTCHA/Turnstile, the
-      enforcing-CSP flip, and nonce-based CSP carry into Milestone C.
+86. (cont.) Milestone B is deployed (`supabase db push` of `20260902000000`, Vercel `master`
+    live, prod CSP report-only header verified). Source-map upload, CAPTCHA/Turnstile, the
+    enforcing-CSP flip, and nonce-based CSP carried into Milestone C.
+
+87. **Production-readiness — Milestone C (hardening + deferred features).** _in progress_. The
+    infra hardening set plus the three deferred features the owner opted into (CAPTCHA on signup,
+    data export, workspace ownership transfer), and flipping the CSP to enforcing. Shipped as one
+    sub-PR per slice.
+    - **C1 — CI / infra** ✅ — `.github/workflows/ci.yml`: the `e2e` job is now `e2e-shard`, a
+      3-way `playwright test --shard=k/3` matrix (each shard its own runner + `supabase start`,
+      so `workers:1`/`fullyParallel:false` still hold per shard while wall-clock drops ~3×); a
+      tiny `e2e` gate job `needs` all shards and keeps the stable branch-protection check name.
+      Node 20 → 22 (CI, `.nvmrc`, root + `apps/web` `engines`). `supabase/setup-cli` pinned
+      (`2.116.0`) in both workflows. `.github/dependabot.yml` (weekly grouped npm +
+      github-actions). New error boundaries `app/share/error.tsx` + `app/invite/error.tsx`
+      (unauth-safe, Sentry capture) — a throw there no longer escalates to the root boundary.
+    - Still in this milestone: C2 self-host Excalidraw fonts + flip CSP to enforcing; C3 CAPTCHA;
+      C4 data export; C5 ownership transfer; C6 `profiles`/`avatars` RLS audit; C7 Sentry
+      source-maps (may defer — Next 16 Turbopack builds don't upload maps in the current SDK).
