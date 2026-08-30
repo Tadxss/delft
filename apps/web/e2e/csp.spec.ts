@@ -21,10 +21,19 @@ test("the CSP report-only header is present on public and app routes", async ({
 test("no CSP violations across the editor, canvas, and vault", async ({
   page,
 }) => {
+  // Only actual blocks/refusals — not WebKit's advisory that a report-only policy without a
+  // `report-to` "will have no effect" (true on Safari; the report-only phase is a Chrome-side
+  // allowlist check, and there's no report collector yet).
   const violations: string[] = [];
   page.on("console", (msg) => {
     const t = msg.text();
-    if (/content security policy|CSP/i.test(t)) violations.push(t);
+    if (
+      /refused to|violates the following content security policy directive/i.test(
+        t,
+      )
+    ) {
+      violations.push(t);
+    }
   });
 
   await signIn(page, uniqueEmail("csp"));
