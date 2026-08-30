@@ -11,9 +11,13 @@ name: DB backup
 #                         this repo/GitHub (a password manager). Without it the dumps are
 #                         unrecoverable — that's the point.
 #
-# Restore: download the artifact, then
+# Restore (into a CLEAN / recovery database, not over live data):
 #   openssl enc -d -aes-256-cbc -pbkdf2 -in backup.tar.gz.enc -pass pass:"$BACKUP_PASSPHRASE" | tar -xz
-#   psql "$SUPABASE_DB_URL" -f roles.sql -f schema.sql -f data.sql   # into a clean/recovery DB
+#   psql "$DB_URL" -v ON_ERROR_STOP=1 -f roles.sql -f schema.sql
+#   psql "$DB_URL" -v ON_ERROR_STOP=1 -c "SET session_replication_role = replica" -f data.sql
+# The `session_replication_role = replica` on the data load is required — the schema has circular
+# FKs (self-referential pages.parent_id, workspaces<->workspace_members) that a plain --data-only
+# COPY order can't satisfy (pg_dump warns about this during the dump; it's expected).
 
 on:
   schedule:

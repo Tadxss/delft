@@ -2881,7 +2881,8 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
       `CrowScribe <noreply@send.crowscribe.space>`, subject "Sign in to CrowScribe", branded
       layout, link signs in. Invite email already branded via the step-83 function deploy.)_
 
-85. **Production-readiness — Milestone A (public-launch blockers).** _in progress_. A three-angle
+85. **Production-readiness — Milestone A (public-launch blockers).** ✅ _done_ (deployed;
+    `support@` inbox + optional lawyer review are the only user-side loose ends). A three-angle
     readiness assessment (security, reliability/data-safety, product/legal) found the engineering
     core solid (RLS, vault crypto, secrets hygiene, e2e all strong) but flagged legal/compliance
     and data-safety gaps that block an _open_ launch — several because `BETA_READINESS.md`'s
@@ -2924,3 +2925,46 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
     - Milestone A remaining: none of the hard blockers. Legal pages, account deletion, backups,
       CI gate all shipped; the readiness plan's "should-fix" (Milestone B) and "later" items are
       still open.
+
+86. **Production-readiness — Milestone B (safe with strangers signing up).** _in progress_.
+    Closes the "should-fix before opening signup wide" set. The theme: `BETA_READINESS.md`
+    accepted several risks "for one trusted user", which open signup + multi-user invalidate.
+    - **Abuse caps** ✅ — `20260902000000_abuse_caps.sql`. `octet_length(content::text)` CHECK
+      on `pages` (2 MB) and `canvases.scene` (8 MB) — the two unbounded jsonb columns; plus
+      `BEFORE INSERT` row-count caps (`enforce_workspace_row_cap` dynamic over `tg_table_name`,
+      + `enforce_owner_workspace_cap`): pages 2000 / canvases 500 / credentials 2000 /
+      credential_folders 500 per workspace, workspaces 50 per account. With a count cap **and** a
+      size cap the total bytes one account can create is bounded regardless of write rate — which
+      is why the permanently-"accepted" lack of app-level mutation rate limiting stops mattering
+      for the free-tier-fill threat. e2e `abuse-caps.spec.ts` covers the content-size CHECK;
+      count caps verified via a manual `psql` loop (2000-row e2e isn't worth the CI minutes).
+      Limits are generous — bump them in the migration if a real workspace nears one.
+    - **Sentry not-dark check** ✅ — `NEXT_PUBLIC_SENTRY_DSN` confirmed set in Vercel Production
+      (`vercel env ls`), so error reporting is live. Added a `console.warn` in
+      `instrumentation-client.ts` for the case a future prod build ships without it.
+    - **Editor unsaved-changes guard** ✅ (B2) — `_lib/useBeforeUnloadWarning.ts` fires the native
+      "Leave site?" prompt while a save is pending/in-flight/retrying/errored;
+      `PageEditor`/`CanvasEditor` also flush the pending patch in their `[id]` unmount cleanup
+      (covers in-app SPA nav, which `beforeunload` misses) instead of dropping it. Fixed a latent
+      bug: `saveTimer`/`retryTimer` refs were never nulled after firing. e2e
+      `editor-unsaved-guard.spec.ts`.
+    - **Concurrent-edit stale-write detection** ✅ (B3) — `useUpdatePage`/`useUpdateCanvas` take an
+      optional `expectedUpdatedAt` → adds `.eq("updated_at", …)` to the autosave PATCH; a 0-row
+      result throws `StaleWriteError` (new, in `packages/shared/src/lib/`). The editor tracks a
+      `baseUpdatedAt` ref (seeded from the row, advanced on each save) and on `StaleWriteError`
+      shows a blocking "changed elsewhere — Reload" banner instead of retrying or merging the
+      local edit over the other writer's. Structural callers (reorder/reparent/publish) omit the
+      token, keeping last-write-wins. A `titleDirty` ref stops a background refetch wiping an
+      unsaved title. e2e `concurrent-edit.spec.ts` (two tabs).
+    - **Content-Security-Policy (report-only)** ✅ (B4) — `Content-Security-Policy-Report-Only` in
+      `next.config.js`, built from `NEXT_PUBLIC_SUPABASE_URL`. `script-src 'self' 'unsafe-inline'`
+      (+ `'unsafe-eval'` **dev only** — Turbopack HMR; a prod build has zero eval violations),
+      `style-src 'unsafe-inline'` (BlockNote/Mantine/Excalidraw), `img-src … https:` (users paste
+      external image URLs), `connect-src` allowlist (Supabase http+ws, Sentry ingest, Vercel
+      vitals), `worker-src blob:` + `font-src … https://esm.sh` (**real finding:** Excalidraw
+      0.18 loads its fonts from esm.sh at runtime — self-hosting via `EXCALIDRAW_ASSET_PATH` is a
+      Milestone C follow-up). e2e `csp.spec.ts` asserts the header and walks editor/canvas/vault
+      with zero violations. **Follow-up:** flip `-Report-Only` → enforcing after a clean week;
+      nonce-based `script-src` (drop `'unsafe-inline'`, needs a `middleware.ts`) is Milestone C.
+    - Milestone B remaining: none of the code items. Source-map upload, a CAPTCHA/Turnstile, the
+      enforcing-CSP flip, and nonce-based CSP carry into Milestone C.

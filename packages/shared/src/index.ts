@@ -4,6 +4,7 @@ export * from "./supabase/context";
 export * from "./supabase/mappers";
 export * from "./queryConfig";
 export * from "./lib/workspaceUrl";
+export * from "./lib/staleWriteError";
 export * from "./lib/vaultCrypto";
 export * from "./lib/treeUtils";
 export * from "./lib/positionUtils";
