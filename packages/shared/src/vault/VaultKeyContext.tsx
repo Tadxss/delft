@@ -87,6 +87,15 @@ export function VaultKeyProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// Multi-workspace accessor for flows that touch every vault at once (data export). Returns the
+// same `getKey` / `isUnlocked` the single-workspace hook wraps, keyed by id.
+export function useVaultKeys() {
+  const ctx = useContext(VaultKeyContext);
+  if (!ctx)
+    throw new Error("useVaultKeys must be used within a VaultKeyProvider");
+  return { getKey: ctx.getKey, isUnlocked: ctx.isUnlocked };
+}
+
 export function useVaultKey(workspaceId: string | undefined) {
   const ctx = useContext(VaultKeyContext);
   if (!ctx)

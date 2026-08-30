@@ -6,6 +6,7 @@ export * from "./queryConfig";
 export * from "./lib/workspaceUrl";
 export * from "./lib/staleWriteError";
 export * from "./lib/vaultCrypto";
+export * from "./lib/exportAccountData";
 export * from "./lib/treeUtils";
 export * from "./lib/positionUtils";
 export * from "./vault/VaultKeyContext";

@@ -1,16 +1,10 @@
-import { test, expect, type Page } from "@playwright/test";
-import { openWorkspaceMenu, signIn, uniqueEmail } from "./helpers";
-
-// First-time vault setup now shows a one-time, non-dismissable recovery key screen before the
-// vault is usable (Build Order step 58) — every test that creates a vault needs to click through
-// it (confirm the "I've saved this" checkbox, then Continue) to reach the unlocked view.
-async function confirmRecoveryKey(page: Page): Promise<void> {
-  await expect(page.getByText("Save your recovery key")).toBeVisible();
-  await page
-    .getByRole("checkbox", { name: "I've saved this recovery key" })
-    .check();
-  await page.getByRole("button", { name: "Continue" }).click();
-}
+import { test, expect } from "@playwright/test";
+import {
+  confirmRecoveryKey,
+  openWorkspaceMenu,
+  signIn,
+  uniqueEmail,
+} from "./helpers";
 
 test("set up a vault, add a credential, and confirm it re-prompts every time the modal reopens", async ({
   page,
