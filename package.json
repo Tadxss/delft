@@ -10,7 +10,7 @@
   },
   "devDependencies": {
     "prettier": "^3.7.4",
-    "turbo": "^2.10.5",
+    "turbo": "^2.10.12",
     "typescript": "5.9.2"
   },
   "packageManager": "pnpm@9.0.0",
@@ -24,6 +24,6 @@
     }
   },
   "dependencies": {
-    "@blocknote/server-util": "^0.53.0"
+    "@blocknote/server-util": "^0.54.0"
   }
 }
