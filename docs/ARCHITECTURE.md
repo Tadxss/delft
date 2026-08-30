@@ -3000,6 +3000,36 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
       auto-waits for the widget. e2e `captcha.spec.ts`. **User (hosted):** create a Cloudflare
       Turnstile widget, set the real site key in Vercel env + the secret in Supabase Auth → Bot
       & Abuse Protection.
-    - Still in this milestone: C4 data export; C5 ownership transfer; C6 `profiles`/`avatars`
-      RLS audit; C7 Sentry source-maps (may defer — Next 16 Turbopack builds don't upload maps
-      in the current SDK).
+    - **C4 — Data export** ✅ — `buildAccountExport` (`packages/shared/src/lib/`) → a single
+      `crowscribe-export-<date>.json` with every RLS-visible workspace's pages (full BlockNote
+      content), canvases (full scene), folders, and credentials. Credential secrets ship
+      **encrypted** (`secretCiphertext` + `secretIv` + the workspace `vaultSalt`) always — the
+      user decrypts offline with their passphrase — plus decrypted inline when that vault is
+      unlocked in memory at export time. `downloadJson` helper (Blob, no dep). "Export my data"
+      in `AccountModal`. `useVaultKeys()` multi-workspace context accessor. e2e
+      `data-export.spec.ts`.
+    - **C5 — Workspace ownership transfer** ✅ — `20260903000000_transfer_ownership.sql`:
+      `transfer_workspace_ownership(p_workspace_id, p_new_owner_id)` `SECURITY DEFINER` (client
+      `UPDATE workspaces SET owner_id` is blocked by `workspaces_update_owner`'s `WITH CHECK`).
+      Caller must be the current owner; target an existing member; re-checks the 50-workspace cap
+      (its `BEFORE INSERT` trigger doesn't fire on this UPDATE); **refuses while
+      `vault_wrapped_key IS NOT NULL`** — the vault key is bound to the original owner's
+      passphrase and can't transfer. Caller → `editor`, target → `owner` (both member rows
+      written directly — `set_workspace_member_role`/`remove_workspace_member` all refuse the
+      owner row). `useTransferWorkspaceOwnership` + a "Make owner" action in
+      `WorkspaceMembersModal`; the `delete-account` "blocked" message now suggests transferring.
+      e2e `ownership-transfer.spec.ts`.
+    - **C7 — Sentry source maps** — **deferred.** `next build` on Next 16.2 uses Turbopack, and
+      `@sentry/nextjs@10.70` does not upload source maps for Turbopack builds. Options (opt out
+      of Turbopack for the prod build, or bump the SDK once Turbopack support is solid) aren't
+      worth the risk in a hardening pass — minified prod traces still carry error
+      type/message/breadcrumbs/URL. Revisit when the SDK supports it cleanly.
+    - **C6 — `profiles` / `avatars` RLS audit** ✅ — `rls-reviewer` pass came back **clean** (no
+      high/medium findings): `profiles` SELECT is self-only, cross-user exposure is only via
+      `SECURITY DEFINER` RPCs projecting fixed non-sensitive columns; `avatars` writes are
+      uid-folder-scoped with a MIME/size clamp. One follow-up: `20260904000000` enables RLS on
+      `rpc_rate_limits` (it has no client grant — belt-and-suspenders). `BETA_READINESS.md`'s
+      "not formally cleared" item is closed.
+    - **Milestone C complete** except the deferred C7 (Sentry source maps) and the user's hosted
+      dashboard actions (Cloudflare Turnstile widget + keys, Node 22 on Vercel, `db push` of the
+      two new migrations, `functions deploy delete-account` for the message tweak).
