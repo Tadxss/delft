@@ -49,7 +49,18 @@ export default function LoginPage() {
   // "dark") value diverges from the deterministic light-mode SSR output and React flags a
   // hydration mismatch.
   const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const [justDeleted, setJustDeleted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+    try {
+      if (sessionStorage.getItem("crowscribe:account-deleted")) {
+        setJustDeleted(true);
+        sessionStorage.removeItem("crowscribe:account-deleted");
+      }
+    } catch {
+      // storage disabled — no banner, no harm
+    }
+  }, []);
   const { user, loading } = useAuthUser();
   const signIn = useSignInWithMagicLink();
   const signInWithPassword = useSignInWithPassword();
@@ -171,7 +182,7 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-10 px-6">
+    <main className="relative flex min-h-screen flex-col items-center justify-center gap-10 px-6 py-16">
       <div className="flex flex-col items-center gap-3 text-center">
         {/* eslint-disable-next-line @next/next/no-img-element -- points at our own /apple-icon route (already a properly-sized generated PNG); next/image's optimization pipeline isn't worth the config for this */}
         <img src="/apple-icon" width={48} height={48} alt="" className="rounded-xl" />
@@ -180,6 +191,12 @@ export default function LoginPage() {
           Where ideas take flight.
         </p>
       </div>
+
+      {justDeleted && (
+        <p className="max-w-sm rounded-md border border-paper-200 bg-paper-100 px-4 py-3 text-center text-sm text-ink-600">
+          Your account has been deleted. Thanks for trying CrowScribe.
+        </p>
+      )}
 
       <div className="flex w-full max-w-sm flex-col gap-4 rounded-lg border border-paper-200 bg-paper-100 p-6 shadow-sm">
         {step === "email" && (
@@ -308,7 +325,31 @@ export default function LoginPage() {
             a sign-in link.
           </p>
         )}
+
+        <p className="mt-1 text-center text-xs text-ink-400">
+          By continuing you agree to our{" "}
+          <a href="/terms" className="underline hover:text-ink-600">
+            Terms
+          </a>{" "}
+          and{" "}
+          <a href="/privacy" className="underline hover:text-ink-600">
+            Privacy Policy
+          </a>
+          .
+        </p>
       </div>
+
+      <footer className="absolute inset-x-0 bottom-6 flex justify-center gap-4 text-xs text-ink-400">
+        <a href="/privacy" className="hover:text-ink-600">
+          Privacy
+        </a>
+        <a href="/terms" className="hover:text-ink-600">
+          Terms
+        </a>
+        <a href="/contact" className="hover:text-ink-600">
+          Contact
+        </a>
+      </footer>
     </main>
   );
 }

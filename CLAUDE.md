@@ -71,10 +71,10 @@ npx supabase db reset     # reapplies all migrations from scratch (destructive t
 npx supabase gen types typescript --local > packages/types/src/database.ts
 ```
 
-Edge Functions live in `supabase/functions/` (currently just `send-invitation-email`, the invite
-email; shared code in `supabase/functions/_shared/` — currently `email.ts`, the branded email
-layout). `supabase start` serves them; iterate a single one with
-`supabase functions serve send-invitation-email --env-file supabase/functions/.env`. Local
+Edge Functions live in `supabase/functions/`: `send-invitation-email` (invite email) and
+`delete-account` (self-serve account deletion, Build Order step 85); shared code in
+`supabase/functions/_shared/` (currently `email.ts`). `supabase start` serves them; iterate a
+single one with `supabase functions serve <name> --env-file supabase/functions/.env`. Local
 secrets: `supabase/functions/.env` (gitignored; copy from `.env.example`; the function no-ops
 when `RESEND_API_KEY` is blank — the default for local/CI). **Gotcha**: that `.env` is reloaded
 on `supabase stop && supabase start`, **not** on `supabase db reset`. Hosted:
@@ -108,8 +108,17 @@ hydrating and clicks silently fall through to native form submits. See
 `.github/workflows/ci.yml` runs on every push/PR to `master`/`develop`: a `checks` job
 (`pnpm lint`, `pnpm check-types`, `pnpm build`) and an `e2e` job (boots a real local Supabase
 stack via `supabase/setup-cli`, then runs the full `apps/web/e2e/` suite against it — that stack
-now also serves the Edge Function, which no-ops without `RESEND_API_KEY`, so `functions.invoke`
-from the invitation spec is harmless).
+now also serves the Edge Functions, which no-op without their secrets, so `functions.invoke`
+from the specs is harmless).
+
+`master` is **branch-protected** (Build Order step 85): all changes land via PR with `checks` +
+`e2e` green and the branch up to date; `enforce_admins` is off so the owner can force through in
+an emergency. Vercel still auto-deploys `master` on its own Git integration, but `master` only
+ever receives CI-green code now.
+
+`.github/workflows/db-backup.yml` runs daily: `supabase db dump` → AES-256-encrypted → 30-day
+GitHub artifact. Needs repo secrets `SUPABASE_DB_URL` + `BACKUP_PASSPHRASE` (the latter stored
+outside GitHub). This is the only restore path — free-tier Supabase has none.
 
 ## Architecture
 
@@ -125,12 +134,12 @@ from the invitation spec is harmless).
   built so a future native app just supplies its own adapter rather than needing an auth
   plumbing rewrite), and one TanStack Query hook per operation (`src/hooks/`) — CRUD hooks over
   tables plus wrappers over the SECURITY DEFINER RPCs (invitations, membership).
-- `supabase/functions/` — Deno Edge Functions. Currently one: `send-invitation-email` (Build
-  Order step 80), the **first server-side code** in the repo and the **first
-  `SUPABASE_SERVICE_ROLE_KEY` use**. `verify_jwt = true`; it bypasses RLS as the service role and
-  re-checks the caller is the inviter/owner in TS. Everything else in the app is still
-  browser-client + anon key + RLS. `_shared/email.ts` (step 84) is the branded HTML/text email
-  layout, imported by the function but not itself deployed (the `_`-prefix convention).
+- `supabase/functions/` — Deno Edge Functions, the only server-side code / `SUPABASE_SERVICE_ROLE_KEY`
+  use in the repo: `send-invitation-email` (step 80) and `delete-account` (step 85). Both set
+  `verify_jwt = true` but re-check the caller's own token in TS as the real authz boundary
+  (invite: caller is inviter/owner; delete: caller deletes only themselves). Everything else in
+  the app is browser-client + anon key + RLS. `_shared/email.ts` (step 84) is the branded
+  HTML/text email layout, imported but not itself deployed (the `_`-prefix convention).
 - `supabase/templates/` — branded GoTrue auth email templates (step 84), kept visually in sync
   with `_shared/email.ts`. Applied to hosted by hand (dashboard-only).
 - No `packages/ui` yet — deliberately deferred until a second app needs shared components.

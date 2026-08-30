@@ -33,7 +33,10 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # The suite runs ~15-18 min; 20 was tight enough to flake on a slow runner. This is a
+    # required status check for the `master` deploy (branch protection), so a spurious timeout
+    # blocks releases — give it headroom.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

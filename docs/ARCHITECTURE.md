@@ -2880,3 +2880,47 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
     - _(verified: real sign-in on `https://crowscribe.space` — email arrives from
       `CrowScribe <noreply@send.crowscribe.space>`, subject "Sign in to CrowScribe", branded
       layout, link signs in. Invite email already branded via the step-83 function deploy.)_
+
+85. **Production-readiness — Milestone A (public-launch blockers).** _in progress_. A three-angle
+    readiness assessment (security, reliability/data-safety, product/legal) found the engineering
+    core solid (RLS, vault crypto, secrets hygiene, e2e all strong) but flagged legal/compliance
+    and data-safety gaps that block an _open_ launch — several because `BETA_READINESS.md`'s
+    risk acceptances were explicitly scoped to "one trusted user" and multi-user + open signup
+    (steps 79, and signup was always open) invalidate that. Milestone A closes the hard blockers:
+    - **Legal pages** ✅ — `apps/web/app/{privacy,terms,contact}/page.tsx` on a shared
+      `LegalPage` shell (`_components/LegalPage.tsx`, hand-styled prose — no
+      `@tailwindcss/typography` for three pages), constants in `_lib/legal.ts` (operator
+      `Daryl John Tadeo`, `support@crowscribe.space`, Philippine law + GDPR/CCPA sections).
+      Linked from the login page (footer + a "By continuing you agree…" line) and cross-linked.
+      `title` template added to `layout.tsx`. e2e: `legal-pages.spec.ts`. **These are plain app
+      routes, not dashboard-managed** — edit the files, bump `LAST_UPDATED`.
+    - **Self-serve account deletion** ✅ — `supabase/functions/delete-account/` (repo's 2nd Edge
+      Function, 2nd service-role use; `verify_jwt = true`, real check is the in-function
+      `getUser()` on the caller's own token — a user can only delete themselves). Deletes the
+      `auth.users` row → cascades `profiles` + every owned workspace (pages/credentials/canvases/
+      members/invitations); best-effort purges the `page-images` / `workspace-logos` / `avatars`
+      Storage prefixes first (Storage isn't FK'd). **Guard:** blocked (`200 {blocked:
+      "shared-workspaces"}`) if the caller solely owns a workspace with other members — no
+      ownership transfer yet (roadmap item 12), so destroying invited members' content isn't
+      allowed; they must remove members / delete those workspaces first. Client:
+      `useDeleteAccount` + `AccountDeletionBlockedError`, a "Delete account" danger view in
+      `AccountModal.tsx` (type "delete" to arm), then a `sessionStorage` one-shot flag → login
+      page shows "Your account has been deleted" (AuthGate redirects to `/` the moment the
+      session clears, so a query param wouldn't survive). e2e: `account-deletion.spec.ts`
+      (solo delete + blocked-by-shared-workspace).
+    - **Scheduled DB backup** ✅ — `.github/workflows/db-backup.yml`, daily `supabase db dump`
+      (roles + schema + data), AES-256-encrypted (`openssl enc -pbkdf2`), kept as a 30-day
+      GitHub Actions artifact. Free-tier Supabase has no self-serve restore, so this is _the_
+      recovery path. **Needs two repo secrets:** `SUPABASE_DB_URL` (hosted connection string) and
+      `BACKUP_PASSPHRASE` (stored outside GitHub — without it the dumps are unrecoverable, by
+      design). Restore recipe is in the workflow header.
+    - **CI gates the `master` deploy** ✅ — branch protection on `master`: all changes via PR,
+      `checks` + `e2e` must pass, branch must be up to date; `enforce_admins: false` so the owner
+      can force through in an emergency. e2e `timeout-minutes` bumped 20 → 30 (it's now a release
+      gate, a spurious timeout shouldn't block a deploy). Vercel still builds `master` on its own
+      Git integration — but `master` now only ever receives PR-merged, CI-green code. A
+      fully workflow-driven deploy (disconnect Vercel auto-deploy, `vercel deploy --prod` from
+      the Action after CI) is deferred — the branch gate covers the practical risk.
+    - Milestone A remaining: none of the hard blockers. Legal pages, account deletion, backups,
+      CI gate all shipped; the readiness plan's "should-fix" (Milestone B) and "later" items are
+      still open.

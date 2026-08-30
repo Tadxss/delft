@@ -1,0 +1,64 @@
+name: DB backup
+
+# Free-tier Supabase has no self-serve restore (production-readiness item 4), so this is the
+# recovery path for a bad migration or an accidental delete on hosted. Daily `supabase db dump`
+# (roles + schema + data), AES-256 encrypted, kept as a GitHub Actions artifact for 30 days.
+#
+# Required repo secrets:
+#   SUPABASE_DB_URL     — hosted DB connection string (Supabase dashboard → Project Settings →
+#                         Database → Connection string → URI, "Session pooler" or "Direct").
+#   BACKUP_PASSPHRASE   — any strong string; needed to decrypt a dump. Store it somewhere OUTSIDE
+#                         this repo/GitHub (a password manager). Without it the dumps are
+#                         unrecoverable — that's the point.
+#
+# Restore: download the artifact, then
+#   openssl enc -d -aes-256-cbc -pbkdf2 -in backup.tar.gz.enc -pass pass:"$BACKUP_PASSPHRASE" | tar -xz
+#   psql "$SUPABASE_DB_URL" -f roles.sql -f schema.sql -f data.sql   # into a clean/recovery DB
+
+on:
+  schedule:
+    - cron: "17 3 * * *" # 03:17 UTC daily
+  workflow_dispatch: {}
+
+concurrency:
+  group: db-backup
+  cancel-in-progress: false
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Dump and encrypt
+        id: dump
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DB_URL:-}" ]; then
+            echo "::error::SUPABASE_DB_URL secret is not set — see this workflow's header." >&2
+            exit 1
+          fi
+          if [ -z "${PASSPHRASE:-}" ]; then
+            echo "::error::BACKUP_PASSPHRASE secret is not set — dumps must be encrypted." >&2
+            exit 1
+          fi
+          mkdir -p backup
+          supabase db dump --db-url "$DB_URL" -f backup/roles.sql --role-only
+          supabase db dump --db-url "$DB_URL" -f backup/schema.sql
+          supabase db dump --db-url "$DB_URL" -f backup/data.sql --data-only
+          tar -czf - -C backup . \
+            | openssl enc -aes-256-cbc -pbkdf2 -salt -pass pass:"$PASSPHRASE" \
+            > backup.tar.gz.enc
+          echo "stamp=$(date -u +%Y%m%d-%H%M)" >> "$GITHUB_OUTPUT"
+          echo "Encrypted dump: $(du -h backup.tar.gz.enc | cut -f1)"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ steps.dump.outputs.stamp }}
+          path: backup.tar.gz.enc
+          retention-days: 30
+          if-no-files-found: error
