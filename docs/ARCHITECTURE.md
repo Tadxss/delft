@@ -2881,7 +2881,8 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
       `CrowScribe <noreply@send.crowscribe.space>`, subject "Sign in to CrowScribe", branded
       layout, link signs in. Invite email already branded via the step-83 function deploy.)_
 
-85. **Production-readiness — Milestone A (public-launch blockers).** _in progress_. A three-angle
+85. **Production-readiness — Milestone A (public-launch blockers).** ✅ _done_ (deployed;
+    `support@` inbox + optional lawyer review are the only user-side loose ends). A three-angle
     readiness assessment (security, reliability/data-safety, product/legal) found the engineering
     core solid (RLS, vault crypto, secrets hygiene, e2e all strong) but flagged legal/compliance
     and data-safety gaps that block an _open_ launch — several because `BETA_READINESS.md`'s
@@ -2924,3 +2925,24 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
     - Milestone A remaining: none of the hard blockers. Legal pages, account deletion, backups,
       CI gate all shipped; the readiness plan's "should-fix" (Milestone B) and "later" items are
       still open.
+
+86. **Production-readiness — Milestone B (safe with strangers signing up).** _in progress_.
+    Closes the "should-fix before opening signup wide" set. The theme: `BETA_READINESS.md`
+    accepted several risks "for one trusted user", which open signup + multi-user invalidate.
+    - **Abuse caps** ✅ — `20260902000000_abuse_caps.sql`. `octet_length(content::text)` CHECK
+      on `pages` (2 MB) and `canvases.scene` (8 MB) — the two unbounded jsonb columns; plus
+      `BEFORE INSERT` row-count caps (`enforce_workspace_row_cap` dynamic over `tg_table_name`,
+      + `enforce_owner_workspace_cap`): pages 2000 / canvases 500 / credentials 2000 /
+      credential_folders 500 per workspace, workspaces 50 per account. With a count cap **and** a
+      size cap the total bytes one account can create is bounded regardless of write rate — which
+      is why the permanently-"accepted" lack of app-level mutation rate limiting stops mattering
+      for the free-tier-fill threat. e2e `abuse-caps.spec.ts` covers the content-size CHECK;
+      count caps verified via a manual `psql` loop (2000-row e2e isn't worth the CI minutes).
+      Limits are generous — bump them in the migration if a real workspace nears one.
+    - **Sentry not-dark check** ✅ — `NEXT_PUBLIC_SENTRY_DSN` confirmed set in Vercel Production
+      (`vercel env ls`), so error reporting is live. Added a `console.warn` in
+      `instrumentation-client.ts` for the case a future prod build ships without it.
+    - Still in this milestone: `beforeunload` + flush-on-nav guard for the editors (B2), an
+      `updated_at` optimistic-concurrency check on autosave with a conflict banner (B3), and a
+      report-only Content-Security-Policy (B4). Source-map upload, a CAPTCHA, and nonce-based CSP
+      are Milestone C.
