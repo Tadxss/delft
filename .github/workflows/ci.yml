@@ -39,11 +39,11 @@ jobs:
   e2e-shard:
     name: e2e-shard
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: [1, 2, 3, 4]
     env:
       # Turnstile always-pass test secret — `supabase start` substitutes this into
       # supabase/config.toml's [auth.captcha] so the e2e sign-in flow works.
@@ -68,7 +68,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
           NEXT_PUBLIC_TURNSTILE_SITE_KEY=1x00000000000000000000AA
           EOF
-      - run: pnpm --filter web exec playwright test --shard=${{ matrix.shard }}/3
+      - run: pnpm --filter web exec playwright test --shard=${{ matrix.shard }}/4
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
