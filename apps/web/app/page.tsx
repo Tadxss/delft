@@ -171,7 +171,7 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-10 px-6">
+    <main className="relative flex min-h-screen flex-col items-center justify-center gap-10 px-6 py-16">
       <div className="flex flex-col items-center gap-3 text-center">
         {/* eslint-disable-next-line @next/next/no-img-element -- points at our own /apple-icon route (already a properly-sized generated PNG); next/image's optimization pipeline isn't worth the config for this */}
         <img src="/apple-icon" width={48} height={48} alt="" className="rounded-xl" />
@@ -308,7 +308,31 @@ export default function LoginPage() {
             a sign-in link.
           </p>
         )}
+
+        <p className="mt-1 text-center text-xs text-ink-400">
+          By continuing you agree to our{" "}
+          <a href="/terms" className="underline hover:text-ink-600">
+            Terms
+          </a>{" "}
+          and{" "}
+          <a href="/privacy" className="underline hover:text-ink-600">
+            Privacy Policy
+          </a>
+          .
+        </p>
       </div>
+
+      <footer className="absolute inset-x-0 bottom-6 flex justify-center gap-4 text-xs text-ink-400">
+        <a href="/privacy" className="hover:text-ink-600">
+          Privacy
+        </a>
+        <a href="/terms" className="hover:text-ink-600">
+          Terms
+        </a>
+        <a href="/contact" className="hover:text-ink-600">
+          Contact
+        </a>
+      </footer>
     </main>
   );
 }

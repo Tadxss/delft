@@ -8,7 +8,7 @@ const DESCRIPTION = "A private, personal records and notes workspace.";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://crowscribe.space"),
-  title: "CrowScribe",
+  title: { default: "CrowScribe", template: "%s — CrowScribe" },
   description: DESCRIPTION,
   openGraph: {
     title: "CrowScribe",

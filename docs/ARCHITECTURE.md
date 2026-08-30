@@ -2880,3 +2880,20 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
     - _(verified: real sign-in on `https://crowscribe.space` — email arrives from
       `CrowScribe <noreply@send.crowscribe.space>`, subject "Sign in to CrowScribe", branded
       layout, link signs in. Invite email already branded via the step-83 function deploy.)_
+
+85. **Production-readiness — Milestone A (public-launch blockers).** _in progress_. A three-angle
+    readiness assessment (security, reliability/data-safety, product/legal) found the engineering
+    core solid (RLS, vault crypto, secrets hygiene, e2e all strong) but flagged legal/compliance
+    and data-safety gaps that block an _open_ launch — several because `BETA_READINESS.md`'s
+    risk acceptances were explicitly scoped to "one trusted user" and multi-user + open signup
+    (steps 79, and signup was always open) invalidate that. Milestone A closes the hard blockers:
+    - **Legal pages** ✅ — `apps/web/app/{privacy,terms,contact}/page.tsx` on a shared
+      `LegalPage` shell (`_components/LegalPage.tsx`, hand-styled prose — no
+      `@tailwindcss/typography` for three pages), constants in `_lib/legal.ts` (operator
+      `Daryl John Tadeo`, `support@crowscribe.space`, Philippine law + GDPR/CCPA sections).
+      Linked from the login page (footer + a "By continuing you agree…" line) and cross-linked.
+      `title` template added to `layout.tsx`. e2e: `legal-pages.spec.ts`. **These are plain app
+      routes, not dashboard-managed** — edit the files, bump `LAST_UPDATED`.
+    - Still in this milestone: self-serve account deletion (Edge Function + `AccountModal` flow +
+      owner-deletion policy), a scheduled DB-backup GitHub Action, and making CI a required gate
+      on the `master` deploy. See the readiness plan for the full item list.
