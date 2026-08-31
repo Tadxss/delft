@@ -1,6 +1,8 @@
-# Weekly dependency + action update PRs (production-readiness Milestone C / item 16 — the repo
-# had no automated dependency scanning). Minor/patch bumps are grouped into one PR per ecosystem
-# to keep the noise low; majors arrive as individual PRs to review deliberately.
+# Weekly dependency + action update PRs (Milestone C / item 16). The first run showed that
+# grouping *minors* hides which bump broke CI, and that framework-coupled majors
+# (react / next / typescript / tailwind / types / eslint / blocknote / excalidraw / playwright)
+# must be deliberate, tested upgrades — not auto-PRs. So: patch bumps grouped, minors individual,
+# framework majors ignored.
 version: 2
 updates:
   - package-ecosystem: npm
@@ -8,10 +10,46 @@ updates:
     schedule:
       interval: weekly
       day: monday
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 3
     groups:
-      minor-and-patch:
-        update-types: [minor, patch]
+      patch:
+        update-types: [patch]
+    ignore:
+      # Framework / toolchain — upgrade by hand with a full test pass, never via Dependabot.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "next"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-is"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "next-themes"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "tailwindcss"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "eslint-plugin-react-hooks"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@blocknote/*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@excalidraw/*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@tanstack/react-query"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@playwright/test"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "turbo"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: "/"

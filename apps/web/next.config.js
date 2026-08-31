@@ -41,7 +41,11 @@ try {
 }
 
 // Cloudflare Turnstile (the login-page CAPTCHA) — its api.js and the widget iframe.
-const turnstile = "https://challenges.cloudflare.com";
+// challenges.cloudflare.com serves api.js + the widget; interactive challenges use per-session
+// subdomains (e.g. brunhild.challenges.cloudflare.com), and a CSP host doesn't cover subdomains
+// — so allow both the apex and `*.challenges.cloudflare.com`.
+const turnstile =
+  "https://challenges.cloudflare.com https://*.challenges.cloudflare.com";
 const CSP = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${devEval} https://va.vercel-scripts.com ${turnstile}`,
