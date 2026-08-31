@@ -39,7 +39,7 @@ jobs:
   e2e-shard:
     name: e2e-shard
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -68,6 +68,9 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
           NEXT_PUBLIC_TURNSTILE_SITE_KEY=1x00000000000000000000AA
           EOF
+      # Serve a prebuilt app during the tests (playwright.config.ts runs `next start` in CI) —
+      # `pnpm dev`'s per-route Turbopack compile under load is what made webkit shards flake.
+      - run: pnpm --filter web build
       - run: pnpm --filter web exec playwright test --shard=${{ matrix.shard }}/4
       - uses: actions/upload-artifact@v4
         if: failure()

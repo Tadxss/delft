@@ -10,9 +10,11 @@ export default defineConfig({
   // spurious timeouts under concurrency, mirroring votero's e2e setup.
   fullyParallel: false,
   workers: 1,
-  retries: process.env.CI ? 1 : 0,
+  retries: process.env.CI ? 2 : 0,
   reporter: [["list"]],
-  timeout: 30_000,
+  // CI serves a prebuilt app (`next start`), so 30s is plenty; locally against `pnpm dev` the
+  // first hit on a route pays a Turbopack compile, so give it more room.
+  timeout: process.env.CI ? 30_000 : 60_000,
   use: {
     baseURL: "http://127.0.0.1:3000",
     trace: "retain-on-failure",
@@ -26,10 +28,14 @@ export default defineConfig({
     { name: "webkit", use: { ...devices["Desktop Safari"] } },
     { name: "mobile-safari", use: { ...devices["iPhone 13"] } },
   ],
+  // CI runs `pnpm --filter web build` as an explicit step first, then serves the prebuilt app
+  // with `next start` — no per-route Turbopack compile mid-test, which is what made webkit
+  // shards intermittently time out en masse under runner load. Locally, `pnpm dev` with
+  // `reuseExistingServer` picks up a dev server you already have running.
   webServer: {
-    command: "pnpm dev",
+    command: process.env.CI ? "pnpm --filter web start" : "pnpm dev",
     url: "http://127.0.0.1:3000",
-    reuseExistingServer: true,
-    timeout: 60_000,
+    reuseExistingServer: !process.env.CI,
+    timeout: 120_000,
   },
 });
