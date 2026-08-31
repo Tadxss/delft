@@ -113,8 +113,13 @@ hydrating and clicks silently fall through to native form submits. See
 ### CI
 
 `.github/workflows/ci.yml` runs on every push/PR to `master`/`develop`: a `checks` job
-(`pnpm lint`, `pnpm check-types`, `pnpm build`) and `e2e-shard` — a 3-way matrix
-(`playwright test --shard=k/4`), each shard on its own runner with its own `supabase start`, so
+(`pnpm lint`, `pnpm check-types`, `pnpm build`) and `e2e-shard` — a 4-way matrix
+(`playwright test --shard=k/4`), each shard builds the app (`pnpm --filter web build`) and
+Playwright serves the prebuilt output with `next start` (Build Order step 88 follow-up — driving
+`pnpm dev` in CI meant the first hit on each route paid a Turbopack compile that intermittently
+blew past the test timeout on the slower WebKit engine and cascaded). Locally the suite still
+runs against `pnpm dev` via `reuseExistingServer`. Each shard runs on its own runner with its
+own `supabase start`, so
 the wall-clock stays well under the timeout as the suite grows. A tiny `e2e` gate job `needs` all
 shards and is the stable status-check name for branch protection. Node 22. `supabase/setup-cli`
 is pinned (not `latest`). `.github/dependabot.yml` (reworked in Build Order step 88 after a bad
