@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { ChevronLeft, ChevronRight, LogOut, User, X } from "lucide-react";
 import imageCompression from "browser-image-compression";
@@ -38,7 +37,6 @@ export function AccountModal({
   onClose: () => void;
 }) {
   const { user } = useAuthUser();
-  const router = useRouter();
   const signOut = useSignOut();
   const setPassword = useSetPassword();
   const supabase = useSupabaseClient();
@@ -100,7 +98,11 @@ export function AccountModal({
     signOut.mutate(undefined, {
       onSuccess: () => {
         onClose();
-        router.replace("/");
+        // Hard navigation, not router.replace: a soft nav to "/" lets the App Router restore the
+        // magic-link `#access_token` hash from a cached history entry, stranding a still-valid
+        // token in the URL after sign-out. A full reload also guarantees all in-memory state
+        // (vault keys, query cache) is gone.
+        window.location.replace("/");
       },
     });
   }

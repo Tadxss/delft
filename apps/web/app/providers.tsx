@@ -8,6 +8,7 @@ import {
   SupabaseProvider,
   type SupabaseStorageAdapter,
 } from "@crowscribe/shared";
+import { AuthHashCleanup } from "./_components/AuthHashCleanup";
 
 const webStorageAdapter: SupabaseStorageAdapter = {
   getItem: (key) =>
@@ -68,6 +69,7 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <SupabaseProvider client={supabase}>
+        <AuthHashCleanup />
         <LazyMotion features={domAnimation} strict>
           {children}
         </LazyMotion>

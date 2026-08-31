@@ -26,14 +26,18 @@ test("the enforcing CSP header is present on public and app routes", async ({
 test("no CSP violations across the editor, canvas, and vault", async ({
   page,
 }) => {
-  // Ignore WebKit's advisory noise; count only real blocks.
+  // Ignore WebKit's advisory noise; count only real blocks. `/_vercel/` (Vercel Analytics +
+  // Speed Insights) scripts are served only by Vercel's edge — under `next start` in CI they
+  // 404 as HTML and `nosniff` refuses to execute them, which is a CI-only artifact, not a CSP
+  // problem the app has in production.
   const violations: string[] = [];
   page.on("console", (msg) => {
     const t = msg.text();
     if (
       /refused to|violates the following content security policy directive/i.test(
         t,
-      )
+      ) &&
+      !t.includes("/_vercel/")
     ) {
       violations.push(t);
     }

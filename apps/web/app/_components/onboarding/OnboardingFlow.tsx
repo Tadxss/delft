@@ -267,7 +267,9 @@ export function OnboardingFlow({ userId }: { userId: string }) {
           type="button"
           onClick={() =>
             signOut.mutate(undefined, {
-              onSuccess: () => router.replace("/"),
+              // Hard nav, not router.replace — see AccountModal.handleSignOut: a soft nav lets
+              // the App Router restore the magic-link `#access_token` hash after sign-out.
+              onSuccess: () => window.location.replace("/"),
             })
           }
           className="self-center text-xs text-ink-400 hover:text-ink-700"

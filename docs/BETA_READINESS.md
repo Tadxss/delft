@@ -359,3 +359,31 @@ outstanding.
 The multi-user spec surface is now `workspace-invitations.spec.ts` (2 two-context flows), and the
 suite is 17 spec files × 3 projects (the "16 specs" / "48-test suite" figures above are
 frozen-in-time snapshots from the step-30–37 fixes).
+
+## Post-multi-user: production-readiness roadmap (Milestones A–C) — closed out
+
+Build Order steps 85–88. A three-milestone pass to take the app from "safe for one trusted user +
+invited collaborators" to "safe to open signup to strangers":
+- **Milestone A (step 85) — public-launch blockers:** legal pages (Privacy / Terms / Contact,
+  operator = an individual in the Philippines, `support@crowscribe.space`), self-serve account
+  deletion (`delete-account` Edge Function — refuses while the caller solely owns a shared
+  workspace), daily AES-256 encrypted DB backup (`db-backup.yml`, 30-day artifact — the only
+  restore path on the free tier), and `master` branch protection (PR-only, `checks` + `e2e`
+  required).
+- **Milestone B (step 86) — safe with strangers signing up:** DB-level abuse caps (jsonb
+  size CHECKs + per-workspace / per-account row-count triggers — bounds total bytes per account
+  regardless of write rate, which is why the permanently-accepted lack of app-level mutation rate
+  limiting stops mattering for the free-tier-fill threat), editor `beforeunload` + SPA-unmount
+  flush guard, concurrent-edit `StaleWriteError` detection, and CSP in report-only.
+- **Milestone C (step 87) — hardening + deferred features:** CI e2e sharding, CSP flipped to
+  **enforcing** (+ Sentry `report-uri`), **Cloudflare Turnstile** on the login page, account data
+  export (single JSON, credential secrets ship encrypted + decrypted-when-unlocked), workspace
+  ownership transfer (`SECURITY DEFINER` RPC, refuses while a vault exists), and the
+  `profiles`/`avatars` RLS audit (came back clean).
+- **Step 88 follow-ups:** Turnstile CSP subdomain fix (`*.challenges.cloudflare.com`), visible
+  widget-failure message, Dependabot rework (patch-only, framework majors ignored), `engines.node`
+  pinned `22.x`. Production CAPTCHA verified end-to-end in a real browser.
+
+**Deferred, not blockers:** Sentry source maps (C7 — Turbopack + `@sentry/nextjs@10.70` don't
+support map upload); framework majors (React 19.2.8 / Next 16.3 / Tailwind v4 / TS 7); nonce-based
+CSP (needs `middleware.ts`); per-member vault-key sharing; real-device iOS Safari testing.
