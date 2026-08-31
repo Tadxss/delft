@@ -27,7 +27,7 @@
     "@excalidraw/excalidraw": "^0.18.1",
     "@sentry/nextjs": "^10.71.0",
     "@supabase/supabase-js": "^2.112.4",
-    "@tanstack/react-query": "^5.101.4",
+    "@tanstack/react-query": "^5.102.8",
     "@tiptap/pm": "^3.30.0",
     "@vercel/speed-insights": "^2.0.0",
     "browser-image-compression": "^2.0.2",
