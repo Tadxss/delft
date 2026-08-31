@@ -28,7 +28,14 @@ maintained). Auto-deploys on push to `master`. Build Order steps 78–84 shipped
 invitation emails (PR #44); the `crowscribe.space` domain switch (82), Resend going live on
 `send.crowscribe.space` (83), and branded email templates (84) via PR #45. All email is now
 branded and live — invite email via the Edge Function, auth (magic-link) email via Resend custom
-SMTP + dashboard templates. See ARCHITECTURE.md's
+SMTP + dashboard templates. **The production-readiness roadmap (Milestones A–C, Build Order steps
+85–88) is complete and deployed** — legal pages (Privacy/Terms/Contact), self-serve account
+deletion (`supabase/functions/delete-account/`), daily encrypted DB backup
+(`.github/workflows/db-backup.yml`), branch-protected `master`, DB-level abuse caps, editor
+unsaved-changes + stale-write guards, **enforcing CSP**, **Cloudflare Turnstile on the login
+page**, account data export, and workspace ownership transfer. The app is ready for a public beta;
+what's left (Sentry source maps on Turbopack, framework majors, nonce CSP, per-member vault-key
+sharing, real-device iOS) is deliberate post-launch work. See ARCHITECTURE.md's
 **Next Up** for current focus and the Build Order for how each feature shipped;
 [docs/BETA_READINESS.md](docs/BETA_READINESS.md)'s original audit is closed out as of Build Order
 step 37, with a separate section for the multi-user surface added since.
@@ -107,11 +114,16 @@ hydrating and clicks silently fall through to native form submits. See
 
 `.github/workflows/ci.yml` runs on every push/PR to `master`/`develop`: a `checks` job
 (`pnpm lint`, `pnpm check-types`, `pnpm build`) and `e2e-shard` — a 3-way matrix
-(`playwright test --shard=k/3`), each shard on its own runner with its own `supabase start`, so
+(`playwright test --shard=k/4`), each shard on its own runner with its own `supabase start`, so
 the wall-clock stays well under the timeout as the suite grows. A tiny `e2e` gate job `needs` all
 shards and is the stable status-check name for branch protection. Node 22. `supabase/setup-cli`
-is pinned (not `latest`). `.github/dependabot.yml` opens weekly grouped npm + github-actions
-update PRs.
+is pinned (not `latest`). `.github/dependabot.yml` (reworked in Build Order step 88 after a bad
+first run): npm updates are **patch-only grouped** — minors arrive as isolated individual PRs,
+and `semver-major` is **ignored** for the framework/toolchain set (typescript, next, react*,
+tailwindcss, eslint*, `@blocknote/*`, `@excalidraw/*`, `@tanstack/react-query`, `@playwright/test`,
+turbo, `@types/*`) since those need deliberate tested upgrades; github-actions stays
+weekly-grouped. `engines.node` is pinned `"22.x"` (root + `apps/web`) — local dev on Node 20
+warns but works.
 
 `master` is **branch-protected** (Build Order step 85): all changes land via PR with `checks` +
 `e2e` green and the branch up to date; `enforce_admins` is off so the owner can force through in

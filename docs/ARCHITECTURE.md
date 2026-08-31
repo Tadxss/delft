@@ -140,7 +140,23 @@ transfer, per-member vault-key sharing, a "Resend invite" button) are still open
 invitations are unrelated to the global signup-gate that was declined above** — that was about who
 can create an account at all; this is about sharing a workspace with someone who already can.
 
-**Deploy status:** all migrations through `20260901000000_invitation_hardening` are on hosted
+**Production-readiness (Milestones A–C) is complete and deployed** — see Build Order steps 85–88.
+The app is ready for a public beta (legal pages, account deletion, encrypted daily backups,
+branch-protected `master`, abuse caps, enforcing CSP, Cloudflare Turnstile on the login page —
+all live and verified, prod CAPTCHA confirmed end-to-end in a real browser). What's left is
+deliberate post-launch work, not blockers: Sentry source maps (C7, deferred on Turbopack),
+framework majors (React 19.2.8 / Next 16.3 / Tailwind v4 / TS 7 — Dependabot no longer
+auto-proposes these), nonce-based CSP, per-member vault-key sharing, real-device iOS testing.
+Step 88's full list is at the end of the Build Order.
+
+**Deploy status:** all migrations through `20260904000000_rpc_rate_limits_rls` are on hosted
+(`supabase db push`; `20260902000000`/`20260903000000`/`20260904000000` for Milestones B–C).
+`send-invitation-email` + `delete-account` Edge Functions are deployed. Vercel `master` is live
+at `https://crowscribe.space` with the enforcing CSP (incl. `*.challenges.cloudflare.com`) and
+`NEXT_PUBLIC_TURNSTILE_SITE_KEY` inlined. `.github/dependabot.yml` was reworked in step 88 after
+a bad first run — npm is patch-only-grouped with framework majors ignored.
+
+**(Historical) earlier deploy note:** all migrations through `20260901000000_invitation_hardening` are on hosted
 (`supabase db push` — needed one fix, `extensions.gen_random_bytes`, since pgcrypto isn't on the
 hosted migration search_path). Vercel `master` deploy is live at `https://crowscribe.space`
 (step 82 — NS → Vercel, certs issued, hosted Supabase Auth URL config updated, Google OAuth +
@@ -3033,3 +3049,53 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
     - **Milestone C complete** except the deferred C7 (Sentry source maps) and the user's hosted
       dashboard actions (Cloudflare Turnstile widget + keys, Node 22 on Vercel, `db push` of the
       two new migrations, `functions deploy delete-account` for the message tweak).
+
+88. **Milestone C follow-ups — Turnstile hardening + Dependabot rework + Node pin.** ✅ _done_
+    (PR #56, merged to `master`, deployed). Three unrelated fixes that surfaced right after
+    Milestone C shipped:
+    - **Turnstile CSP subdomain gap** — `next.config.js`'s `turnstile` CSP host was the bare
+      `https://challenges.cloudflare.com`. A CSP host does **not** match subdomains, but
+      Turnstile's interactive challenges load from per-session subdomains (e.g.
+      `brunhild.challenges.cloudflare.com`), so a genuinely-challenged visitor could hit a CSP
+      block. Now `https://challenges.cloudflare.com https://*.challenges.cloudflare.com` across
+      `script-src` / `connect-src` / `frame-src`.
+    - **Turnstile widget failure was invisible** — `Turnstile.tsx`'s `error-callback` only
+      cleared the token, leaving the sign-in button permanently disabled with no explanation.
+      Now: a 30 s stall timeout + a real error path that renders an inline "couldn't verify
+      you're human — reload" message. The sign-in path can't be left where a widget hiccup
+      silently dead-ends it.
+    - **Dependabot's first run opened 6 bad PRs** — grouped minors hid which bump broke CI
+      (`#51`: a Next 16.2→16.3 / React minor broke a ProseMirror plugin-state internal on
+      mobile-safari), and framework majors (TS 7, Tailwind v4, `@types/node` 26,
+      `eslint-plugin-react-hooks` 7) aren't drop-in. All 6 closed. `.github/dependabot.yml`
+      reworked: npm group is **patch-only** (minors now arrive as isolated individual PRs),
+      `open-pull-requests-limit: 3`, and `version-update:semver-major` is **ignored** for the
+      framework/toolchain set (`typescript`, `next`, `react`, `react-dom`, `react-is`,
+      `next-themes`, `@types/{react,react-dom,node}`, `tailwindcss`, `eslint`,
+      `eslint-plugin-react-hooks`, `@blocknote/*`, `@excalidraw/*`, `@tanstack/react-query`,
+      `@playwright/test`, `turbo`) — those are deliberate, tested upgrades, not auto-PRs. The
+      github-actions ecosystem keeps its weekly group. The reworked config's first run opened
+      one correctly-scoped github-actions group PR (`#57`) + a patch-group npm PR.
+    - **`engines.node` `">=22"` → `"22.x"`** (root + `apps/web`) — silences the Vercel
+      "will auto-upgrade on the next Node major" build warning while still taking 22.x minors.
+      CI's `node-version: 22` already resolves to latest-22.x, so no CI change. (Local dev on
+      Node 20 now prints a harmless `Unsupported engine` warning on `pnpm install`.)
+    - **Production CAPTCHA verified end-to-end in a real browser** — the Turnstile widget renders
+      on the `crowscribe.space` password step and returns "Success!", the sign-in button
+      enables, magic-link sign-in completes. Headless Playwright can't clear a real Turnstile
+      challenge (the always-pass test key bypasses it), so this needed a human pass — done.
+
+**Production-readiness roadmap (Milestones A–C) is complete and fully deployed.** The system is
+ready for a public beta: legal pages, self-serve account deletion, daily encrypted DB backups,
+`master` branch protection, abuse caps, enforcing CSP, and Turnstile bot protection are all live
+and verified. Remaining work is deliberate post-launch iteration, not launch blockers:
+- **C7 — Sentry source maps** — deferred; Turbopack + `@sentry/nextjs@10.70` don't support map
+  upload. Revisit when the SDK does.
+- **Framework upgrades** — React 19.2.8 / Next 16.3 (needs the mobile-safari `localsInner`
+  ProseMirror regression bisected), Tailwind v4 (config-format rewrite), TS 7 (wait for stable).
+  Each is its own tested piece of work; Dependabot no longer auto-proposes them.
+- **Nonce-based CSP** — drop `script-src 'unsafe-inline'`; needs a `middleware.ts`.
+- **Per-member vault-key sharing** — editors/viewers still can't see credentials; ownership
+  transfer is blocked while a vault exists (step 87, C5).
+- **Real-device iOS Safari testing** — only emulated mobile-safari so far.
+- **Step 79 follow-ups** — a "Resend invite" button (ownership transfer shipped as C5).
