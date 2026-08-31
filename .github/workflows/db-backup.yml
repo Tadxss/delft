@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@v3
         with:
           version: 2.116.0
       - name: Dump and encrypt
@@ -60,7 +60,7 @@ jobs:
             > backup.tar.gz.enc
           echo "stamp=$(date -u +%Y%m%d-%H%M)" >> "$GITHUB_OUTPUT"
           echo "Encrypted dump: $(du -h backup.tar.gz.enc | cut -f1)"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: db-backup-${{ steps.dump.outputs.stamp }}
           path: backup.tar.gz.enc
