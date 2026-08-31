@@ -3074,8 +3074,15 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
       `next-themes`, `@types/{react,react-dom,node}`, `tailwindcss`, `eslint`,
       `eslint-plugin-react-hooks`, `@blocknote/*`, `@excalidraw/*`, `@tanstack/react-query`,
       `@playwright/test`, `turbo`) — those are deliberate, tested upgrades, not auto-PRs. The
-      github-actions ecosystem keeps its weekly group. The reworked config's first run opened
-      one correctly-scoped github-actions group PR (`#57`) + a patch-group npm PR.
+      github-actions ecosystem keeps its weekly group. **Follow-up (same step):** the reworked
+      config's first npm run (`#58`) still bundled `react`/`react-dom` `19.2.3→19.2.8` +
+      `@tiptap/pm` `3.30.0→3.30.5` — Dependabot classifies those as *patch*, so the major-ignore
+      missed them, and they reproduce the `localsInner` ProseMirror TypeError on **both**
+      chromium and webkit now (worse than `#51`). `#58` closed; `dependabot.yml` now ignores
+      `react` / `react-dom` / `react-is` / `@types/react` / `@types/react-dom` / `@tiptap/*` at
+      **every** update type until the regression is bisected by hand. `#57` (github-actions
+      group), `#59` (`lucide-react` minor), `#60` (`@blocknote/server-util` minor) were clean and
+      merged — the isolate-minors policy working as intended.
     - **`engines.node` `">=22"` → `"22.x"`** (root + `apps/web`) — silences the Vercel
       "will auto-upgrade on the next Node major" build warning while still taking 22.x minors.
       CI's `node-version: 22` already resolves to latest-22.x, so no CI change. (Local dev on

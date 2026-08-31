@@ -3,6 +3,12 @@
 # (react / next / typescript / tailwind / types / eslint / blocknote / excalidraw / playwright)
 # must be deliberate, tested upgrades — not auto-PRs. So: patch bumps grouped, minors individual,
 # framework majors ignored.
+#
+# Step 88 addendum: react/react-dom 19.2.3->19.2.8 + @tiptap/pm 3.30.0->3.30.5 (which Dependabot
+# classifies as *patch*, so the major-ignore below didn't stop them) reproduce a ProseMirror
+# `localsInner` TypeError across the editor/canvas specs on BOTH chromium and webkit (PR #58,
+# and PR #51 before it). Until that regression is bisected and fixed by hand, react* and
+# @tiptap/* are ignored for *every* update type — see the second ignore block.
 version: 2
 updates:
   - package-ecosystem: npm
@@ -50,6 +56,14 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "turbo"
         update-types: ["version-update:semver-major"]
+
+      # Held at ALL update types (not just major) pending the `localsInner` bisect — see header.
+      - dependency-name: "react"
+      - dependency-name: "react-dom"
+      - dependency-name: "react-is"
+      - dependency-name: "@types/react"
+      - dependency-name: "@types/react-dom"
+      - dependency-name: "@tiptap/*"
 
   - package-ecosystem: github-actions
     directory: "/"
