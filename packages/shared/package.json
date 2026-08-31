@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@crowscribe/types": "workspace:*",
-    "@supabase/supabase-js": "^2.112.3",
+    "@supabase/supabase-js": "^2.112.4",
     "@tanstack/react-query": "^5.101.4"
   },
   "peerDependencies": {
@@ -23,8 +23,8 @@
   "devDependencies": {
     "@crowscribe/eslint-config": "workspace:*",
     "@crowscribe/typescript-config": "workspace:*",
-    "@types/react": "^19.2.2",
+    "@types/react": "^19.2.18",
     "eslint": "^9.39.1",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.3"
   }
 }
