@@ -115,7 +115,7 @@ hydrating and clicks silently fall through to native form submits. See
 `.github/workflows/ci.yml` runs on every push/PR to `master`/`develop`: a `checks` job
 (`pnpm lint`, `pnpm check-types`, `pnpm build`) and `e2e-shard` — a 4-way matrix
 (`playwright test --shard=k/4`), each shard builds the app (`pnpm --filter web build`) and
-Playwright serves the prebuilt output with `next start` (Build Order step 88 follow-up — driving
+Playwright serves the prebuilt output with `next start` (Build Order step 89 — driving
 `pnpm dev` in CI meant the first hit on each route paid a Turbopack compile that intermittently
 blew past the test timeout on the slower WebKit engine and cascaded). Locally the suite still
 runs against `pnpm dev` via `reuseExistingServer`. Each shard runs on its own runner with its
