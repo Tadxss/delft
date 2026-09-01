@@ -140,14 +140,16 @@ transfer, per-member vault-key sharing, a "Resend invite" button) are still open
 invitations are unrelated to the global signup-gate that was declined above** — that was about who
 can create an account at all; this is about sharing a workspace with someone who already can.
 
-**Production-readiness (Milestones A–C) is complete and deployed** — see Build Order steps 85–88.
+**Production-readiness (Milestones A–C) is complete and deployed** — see Build Order steps 85–89.
 The app is ready for a public beta (legal pages, account deletion, encrypted daily backups,
 branch-protected `master`, abuse caps, enforcing CSP, Cloudflare Turnstile on the login page —
-all live and verified, prod CAPTCHA confirmed end-to-end in a real browser). What's left is
-deliberate post-launch work, not blockers: Sentry source maps (C7, deferred on Turbopack),
+all live and verified, prod CAPTCHA confirmed end-to-end in a real browser). Step 89 then made
+CI's e2e serve a prebuilt `next start` build (fixing the intermittent WebKit shard timeouts) and
+fixed a real bug it surfaced — a magic-link `#access_token` left in the URL after sign-out. What's
+left is deliberate post-launch work, not blockers: Sentry source maps (C7, deferred on Turbopack),
 framework majors (React 19.2.8 / Next 16.3 / Tailwind v4 / TS 7 — Dependabot no longer
 auto-proposes these), nonce-based CSP, per-member vault-key sharing, real-device iOS testing.
-Step 88's full list is at the end of the Build Order.
+Steps 88–89's full detail is at the end of the Build Order.
 
 **Deploy status:** all migrations through `20260904000000_rpc_rate_limits_rls` are on hosted
 (`supabase db push`; `20260902000000`/`20260903000000`/`20260904000000` for Milestones B–C).
@@ -3092,14 +3094,55 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
       enables, magic-link sign-in completes. Headless Playwright can't clear a real Turnstile
       challenge (the always-pass test key bypasses it), so this needed a human pass — done.
 
+89. **CI e2e stability + the sign-out token-leak fix.** ✅ _done_ (PR #61, merged `cf1858c`,
+    deployed). Step 88's Turnstile CSP fix + Dependabot rework landed via #56; the round of
+    Dependabot PRs that followed kept flaking CI, and chasing that down surfaced two real
+    issues the dev server had been masking.
+    - **e2e now serves a prebuilt app in CI, not `pnpm dev`.** `apps/web/playwright.config.ts`'s
+      `webServer.command` is `pnpm --filter web start` under `CI` (and `pnpm dev` locally, via
+      `reuseExistingServer: !CI`); `.github/workflows/ci.yml` runs `pnpm --filter web build` per
+      shard before `playwright test` (job `timeout-minutes` 25 → 30). **Root cause it fixed:**
+      driving `pnpm dev` meant the first hit on each route paid a Turbopack compile that, under
+      runner load on the slower WebKit engine, blew past the 30 s test timeout and cascaded —
+      the intermittent "e2e-shard (N): every webkit test times out at ~30 s" failures on the #56
+      merge commit, #58, and #57. With a prebuilt `next start`, shard wall-clock roughly halved
+      and the flake is gone. `retries` is `CI ? 2 : 1`, per-test `timeout` `CI ? 30_000 :
+      60_000` (dev still pays the compile).
+    - **`#access_token` is no longer stranded in the URL after sign-out** — a real production
+      bug, only visible once CI served a real build. supabase-js's `detectSessionInUrl` clears
+      the magic-link callback hash via `history.replaceState` during async init, but a
+      production build's App Router captures the URL (hash included) at hydration and re-asserts
+      it on the next client navigation — so a still-valid access-token JWT lingered in the URL
+      bar, history, and referrer after login and even after sign-out. Fix: new
+      `apps/web/app/_components/AuthHashCleanup.tsx` (mounted in `providers.tsx` inside
+      `SupabaseProvider`) strips any `access_token` / `error=` hash on each `onAuthStateChange`
+      — which fires only *after* supabase-js has read the URL, so it never races sign-in — and
+      `AccountModal.tsx` + `onboarding/OnboardingFlow.tsx` now hard-navigate on sign-out
+      (`window.location.replace("/")` instead of `router.replace("/")`), which a stale hash
+      can't survive and which also guarantees in-memory state (vault keys, query cache) is gone.
+      `sign-in.spec.ts` already asserted the fragment is stripped on the *forward* path (that
+      always worked); `password-sign-in` / `username-sign-in` catch the sign-out path.
+    - **`csp.spec.ts` ignores `/_vercel/` script refusals** — Vercel Analytics / Speed-Insights
+      scripts are served only by Vercel's edge; under `next start` in CI they 404 as HTML and
+      `nosniff` refuses them. A CI artifact, not a CSP gap the app has in production.
+    - **Dependabot `react*` / `@tiptap/*` are now held at every update type** (not just major) —
+      see step 88's follow-up: `#58` reproduced the `localsInner` ProseMirror TypeError on
+      chromium *and* webkit via a "patch" react/tiptap bump.
+    - **Routine dependency bumps merged clean on the new CI:** `#57` (github-actions group),
+      `#62` (npm patch group — `@supabase/supabase-js`, `typescript` 5.9.3, `turbo`, eslint
+      plugins; no react/tiptap), `#63` (`@sentry/nextjs` 10.71), `#64` (`@tanstack/react-query`
+      5.102). The isolate-minors policy working — each arrived as its own PR, none needed a
+      re-run.
+
 **Production-readiness roadmap (Milestones A–C) is complete and fully deployed.** The system is
 ready for a public beta: legal pages, self-serve account deletion, daily encrypted DB backups,
 `master` branch protection, abuse caps, enforcing CSP, and Turnstile bot protection are all live
 and verified. Remaining work is deliberate post-launch iteration, not launch blockers:
 - **C7 — Sentry source maps** — deferred; Turbopack + `@sentry/nextjs@10.70` don't support map
   upload. Revisit when the SDK does.
-- **Framework upgrades** — React 19.2.8 / Next 16.3 (needs the mobile-safari `localsInner`
-  ProseMirror regression bisected), Tailwind v4 (config-format rewrite), TS 7 (wait for stable).
+- **Framework upgrades** — React 19.2.8 / Next 16.3 (needs the `localsInner` ProseMirror
+  regression — chromium + webkit — bisected), Tailwind v4 (config-format rewrite), TS 7 (wait
+  for stable).
   Each is its own tested piece of work; Dependabot no longer auto-proposes them.
 - **Nonce-based CSP** — drop `script-src 'unsafe-inline'`; needs a `middleware.ts`.
 - **Per-member vault-key sharing** — editors/viewers still can't see credentials; ownership
