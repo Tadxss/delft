@@ -17,7 +17,7 @@ test("set up a vault, add a credential, and confirm it re-prompts every time the
 
   await openWorkspaceMenu(page);
   await page.getByRole("menuitem", { name: "Credentials Vault" }).click();
-  await expect(page.getByText("Set up this workspace's vault")).toBeVisible();
+  await expect(page.getByText("Set up your vault")).toBeVisible();
 
   // First open — no vault_salt yet, so this is the "set up" form.
   await page.fill("#passphrase", "correct-horse-battery-staple");
@@ -48,7 +48,7 @@ test("set up a vault, add a credential, and confirm it re-prompts every time the
   // Close the modal — this must lock the vault (discard the in-memory key), not just hide the UI.
   await page.click('button[aria-label="Close"]');
   await expect(
-    page.getByText("Set up this workspace's vault"),
+    page.getByText("Set up your vault"),
   ).not.toBeVisible();
 
   // Reopen — since it always re-prompts on open (no "unlock once per session" behavior), this must

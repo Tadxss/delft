@@ -51,9 +51,8 @@ function ConfirmVaultResetContent() {
     <main className="mx-auto max-w-md px-6 py-10 text-sm">
       <Heading level="page">Confirm vault reset</Heading>
       <p className="mt-3 text-ink-500">
-        This will permanently delete every credential currently stored in{" "}
-        {workspace?.name ?? "this workspace"}&apos;s vault. This cannot be
-        undone.
+        This will permanently delete every credential in your vault for{" "}
+        {workspace?.name ?? "this workspace"}. This cannot be undone.
       </p>
       <Button
         variant="destructive"

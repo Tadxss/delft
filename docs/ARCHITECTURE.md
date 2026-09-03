@@ -140,7 +140,7 @@ transfer, per-member vault-key sharing, a "Resend invite" button) are still open
 invitations are unrelated to the global signup-gate that was declined above** — that was about who
 can create an account at all; this is about sharing a workspace with someone who already can.
 
-**Production-readiness (Milestones A–C) is complete and deployed** — see Build Order steps 85–92.
+**Production-readiness (Milestones A–C) is complete and deployed** — see Build Order steps 85–93.
 The app is ready for a public beta (legal pages, account deletion, encrypted daily backups,
 branch-protected `master`, abuse caps, enforcing CSP, Cloudflare Turnstile on the login page —
 all live and verified, prod CAPTCHA confirmed end-to-end in a real browser). Step 89 then made
@@ -151,10 +151,11 @@ post-launch work, not blockers: Sentry source maps (C7, deferred on Turbopack), 
 (React 19.2.8 / Tailwind v4 / TS 7 — Dependabot no longer auto-proposes these; Next reached
 16.3.3 via #67), nonce-based CSP, real-device iOS testing. Step 91 grouped "Export my data" +
 "Delete account" under a "Security & data" sub-section (delete now takes a full-name signature;
-export shows a confirmation first). **Step 92 shipped per-member vaults** — the plumbing
-(`workspace_vaults` table, per-member credential RLS, ownership-transfer unblocked, legacy path
-removed); PR 2 opens the vault UI to every member.
-Steps 88–92's full detail is at the end of the Build Order.
+export shows a confirmation first). **Steps 92–93 shipped per-member vaults** — every member of a
+shared workspace now has their own private credentials vault (`workspace_vaults` table,
+per-member RLS, ownership transfer no longer blocked by a vault, legacy pre-wrapped-key path
+removed).
+Steps 88–93's full detail is at the end of the Build Order.
 
 **Deploy status:** all migrations through `20260904000000_rpc_rate_limits_rls` are on hosted
 (`supabase db push`; `20260902000000`/`20260903000000`/`20260904000000` for Milestones B–C).
@@ -3223,6 +3224,16 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
       (they fail `has_workspace_access`); re-inviting restores access; account/workspace deletion
       cascades them away. Deliberate — member removal doesn't destroy that member's own data.
 
+93. **Per-member vaults — UI (PR 2 of 2).** ✅ _done_. Opens the feature to non-owner members:
+    - `SidebarHeader.tsx` — the "Credentials Vault" menu item is no longer `{isOwner && …}`;
+      every member of any role sees it (their own private vault). "Members" stays owner-only.
+    - `VaultUnlockPanel.tsx` / vault-reset pages — copy reframed from "this workspace's vault" to
+      "your vault" / "your private vault for this workspace — only you can see what's in it".
+    - e2e: new `member-vaults.spec.ts` (two contexts) — A and B in one workspace each get the
+      *setup* form (neither inherits the other's vault), each adds a credential, and neither
+      vault ever shows the other's row. `workspace-invitations.spec.ts` flipped (viewer B now
+      sees "Credentials Vault"); `credentials.spec.ts` copy assertions updated.
+
 **Production-readiness roadmap (Milestones A–C) is complete and fully deployed.** The system is
 ready for a public beta: legal pages, self-serve account deletion, daily encrypted DB backups,
 `master` branch protection, abuse caps, enforcing CSP, and Turnstile bot protection are all live
@@ -3234,10 +3245,5 @@ and verified. Remaining work is deliberate post-launch iteration, not launch blo
   v4 (config-format rewrite), TS 7 (wait for stable). Next reached 16.3.3 via `#67` (step 89) —
   clean on the full e2e suite. Each remaining one is its own tested piece of work.
 - **Nonce-based CSP** — drop `script-src 'unsafe-inline'`; needs a `middleware.ts`.
-- **Per-member vaults in shared workspaces — PR 2 (UI).** The plumbing shipped as step 92 (new
-  `workspace_vaults` table, per-member credential RLS, ownership-transfer unblocked). PR 2 opens
-  the "Credentials Vault" menu item to **every member** (not just the owner), adjusts the
-  setup/unlock copy for non-owners, and adds a two-user e2e proving each member's vault is
-  independent and invisible to the others.
 - **Real-device iOS Safari testing** — only emulated mobile-safari so far.
 - **Step 79 follow-ups** — a "Resend invite" button (ownership transfer shipped as C5).

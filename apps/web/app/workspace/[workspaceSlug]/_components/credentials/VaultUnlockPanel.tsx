@@ -172,12 +172,12 @@ export function VaultUnlockPanel({
     <div className="flex flex-1 items-center p-10">
       <div className="mx-auto w-full max-w-sm">
         <h2 className="text-sm font-medium text-ink-800">
-          {isSetup ? "Set up this workspace's vault" : "Unlock vault"}
+          {isSetup ? "Set up your vault" : "Unlock vault"}
         </h2>
         <p className="mt-1 text-xs text-ink-500">
           {isSetup
-            ? "This passphrase is separate from your login and is never sent to the server — only you can decrypt what you store here. You'll get a recovery key next in case you ever forget it."
-            : "Enter your vault passphrase to view and manage this workspace's credentials."}
+            ? "Your private vault for this workspace — only you can see what's in it, not other members or the workspace owner. This passphrase is separate from your login and is never sent to the server. You'll get a recovery key next in case you ever forget it."
+            : "Enter your vault passphrase to view and manage your credentials for this workspace."}
         </p>
         <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-3">
           <FormLabel htmlFor="passphrase">Vault passphrase</FormLabel>

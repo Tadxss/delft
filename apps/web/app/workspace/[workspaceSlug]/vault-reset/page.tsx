@@ -45,7 +45,7 @@ export default function VaultResetRequestPage() {
   return (
     <main className="mx-auto max-w-md px-6 py-10 text-sm">
       <Heading level="page">
-        Reset {workspace?.name ?? "this workspace"}&apos;s vault
+        Reset your vault in {workspace?.name ?? "this workspace"}
       </Heading>
       <p className="mt-3 text-ink-500">
         Use this only if you&apos;ve lost both this vault&apos;s passphrase{" "}

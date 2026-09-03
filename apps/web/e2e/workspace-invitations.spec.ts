@@ -91,7 +91,9 @@ test("invite by email → accept → edit as editor → demote to viewer (read-o
   await a.page.waitForTimeout(500);
   await a.page.getByRole("button", { name: "Close" }).click();
 
-  // B: reload → editor is read-only, no "New page" button, no Credentials Vault.
+  // B: reload → editor is read-only, no "New page" button. The "Credentials Vault" item IS
+  // present for every member now (their own private vault — Build Order step 92), but "Members"
+  // stays owner-only.
   await b.page.reload();
   await expect(b.page.locator('[contenteditable="false"]').first()).toBeVisible();
   await expect(b.page.getByText("View only")).toBeVisible();
@@ -104,6 +106,9 @@ test("invite by email → accept → edit as editor → demote to viewer (read-o
   ).click();
   await expect(
     b.page.getByRole("menuitem", { name: "Credentials Vault" }),
+  ).toBeVisible();
+  await expect(
+    b.page.getByRole("menuitem", { name: "Members" }),
   ).toHaveCount(0);
   await b.page.keyboard.press("Escape");
 

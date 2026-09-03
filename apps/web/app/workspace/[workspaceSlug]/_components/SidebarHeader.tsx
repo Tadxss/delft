@@ -124,19 +124,19 @@ export function SidebarHeader({ onCollapse }: { onCollapse: () => void }) {
                 Switch workspace
               </button>
               <div role="separator" className="my-1 h-px bg-paper-200" />
-              {isOwner && (
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    setCredentialsOpen(true);
-                  }}
-                  className="block w-full px-3 py-1.5 text-left text-xs text-ink-700 hover:bg-paper-100"
-                >
-                  Credentials Vault
-                </button>
-              )}
+              {/* Every member of any role gets their own private vault in this workspace
+                  (Build Order step 92) — not owner-gated. */}
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setCredentialsOpen(true);
+                }}
+                className="block w-full px-3 py-1.5 text-left text-xs text-ink-700 hover:bg-paper-100"
+              >
+                Credentials Vault
+              </button>
               <button
                 type="button"
                 role="menuitem"
