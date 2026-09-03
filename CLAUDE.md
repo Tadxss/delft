@@ -29,11 +29,14 @@ invitation emails (PR #44); the `crowscribe.space` domain switch (82), Resend go
 `send.crowscribe.space` (83), and branded email templates (84) via PR #45. All email is now
 branded and live — invite email via the Edge Function, auth (magic-link) email via Resend custom
 SMTP + dashboard templates. **The production-readiness roadmap (Milestones A–C, Build Order steps
-85–88) is complete and deployed** — legal pages (Privacy/Terms/Contact), self-serve account
+85–90) is complete and deployed** — legal pages (Privacy/Terms/Contact), self-serve account
 deletion (`supabase/functions/delete-account/`), daily encrypted DB backup
 (`.github/workflows/db-backup.yml`), branch-protected `master`, DB-level abuse caps, editor
 unsaved-changes + stale-write guards, **enforcing CSP**, **Cloudflare Turnstile on the login
-page**, account data export, and workspace ownership transfer. The app is ready for a public beta;
+page**, account data export, and workspace ownership transfer. Steps 89–90 since: CI's e2e suite
+runs against a prebuilt `next start` build (fixed the flaky WebKit shard timeouts) and a
+magic-link token no longer lingers in the URL after sign-out; Google OAuth was reverted from a
+popup to a same-tab redirect. The app is ready for a public beta;
 what's left (Sentry source maps on Turbopack, framework majors, nonce CSP, per-member vault-key
 sharing, real-device iOS) is deliberate post-launch work. See ARCHITECTURE.md's
 **Next Up** for current focus and the Build Order for how each feature shipped;

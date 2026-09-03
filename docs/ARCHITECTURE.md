@@ -2948,7 +2948,7 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
       CI gate all shipped; the readiness plan's "should-fix" (Milestone B) and "later" items are
       still open.
 
-86. **Production-readiness — Milestone B (safe with strangers signing up).** _in progress_.
+86. **Production-readiness — Milestone B (safe with strangers signing up).** ✅ _done_.
     Closes the "should-fix before opening signup wide" set. The theme: `BETA_READINESS.md`
     accepted several risks "for one trusted user", which open signup + multi-user invalidate.
     - **Abuse caps** ✅ — `20260902000000_abuse_caps.sql`. `octet_length(content::text)` CHECK
@@ -2992,7 +2992,7 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
     live, prod CSP report-only header verified). Source-map upload, CAPTCHA/Turnstile, the
     enforcing-CSP flip, and nonce-based CSP carried into Milestone C.
 
-87. **Production-readiness — Milestone C (hardening + deferred features).** _in progress_. The
+87. **Production-readiness — Milestone C (hardening + deferred features).** ✅ _done_. The
     infra hardening set plus the three deferred features the owner opted into (CAPTCHA on signup,
     data export, workspace ownership transfer), and flipping the CSP to enforcing. Shipped as one
     sub-PR per slice.
