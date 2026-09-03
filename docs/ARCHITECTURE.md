@@ -140,16 +140,17 @@ transfer, per-member vault-key sharing, a "Resend invite" button) are still open
 invitations are unrelated to the global signup-gate that was declined above** — that was about who
 can create an account at all; this is about sharing a workspace with someone who already can.
 
-**Production-readiness (Milestones A–C) is complete and deployed** — see Build Order steps 85–89.
+**Production-readiness (Milestones A–C) is complete and deployed** — see Build Order steps 85–90.
 The app is ready for a public beta (legal pages, account deletion, encrypted daily backups,
 branch-protected `master`, abuse caps, enforcing CSP, Cloudflare Turnstile on the login page —
 all live and verified, prod CAPTCHA confirmed end-to-end in a real browser). Step 89 then made
 CI's e2e serve a prebuilt `next start` build (fixing the intermittent WebKit shard timeouts) and
-fixed a real bug it surfaced — a magic-link `#access_token` left in the URL after sign-out. What's
-left is deliberate post-launch work, not blockers: Sentry source maps (C7, deferred on Turbopack),
-framework majors (React 19.2.8 / Next 16.3 / Tailwind v4 / TS 7 — Dependabot no longer
-auto-proposes these), nonce-based CSP, per-member vault-key sharing, real-device iOS testing.
-Steps 88–89's full detail is at the end of the Build Order.
+fixed a real bug it surfaced — a magic-link `#access_token` left in the URL after sign-out; step 90
+reverted Google OAuth from a popup back to a same-tab redirect. What's left is deliberate
+post-launch work, not blockers: Sentry source maps (C7, deferred on Turbopack), framework majors
+(React 19.2.8 / Tailwind v4 / TS 7 — Dependabot no longer auto-proposes these; Next reached
+16.3.3 via #67), nonce-based CSP, per-member vault-key sharing, real-device iOS testing.
+Steps 88–90's full detail is at the end of the Build Order.
 
 **Deploy status:** all migrations through `20260904000000_rpc_rate_limits_rls` are on hosted
 (`supabase db push`; `20260902000000`/`20260903000000`/`20260904000000` for Milestones B–C).
@@ -510,7 +511,9 @@ workspace_members` instead of just filtering to zero rows. Fixed by scoping ever
       inheriting this app's own `paper`/`ink` theme tokens, since real Google buttons intentionally
       don't reskin to match the host page.
 
-    - **Google OAuth as a popup, not a full-tab redirect.** `useSignInWithGoogle`
+    - **Google OAuth as a popup, not a full-tab redirect.** _(Superseded by step 90 — the popup
+      opened a jarring separate Chrome window and the cross-tab handoff was flaky; reverted to a
+      plain full-page redirect.)_ `useSignInWithGoogle`
       (`packages/shared/src/hooks/`) now calls `signInWithOAuth` with `skipBrowserRedirect: true`
       and returns the authorize URL instead of navigating itself; `page.tsx`'s `handleGoogleClick`
       opens that URL in a small centered `window.open(...)` popup (falling back to a full-page
@@ -1501,7 +1504,8 @@ Storage usage — see **Next Up** above.
       different from Vercel's redirect: it stops the browser from ever attempting plain HTTP again,
       closing the downgrade-on-first-request gap that a redirect-after-the-fact doesn't cover),
       `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` (safe — confirmed zero `<iframe>`
-      usage anywhere in `apps/web`; Google sign-in is a popup, not an embed), `Referrer-Policy:
+      usage anywhere in `apps/web`; Google sign-in is a full-page redirect, not an embed),
+      `Referrer-Policy:
 strict-origin-when-cross-origin`, and a `Permissions-Policy` denying camera/mic/geolocation
       (unused by the app). Verified live: `curl -D -` against the dev server showed all five headers
       present, then the full `chromium` e2e suite (16/16, including sign-in flows) still passed with
@@ -3131,8 +3135,25 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
     - **Routine dependency bumps merged clean on the new CI:** `#57` (github-actions group),
       `#62` (npm patch group — `@supabase/supabase-js`, `typescript` 5.9.3, `turbo`, eslint
       plugins; no react/tiptap), `#63` (`@sentry/nextjs` 10.71), `#64` (`@tanstack/react-query`
-      5.102). The isolate-minors policy working — each arrived as its own PR, none needed a
-      re-run.
+      5.102), plus `#66`/`#67` since (`@sentry/nextjs` 10.72, `next` 16.3.3 — the latter green
+      across all four shards on the real build, so the `localsInner` regression was react/@tiptap,
+      not Next). The isolate-minors policy working — each arrived as its own PR.
+
+90. **Google OAuth: popup → full-page redirect.** ✅ _done_. Step 15 had made "Continue with
+    Google" open a small `window.open(...)` popup, relying on GoTrueClient's cross-tab
+    `BroadcastChannel` to hand the session back to the main tab. In practice Chrome renders a
+    sized `window.open` as a **separate window** (not a tab), and the hand-off could fail to
+    propagate — the popup window would end up signed in while the original tab sat on the login
+    page. Reverted to step 14's behaviour: `useSignInWithGoogle` drops `skipBrowserRedirect`, so
+    `signInWithOAuth` navigates the current tab to Google itself (`@supabase/auth-js` does the
+    `window.location.assign` — `GoTrueClient.js`), and the tab lands back on `redirectTo`
+    (`window.location.origin`) with the session in the URL — the same implicit-flow
+    `#access_token` path magic link uses, already stripped by step 89's `AuthHashCleanup`.
+    `page.tsx` loses ~40 lines of popup/poll/`?authPopup=1` machinery; the post-auth effect is
+    now just `if (!loading && user) router.replace("/workspace")`. No `flowType`, config, or
+    hosted-dashboard change (the redirect allow-list already covers `origin`). Not e2e-covered
+    (Google's real consent screen never was); verified manually + `pnpm lint`/`check-types`/
+    `build` + the full e2e suite.
 
 **Production-readiness roadmap (Milestones A–C) is complete and fully deployed.** The system is
 ready for a public beta: legal pages, self-serve account deletion, daily encrypted DB backups,
@@ -3140,10 +3161,10 @@ ready for a public beta: legal pages, self-serve account deletion, daily encrypt
 and verified. Remaining work is deliberate post-launch iteration, not launch blockers:
 - **C7 — Sentry source maps** — deferred; Turbopack + `@sentry/nextjs@10.70` don't support map
   upload. Revisit when the SDK does.
-- **Framework upgrades** — React 19.2.8 / Next 16.3 (needs the `localsInner` ProseMirror
-  regression — chromium + webkit — bisected), Tailwind v4 (config-format rewrite), TS 7 (wait
-  for stable).
-  Each is its own tested piece of work; Dependabot no longer auto-proposes them.
+- **Framework upgrades** — React 19.2.8 (still needs the `localsInner` ProseMirror regression —
+  chromium + webkit — bisected; `react*`/`@tiptap/*` are Dependabot-ignored until then), Tailwind
+  v4 (config-format rewrite), TS 7 (wait for stable). Next reached 16.3.3 via `#67` (step 89) —
+  clean on the full e2e suite. Each remaining one is its own tested piece of work.
 - **Nonce-based CSP** — drop `script-src 'unsafe-inline'`; needs a `middleware.ts`.
 - **Per-member vault-key sharing** — editors/viewers still can't see credentials; ownership
   transfer is blocked while a vault exists (step 87, C5).
