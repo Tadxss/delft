@@ -27,7 +27,7 @@ import { UsageCheckboxes } from "./UsageCheckboxes";
 
 const MIN_PASSWORD_LENGTH = 8;
 
-type View = "list" | "password" | "profile" | "theme" | "delete";
+type View = "list" | "password" | "profile" | "theme" | "data";
 
 export function AccountModal({
   open,
@@ -39,35 +39,11 @@ export function AccountModal({
   const { user } = useAuthUser();
   const signOut = useSignOut();
   const setPassword = useSetPassword();
-  const supabase = useSupabaseClient();
-  const { getKey } = useVaultKeys();
   const [view, setView] = useState<View>("list");
   const [password, setPasswordValue] = useState("");
   const [confirm, setConfirm] = useState("");
   const [saved, setSaved] = useState(false);
   const [mismatch, setMismatch] = useState(false);
-  const [exporting, setExporting] = useState(false);
-  const [exportError, setExportError] = useState<string | null>(null);
-
-  async function handleExport() {
-    setExporting(true);
-    setExportError(null);
-    try {
-      const data = await buildAccountExport(
-        supabase,
-        user?.email ?? null,
-        getKey,
-      );
-      downloadJson(
-        `crowscribe-export-${new Date().toISOString().slice(0, 10)}.json`,
-        data,
-      );
-    } catch (e) {
-      setExportError(e instanceof Error ? e.message : "Export failed");
-    } finally {
-      setExporting(false);
-    }
-  }
 
   // Never resume mid-drill-down on reopen — same reset-on-close pattern CredentialsModal uses.
   useEffect(() => {
@@ -112,8 +88,8 @@ export function AccountModal({
       ? "Password"
       : view === "theme"
         ? "Dark Mode"
-        : view === "delete"
-          ? "Delete account"
+        : view === "data"
+          ? "Security & data"
           : "Update profile";
 
   return (
@@ -176,16 +152,12 @@ export function AccountModal({
 
           <button
             type="button"
-            onClick={handleExport}
-            disabled={exporting}
-            className="flex w-full items-center justify-between rounded-md border border-paper-200 bg-paper-100 px-4 py-3 text-left text-sm text-ink-800 hover:bg-paper-200 disabled:opacity-60"
+            onClick={() => setView("data")}
+            className="flex w-full items-center justify-between rounded-md border border-paper-200 bg-paper-100 px-4 py-3 text-left text-sm text-ink-800 hover:bg-paper-200"
           >
-            {exporting ? "Preparing…" : "Export my data"}
+            Security &amp; data
             <ChevronRight size={14} className="text-ink-400" />
           </button>
-          {exportError && (
-            <p className="-mt-2 text-xs text-red-700">{exportError}</p>
-          )}
 
           <button
             type="button"
@@ -195,18 +167,9 @@ export function AccountModal({
             <LogOut size={14} />
             Sign out
           </button>
-
-          <button
-            type="button"
-            onClick={() => setView("delete")}
-            className="mt-2 flex w-full items-center justify-between rounded-md border border-red-200 px-4 py-3 text-left text-sm text-red-700 hover:bg-red-50 dark:border-red-900/50 dark:hover:bg-red-950/30"
-          >
-            Delete account
-            <ChevronRight size={14} className="opacity-60" />
-          </button>
         </div>
-      ) : view === "delete" ? (
-        <DeleteAccountPanel email={user?.email} onDeleted={onClose} />
+      ) : view === "data" ? (
+        <DataPanel user={user} onDeleted={onClose} />
       ) : view === "password" ? (
         <div className="flex flex-col gap-2 overflow-y-auto p-4">
           <p className="text-xs text-ink-500">
@@ -257,6 +220,273 @@ export function AccountModal({
       ) : (
         <ProfileForm userId={user?.id} />
       )}
+    </Modal>
+  );
+}
+
+function DataPanel({
+  user,
+  onDeleted,
+}: {
+  user: { id?: string; email?: string } | null | undefined;
+  onDeleted: () => void;
+}) {
+  const [showExport, setShowExport] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
+
+  return (
+    <div className="flex flex-col gap-4 overflow-y-auto p-4">
+      <p className="text-xs text-ink-500">
+        Download a copy of everything you&apos;ve created, or permanently close
+        your account.
+      </p>
+
+      <button
+        type="button"
+        onClick={() => setShowExport(true)}
+        className="flex w-full items-center justify-between rounded-md border border-paper-200 bg-paper-100 px-4 py-3 text-left text-sm text-ink-800 hover:bg-paper-200"
+      >
+        Export my data
+        <ChevronRight size={14} className="text-ink-400" />
+      </button>
+
+      <button
+        type="button"
+        onClick={() => setShowDelete(true)}
+        className="flex w-full items-center justify-between rounded-md border border-red-200 px-4 py-3 text-left text-sm text-red-700 hover:bg-red-50 dark:border-red-900/50 dark:hover:bg-red-950/30"
+      >
+        Delete account
+        <ChevronRight size={14} className="opacity-60" />
+      </button>
+
+      <ExportConfirmModal
+        open={showExport}
+        onClose={() => setShowExport(false)}
+        email={user?.email}
+      />
+      <DeleteAccountModal
+        open={showDelete}
+        onClose={() => setShowDelete(false)}
+        userId={user?.id}
+        email={user?.email}
+        onDeleted={onDeleted}
+      />
+    </div>
+  );
+}
+
+function ExportConfirmModal({
+  open,
+  onClose,
+  email,
+}: {
+  open: boolean;
+  onClose: () => void;
+  email: string | undefined;
+}) {
+  const supabase = useSupabaseClient();
+  const { getKey } = useVaultKeys();
+  const [exporting, setExporting] = useState(false);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      setDone(false);
+      setError(null);
+      setExporting(false);
+    }
+  }, [open]);
+
+  async function handleExport() {
+    setExporting(true);
+    setError(null);
+    try {
+      const data = await buildAccountExport(supabase, email ?? null, getKey);
+      downloadJson(
+        `crowscribe-export-${new Date().toISOString().slice(0, 10)}.json`,
+        data,
+      );
+      setDone(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Export failed");
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} widthClassName="max-w-sm">
+      <div className="flex shrink-0 items-center justify-between border-b border-paper-200 px-4 py-2">
+        <span className="text-sm font-medium text-ink-800">Export my data</span>
+        <Button variant="ghost" onClick={onClose} aria-label="Close">
+          <X size={16} />
+        </Button>
+      </div>
+      <div className="flex flex-col gap-3 overflow-y-auto p-4">
+        <p className="text-sm text-ink-700">
+          This downloads a single JSON file with everything you can see:
+        </p>
+        <ul className="ml-4 list-disc space-y-1 text-xs text-ink-600">
+          <li>every workspace you own or belong to</li>
+          <li>its pages (full content), canvases, and folders</li>
+          <li>
+            its credentials in <span className="font-medium">encrypted</span>{" "}
+            form — decrypt them offline with your vault passphrase (any vault
+            you have unlocked right now is also included decrypted)
+          </li>
+        </ul>
+        <p className="text-xs text-ink-500">
+          Keep the file somewhere safe — it contains your data. Nothing is sent
+          anywhere; the file is built in your browser.
+        </p>
+
+        {error && <p className="text-xs text-red-700">{error}</p>}
+        {done && (
+          <p className="text-xs text-emerald-700">
+            Export downloaded. Check your browser&apos;s downloads.
+          </p>
+        )}
+
+        <div className="mt-1 flex justify-end gap-2">
+          <Button variant="secondary" onClick={onClose}>
+            {done ? "Close" : "Cancel"}
+          </Button>
+          {!done && (
+            <Button onClick={handleExport} disabled={exporting}>
+              {exporting ? "Preparing…" : "Download export"}
+            </Button>
+          )}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function DeleteAccountModal({
+  open,
+  onClose,
+  userId,
+  email,
+  onDeleted,
+}: {
+  open: boolean;
+  onClose: () => void;
+  userId: string | undefined;
+  email: string | undefined;
+  onDeleted: () => void;
+}) {
+  const deleteAccount = useDeleteAccount();
+  const { data: profile } = useProfile(userId);
+  const [confirmText, setConfirmText] = useState("");
+
+  useEffect(() => {
+    if (!open) {
+      setConfirmText("");
+      deleteAccount.reset();
+    }
+    // deleteAccount.reset is stable; excluding it keeps this to an open/close effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const fullName = [profile?.firstName, profile?.middleName, profile?.lastName]
+    .map((s) => s?.trim())
+    .filter(Boolean)
+    .join(" ");
+  const armed =
+    fullName.length > 0 &&
+    confirmText.trim().replace(/\s+/g, " ").toLowerCase() ===
+      fullName.toLowerCase();
+
+  const blocked =
+    deleteAccount.error instanceof AccountDeletionBlockedError
+      ? deleteAccount.error
+      : null;
+
+  function handleDelete() {
+    if (!armed) return;
+    deleteAccount.mutate(undefined, { onSuccess: onDeleted });
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} widthClassName="max-w-sm">
+      <div className="flex shrink-0 items-center justify-between border-b border-paper-200 px-4 py-2">
+        <span className="text-sm font-medium text-ink-800">Delete account</span>
+        <Button variant="ghost" onClick={onClose} aria-label="Close">
+          <X size={16} />
+        </Button>
+      </div>
+      <div className="flex flex-col gap-3 overflow-y-auto p-4">
+        <p className="text-sm text-ink-700">
+          This permanently deletes{" "}
+          <span className="font-medium text-ink-800">{email}</span>, your
+          profile, and every workspace you own along with its pages, canvases,
+          and credentials vault.
+        </p>
+        <p className="text-xs text-ink-500">
+          This cannot be undone. Workspaces where you&apos;re a member (not the
+          owner) are unaffected — you&apos;re simply removed from them.
+        </p>
+
+        {blocked ? (
+          <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+            You still own {blocked.workspaces.length === 1 ? "a" : ""} shared
+            workspace{blocked.workspaces.length > 1 ? "s" : ""}:{" "}
+            <span className="font-medium">
+              {blocked.workspaces.join(", ")}
+            </span>
+            . Transfer {blocked.workspaces.length > 1 ? "them" : "it"} to another
+            member (Members → Make owner), remove the other members, or delete{" "}
+            {blocked.workspaces.length > 1
+              ? "those workspaces"
+              : "that workspace"}
+            , then try again.
+          </div>
+        ) : (
+          deleteAccount.isError && (
+            <p className="text-xs text-red-700">
+              {deleteAccount.error.message}
+            </p>
+          )
+        )}
+
+        {profile === undefined ? (
+          <p className="text-sm text-ink-400">Loading…</p>
+        ) : fullName.length === 0 ? (
+          <p className="text-xs text-amber-700">
+            Add your name under <span className="font-medium">Update
+            profile</span> first — it&apos;s used to confirm this.
+          </p>
+        ) : (
+          <>
+            <FormLabel htmlFor="delete-confirm">
+              Type your full name{" "}
+              <span className="font-semibold">({fullName})</span> to confirm
+            </FormLabel>
+            <Input
+              id="delete-confirm"
+              autoComplete="off"
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+            />
+          </>
+        )}
+
+        <div className="mt-1 flex justify-end gap-2">
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={handleDelete}
+            disabled={!armed || deleteAccount.isPending}
+          >
+            {deleteAccount.isPending
+              ? "Deleting…"
+              : "Permanently delete my account"}
+          </Button>
+        </div>
+      </div>
     </Modal>
   );
 }
@@ -321,81 +551,6 @@ function ThemePicker() {
           );
         })}
       </div>
-    </div>
-  );
-}
-
-function DeleteAccountPanel({
-  email,
-  onDeleted,
-}: {
-  email: string | undefined;
-  onDeleted: () => void;
-}) {
-  const deleteAccount = useDeleteAccount();
-  const [confirmText, setConfirmText] = useState("");
-  const armed = confirmText.trim().toLowerCase() === "delete";
-
-  const blocked =
-    deleteAccount.error instanceof AccountDeletionBlockedError
-      ? deleteAccount.error
-      : null;
-
-  function handleDelete() {
-    if (!armed) return;
-    deleteAccount.mutate(undefined, { onSuccess: onDeleted });
-  }
-
-  return (
-    <div className="flex flex-col gap-3 overflow-y-auto p-4">
-      <p className="text-sm text-ink-700">
-        This permanently deletes{" "}
-        <span className="font-medium text-ink-800">{email}</span>, your profile,
-        and every workspace you own along with its pages, canvases, and
-        credentials vault.
-      </p>
-      <p className="text-xs text-ink-500">
-        This cannot be undone. Workspaces where you&apos;re a member (not the
-        owner) are unaffected — you&apos;re simply removed from them.
-      </p>
-
-      {blocked ? (
-        <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
-          You still own {blocked.workspaces.length === 1 ? "a" : ""} shared
-          workspace{blocked.workspaces.length > 1 ? "s" : ""}:{" "}
-          <span className="font-medium">{blocked.workspaces.join(", ")}</span>.
-          Transfer{" "}
-          {blocked.workspaces.length > 1 ? "them" : "it"} to another member
-          (Members → Make owner), remove the other members, or delete{" "}
-          {blocked.workspaces.length > 1 ? "those workspaces" : "that workspace"}
-          , then try again.
-        </div>
-      ) : (
-        deleteAccount.isError && (
-          <p className="text-xs text-red-700">{deleteAccount.error.message}</p>
-        )
-      )}
-
-      <FormLabel htmlFor="delete-confirm">
-        Type <span className="font-semibold">delete</span> to confirm
-      </FormLabel>
-      <Input
-        id="delete-confirm"
-        autoComplete="off"
-        value={confirmText}
-        onChange={(e) => setConfirmText(e.target.value)}
-      />
-
-      <button
-        type="button"
-        onClick={handleDelete}
-        disabled={!armed || deleteAccount.isPending}
-        className="mt-1 rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
-      >
-        {deleteAccount.isPending
-          ? "Deleting…"
-          : "Permanently delete my account"}
-      </button>
     </div>
   );
 }

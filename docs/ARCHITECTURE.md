@@ -140,7 +140,7 @@ transfer, per-member vault-key sharing, a "Resend invite" button) are still open
 invitations are unrelated to the global signup-gate that was declined above** — that was about who
 can create an account at all; this is about sharing a workspace with someone who already can.
 
-**Production-readiness (Milestones A–C) is complete and deployed** — see Build Order steps 85–90.
+**Production-readiness (Milestones A–C) is complete and deployed** — see Build Order steps 85–91.
 The app is ready for a public beta (legal pages, account deletion, encrypted daily backups,
 branch-protected `master`, abuse caps, enforcing CSP, Cloudflare Turnstile on the login page —
 all live and verified, prod CAPTCHA confirmed end-to-end in a real browser). Step 89 then made
@@ -149,8 +149,10 @@ fixed a real bug it surfaced — a magic-link `#access_token` left in the URL af
 reverted Google OAuth from a popup back to a same-tab redirect. What's left is deliberate
 post-launch work, not blockers: Sentry source maps (C7, deferred on Turbopack), framework majors
 (React 19.2.8 / Tailwind v4 / TS 7 — Dependabot no longer auto-proposes these; Next reached
-16.3.3 via #67), nonce-based CSP, per-member vault-key sharing, real-device iOS testing.
-Steps 88–90's full detail is at the end of the Build Order.
+16.3.3 via #67), nonce-based CSP, per-member vaults in shared workspaces, real-device iOS testing.
+Step 91 grouped "Export my data" + "Delete account" under a "Security & data" sub-section (delete
+now takes a full-name signature; export shows a confirmation first).
+Steps 88–91's full detail is at the end of the Build Order.
 
 **Deploy status:** all migrations through `20260904000000_rpc_rate_limits_rls` are on hosted
 (`supabase db push`; `20260902000000`/`20260903000000`/`20260904000000` for Milestones B–C).
@@ -3155,6 +3157,26 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
     (Google's real consent screen never was); verified manually + `pnpm lint`/`check-types`/
     `build` + the full e2e suite.
 
+91. **Account modal: "Security & data" sub-section; delete = full-name signature; export
+    confirmation.** ✅ _done_. "Export my data" and "Delete account" were loose top-level rows in
+    `AccountModal.tsx` next to Profile / Password / Dark Mode. Grouped both behind a new
+    **Security & data** drill-down row (`view: "data"` → new `DataPanel`). Two changes to how
+    each fires:
+    - **Export** now opens a confirmation modal (`ExportConfirmModal`, a nested `<Modal>`) that
+      lists what the JSON contains (workspaces you own/belong to; pages/canvases/folders;
+      credentials in encrypted form, decrypted inline only for vaults unlocked at export time)
+      and notes it's built client-side. Cancel / **Download export**. `buildAccountExport` +
+      `downloadJson` unchanged.
+    - **Delete** now opens a nested confirmation modal (`DeleteAccountModal`) where you must
+      type your **profile full name** (`firstName [middleName] lastName`, case-insensitive,
+      whitespace-collapsed) as a signature — replacing the old "type `delete`" gate. Onboarding
+      is mandatory and always sets first + last, so there's always a name; a defensive
+      "add your name first" message covers the impossible empty case. Keeps the
+      `AccountDeletionBlockedError` amber box and `useDeleteAccount`.
+    `Modal.tsx` already supported nested instances (its Escape/Tab handler is focus-scoped). e2e
+    `account-deletion.spec.ts` / `data-export.spec.ts` updated for the new nav path
+    (`Account settings → Security & data → …`) + the full-name gate + the export confirm step.
+
 **Production-readiness roadmap (Milestones A–C) is complete and fully deployed.** The system is
 ready for a public beta: legal pages, self-serve account deletion, daily encrypted DB backups,
 `master` branch protection, abuse caps, enforcing CSP, and Turnstile bot protection are all live
@@ -3166,7 +3188,14 @@ and verified. Remaining work is deliberate post-launch iteration, not launch blo
   v4 (config-format rewrite), TS 7 (wait for stable). Next reached 16.3.3 via `#67` (step 89) —
   clean on the full e2e suite. Each remaining one is its own tested piece of work.
 - **Nonce-based CSP** — drop `script-src 'unsafe-inline'`; needs a `middleware.ts`.
-- **Per-member vault-key sharing** — editors/viewers still can't see credentials; ownership
-  transfer is blocked while a vault exists (step 87, C5).
+- **Per-member vaults in shared workspaces** — the workspace owner's vault is private by design
+  (credentials/`credential_folders` RLS is owner-only since step 79 — the per-workspace VMK is
+  bound to the owner's passphrase and can't be handed out). The intended model, not yet built:
+  each non-owner member creates their **own** independent vault in that workspace (their own
+  passphrase, their own credential rows, invisible to everyone else). A scoped schema/crypto/RLS
+  change — a new `workspace_vaults` table keyed `(workspace_id, user_id)`, a `user_id` column on
+  `credentials`/`credential_folders`, an RLS rewrite (rls-reviewer), the ~8 vault-crypto hooks
+  retargeted, and a one-time data-migration of the single hosted owner vault. It also lifts
+  `transfer_workspace_ownership`'s "blocked while a vault exists" check (step 87, C5).
 - **Real-device iOS Safari testing** — only emulated mobile-safari so far.
 - **Step 79 follow-ups** — a "Resend invite" button (ownership transfer shipped as C5).

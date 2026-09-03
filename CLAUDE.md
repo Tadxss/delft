@@ -181,7 +181,9 @@ there in depth:
    helper the content policies call is `SECURITY INVOKER` and only ever called from policies on
    _other_ tables. Every `workspace_members` write goes through a `SECURITY DEFINER` function.
 4. Credentials/`credential_folders` RLS is **owner-only** in a shared workspace — editors/viewers
-   never see credential rows (the per-workspace vault key can't be shared).
+   never see credential rows (the per-workspace vault key can't be shared). Giving each member
+   their own independent vault in a shared workspace is a planned follow-up, not a gap — see
+   `docs/ARCHITECTURE.md` Next Up ("Per-member vaults in shared workspaces").
 5. `enable_confirmations = false` (magic-link-only signup) ⇒ a session's `auth.jwt() ->> 'email'`
    claim can be an _unconfirmed_ address. The invitation RPCs match invitees against
    `auth.users.email_confirmed_at`, never the raw claim.

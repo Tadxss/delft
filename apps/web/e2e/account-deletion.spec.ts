@@ -21,8 +21,15 @@ async function newUser(browser: Browser, prefix: string) {
 async function openDeletePanel(page: import("@playwright/test").Page, workspaceName = "Personal") {
   await openWorkspaceMenu(page, workspaceName);
   await page.getByRole("menuitem", { name: "Account settings" }).click();
+  await page
+    .getByRole("button", { name: "Security & data", exact: true })
+    .click();
   await page.getByRole("button", { name: "Delete account", exact: true }).click();
 }
+
+// The signIn helper's onboarding fills first name "Test" / last name "User" — the delete gate
+// now wants the profile full name typed as a signature.
+const DELETE_SIGNATURE = "Test User";
 
 test("a solo user can delete their account and is returned to a fresh sign-in", async ({
   page,
@@ -39,7 +46,7 @@ test("a solo user can delete their account and is returned to a fresh sign-in", 
     name: "Permanently delete my account",
   });
   await expect(confirmBtn).toBeDisabled();
-  await page.fill("#delete-confirm", "delete");
+  await page.fill("#delete-confirm", DELETE_SIGNATURE);
   await confirmBtn.click();
 
   await expect(page.getByText("Your account has been deleted.")).toBeVisible({
@@ -84,7 +91,7 @@ test("deleting is blocked while you solely own a shared workspace", async ({
 
   // A: deletion is blocked.
   await openDeletePanel(a.page, "Shared workspace");
-  await a.page.fill("#delete-confirm", "delete");
+  await a.page.fill("#delete-confirm", DELETE_SIGNATURE);
   await a.page
     .getByRole("button", { name: "Permanently delete my account" })
     .click();

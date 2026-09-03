@@ -52,11 +52,15 @@ test("exports pages, canvas, and the decrypted vault as one JSON file", async ({
   ).toBeVisible();
   await page.click('button[aria-label="Close"]');
 
-  // Export
+  // Export — Account settings → Security & data → Export my data → confirm modal
   await openWorkspaceMenu(page);
   await page.getByRole("menuitem", { name: "Account settings" }).click();
-  const downloadPromise = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "Security & data", exact: true })
+    .click();
   await page.getByRole("button", { name: "Export my data" }).click();
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download export" }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(
     /^crowscribe-export-\d{4}-\d{2}-\d{2}\.json$/,
