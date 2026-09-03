@@ -55,6 +55,12 @@ test("invite by email → accept → edit as editor → demote to viewer (read-o
   await dialog.getByRole("combobox", { name: "Role" }).selectOption("editor");
   await dialog.getByRole("button", { name: "Invite" }).click();
   await expect(dialog.getByText(new RegExp(b.email))).toBeVisible();
+
+  // Owner can re-send the invitation email. CI has RESEND_API_KEY unset, so the Edge Function
+  // returns {skipped:"no-api-key"} — the hook resolves and the button flashes "Sent".
+  await dialog.getByRole("button", { name: "Resend" }).click();
+  await expect(dialog.getByRole("button", { name: "Sent" })).toBeVisible();
+
   await a.page.getByRole("button", { name: "Close" }).click();
 
   // B: pending invite on the picker → accept → lands in the workspace.
