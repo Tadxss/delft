@@ -1,8 +1,11 @@
 // Self-serve account deletion (production-readiness Milestone A / item 2). A signed-in user
 // permanently deletes their own account: the `auth.users` row goes, which cascades `profiles`
 // and every workspace they own (`workspaces.owner_id` FK) → pages / credentials / canvases /
-// credential_folders / workspace_members / workspace_invitations. Storage objects aren't
-// foreign-keyed, so this function also best-effort-clears them first.
+// credential_folders / workspace_members / workspace_invitations. Per-member vault data
+// (`workspace_vaults`, and `credentials`/`credential_folders` in workspaces they were a
+// non-owner member of) is keyed `user_id → auth.users on delete cascade` (Build Order step 92),
+// so it goes with the `auth.users` row too. Storage objects aren't foreign-keyed, so this
+// function also best-effort-clears them first.
 //
 // Second Edge Function in the repo, second `SUPABASE_SERVICE_ROLE_KEY` use. `verify_jwt = true`
 // (satisfied by the anon key — not the authz boundary); the real check is the in-function

@@ -140,7 +140,7 @@ transfer, per-member vault-key sharing, a "Resend invite" button) are still open
 invitations are unrelated to the global signup-gate that was declined above** — that was about who
 can create an account at all; this is about sharing a workspace with someone who already can.
 
-**Production-readiness (Milestones A–C) is complete and deployed** — see Build Order steps 85–91.
+**Production-readiness (Milestones A–C) is complete and deployed** — see Build Order steps 85–92.
 The app is ready for a public beta (legal pages, account deletion, encrypted daily backups,
 branch-protected `master`, abuse caps, enforcing CSP, Cloudflare Turnstile on the login page —
 all live and verified, prod CAPTCHA confirmed end-to-end in a real browser). Step 89 then made
@@ -149,10 +149,12 @@ fixed a real bug it surfaced — a magic-link `#access_token` left in the URL af
 reverted Google OAuth from a popup back to a same-tab redirect. What's left is deliberate
 post-launch work, not blockers: Sentry source maps (C7, deferred on Turbopack), framework majors
 (React 19.2.8 / Tailwind v4 / TS 7 — Dependabot no longer auto-proposes these; Next reached
-16.3.3 via #67), nonce-based CSP, per-member vaults in shared workspaces, real-device iOS testing.
-Step 91 grouped "Export my data" + "Delete account" under a "Security & data" sub-section (delete
-now takes a full-name signature; export shows a confirmation first).
-Steps 88–91's full detail is at the end of the Build Order.
+16.3.3 via #67), nonce-based CSP, real-device iOS testing. Step 91 grouped "Export my data" +
+"Delete account" under a "Security & data" sub-section (delete now takes a full-name signature;
+export shows a confirmation first). **Step 92 shipped per-member vaults** — the plumbing
+(`workspace_vaults` table, per-member credential RLS, ownership-transfer unblocked, legacy path
+removed); PR 2 opens the vault UI to every member.
+Steps 88–92's full detail is at the end of the Build Order.
 
 **Deploy status:** all migrations through `20260904000000_rpc_rate_limits_rls` are on hosted
 (`supabase db push`; `20260902000000`/`20260903000000`/`20260904000000` for Milestones B–C).
@@ -181,22 +183,27 @@ fix).
 
 ## Data model
 
-- `workspaces (id, owner_id, name, logo_url, description, vault_salt, vault_wrapped_key,
-  vault_wrapped_key_iv, vault_recovery_wrapped_key, vault_recovery_wrapped_key_iv, created_at)` —
+- `workspaces (id, owner_id, name, logo_url, description, created_at)` —
   `logo_url` (nullable, points at the public `workspace-logos` Storage bucket; falls back to the
   workspace's initials) and `description` (nullable, ≤2000 char CHECK) are owner-editable in
-  Workspace settings, both added in Build Order step 76. `vault_salt` is the
-  Credentials Manager's per-workspace PBKDF2 salt (plaintext; salts aren't secret), null until that
-  workspace's vault passphrase is first set up. `vault_wrapped_key`/`_iv` is the Vault Master Key
-  wrapped under the passphrase-derived key; `vault_recovery_wrapped_key`/`_iv` is the same VMK
-  wrapped under a one-time-shown recovery key instead — see Build Order step 58 for the
-  wrapped-key model and why it replaced direct passphrase-key encryption. The original
-  `vault_verifier`/`vault_verifier_iv` columns (Build Order step 22/23) that model temporarily kept
-  alongside it for legacy-vault migration no longer exist — dropped in step 60, once every
-  workspace had migrated.
+  Workspace settings, both added in Build Order step 76. **The vault key-wrap columns moved off
+  this table in Build Order step 92** (per-member vaults) — see `workspace_vaults` below.
+- `workspace_vaults (workspace_id, user_id, vault_salt, vault_wrapped_key, vault_wrapped_key_iv,
+  vault_recovery_wrapped_key, vault_recovery_wrapped_key_iv, created_at)` — one row per
+  `(workspace, member)` who has set up a vault (PK is the pair). `vault_salt` is that member's
+  PBKDF2 salt (plaintext; salts aren't secret); `vault_wrapped_key`/`_iv` is their Vault Master
+  Key wrapped under the passphrase-derived key; `vault_recovery_wrapped_key`/`_iv` is the same
+  VMK wrapped under their one-time-shown recovery key — see Build Order step 58 for the
+  wrapped-key model, step 92 for the move to per-member. RLS is self-only:
+  `user_id = auth.uid() AND has_workspace_access(workspace_id, any role)`. `user_id → auth.users`
+  is `on delete cascade` (account deletion takes the member's vault with it); `workspace_id →
+  workspaces` likewise. The legacy pre-wrapped-key model's `vault_verifier`/`vault_verifier_iv`
+  columns (steps 22/23) were dropped in step 60; its `migrate_vault_to_wrapped_key` RPC was
+  dropped in step 92 (0 legacy vaults remained).
 - `vault_reset_requests (id, workspace_id, requested_by, token, expires_at, confirmed_at,
-  created_at)` — a single-use, owner-only, 1-hour-expiry token for the last-resort vault reset (both
-  passphrase and recovery key lost) — see Build Order step 58.
+  created_at)` — a single-use, 1-hour-expiry token for the last-resort vault reset (both
+  passphrase and recovery key lost). Per-member since step 92 (was owner-only) — the `reset_vault`
+  RPC scopes its deletes to `requested_by = auth.uid()`. See Build Order step 58.
 - `workspace_members (workspace_id, user_id, role, created_at)` — `role` is `owner | editor |
   viewer` (CHECK-enforced; was `owner | member` until Build Order step 79 turned on real
   multi-user). Every RLS policy keys off membership rather than `owner_id` directly, which is why
@@ -218,19 +225,25 @@ fix).
 - `pages (id, workspace_id, parent_id, title, content jsonb, is_published, published_slug,
 position, created_at, updated_at)` — `parent_id` self-references `pages` for the sidebar tree.
   `position` (`double precision`) is a manually-settable sibling order — see Build Order step 54.
-- `credentials (id, workspace_id, folder_id, title, url, secret_ciphertext, secret_iv, position,
-created_at, updated_at)` — `title`/`url` plaintext (list view + search); `secret_ciphertext`/`secret_iv` are
-  one AES-GCM ciphertext+iv pair encrypting a `{username, password, notes}` JSON payload per
-  credential. See Build Order step 16. `folder_id` (nullable, `on delete set null`) places it in a
-  `credential_folders` folder, or at root when null — see Build Order step 24. `position` (Build
-  Order step 54) is scoped per `folder_id` group.
-- `credential_folders (id, workspace_id, parent_folder_id, name, position, created_at,
+- `credentials (id, workspace_id, user_id, folder_id, title, url, secret_ciphertext, secret_iv,
+position, created_at, updated_at)` — `title`/`url` plaintext (list view + search);
+  `secret_ciphertext`/`secret_iv` are one AES-GCM ciphertext+iv pair encrypting a
+  `{username, password, notes}` JSON payload per credential. See Build Order step 16. `user_id`
+  (Build Order step 92, `default auth.uid()`, `→ auth.users on delete cascade`) is the member who
+  owns this row — RLS is `user_id = auth.uid() AND has_workspace_access(..., any role)`, so a
+  credential is visible only to its creator, never to other members or the workspace owner.
+  `folder_id` (nullable, `on delete set null`) places it in a `credential_folders` folder, or at
+  root when null — see Build Order step 24. `position` (Build Order step 54) is scoped per
+  `folder_id` group.
+- `credential_folders (id, workspace_id, user_id, parent_folder_id, name, position, created_at,
 updated_at)` — pure containers (name only, no secret of their own), nesting arbitrarily deep via
   `parent_folder_id` (self-referencing, `on delete cascade` — unlike `credentials.folder_id`, which
   is deliberately `on delete set null` so deleting a folder never destroys the credentials inside
-  it). Two triggers (`check_credential_folder_parent`, `check_credential_folder_workspace`) guard
-  against cycles and cross-workspace linking, since RLS's flat per-row membership check can't catch
-  either on its own. See Build Order step 24; `position` (per `parent_folder_id` group) is step 54.
+  it). `user_id` mirrors `credentials` (step 92, same RLS). Two triggers
+  (`check_credential_folder_parent`, `check_credential_folder_workspace`) guard against cycles,
+  cross-workspace linking, and (since step 92) cross-member linking, since RLS's flat per-row
+  check can't catch those on its own. See Build Order step 24; `position` (per `parent_folder_id`
+  group) is step 54.
 - `canvases (id, workspace_id, title, scene jsonb, is_published, published_slug, position,
   created_at, updated_at)` — flat, no `parent_id` (standalone items, not a tree like `pages`).
   `scene` is Excalidraw's own `{elements, appState}` shape; the `files` argument from Excalidraw's
@@ -264,10 +277,11 @@ roles[])` (`language sql stable security invoker`):
 - `pages` / `canvases` — `SELECT` allows any role (`owner|editor|viewer`); `INSERT`/`UPDATE`/
   `DELETE` require `owner|editor`. A `viewer` browses but can't write (the editor UI also renders
   read-only for them — step 79).
-- `credentials` / `credential_folders` — **all four ops require `owner`.** The Credentials vault
-  stays owner-only in a shared workspace: its per-workspace encryption key can't be handed to a
-  new member without a separate crypto design, so editors/viewers never see credential rows at
-  all. A deliberate role-model limit, not an oversight.
+- `credentials` / `credential_folders` / `workspace_vaults` — **self-only, any role** (Build
+  Order step 92): `user_id = auth.uid() AND has_workspace_access(workspace_id, any role)`. Each
+  member has their own private vault in a workspace — their own passphrase, their own credential
+  rows, invisible to every other member including the owner. (Before step 92 there was one
+  owner-keyed vault per workspace and these were all `owner`-only.)
 - Storage — `page-images` and `workspace-logos` **write** policies require `owner|editor`; reads
   stay any-member.
 
@@ -3177,6 +3191,38 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
     `account-deletion.spec.ts` / `data-export.spec.ts` updated for the new nav path
     (`Account settings → Security & data → …`) + the full-name gate + the export confirm step.
 
+92. **Per-member vaults in shared workspaces — plumbing (PR 1 of 2).** ✅ _done_. Until now a
+    workspace had ONE credentials vault, keyed to the owner's passphrase (wrap material on the
+    `workspaces` row, credentials RLS `owner`-only), and `transfer_workspace_ownership` refused
+    while a vault existed. New model: every member of any role gets one optional **private** vault
+    per workspace — their own passphrase, their own credential rows, invisible to everyone else
+    including the owner.
+    - **Migration `20260905000000_per_member_vaults.sql`** (one transaction): new
+      `workspace_vaults (workspace_id, user_id, …)` table, self-only RLS
+      (`user_id = auth.uid() AND has_workspace_access(ws, any role)`); the 5 vault columns move
+      off `workspaces` into it (the one production owner vault is copied across by
+      `insert … select … where vault_wrapped_key is not null`, then the columns are dropped);
+      `credentials` / `credential_folders` gain `user_id` (`default auth.uid()`,
+      `→ auth.users on delete cascade`), backfilled to the workspace owner (with a
+      `raise exception` assertion that no row is left null), and their RLS is rewritten to
+      `user_id = auth.uid() AND member`; the two folder-integrity triggers also enforce
+      same-`user_id`; `vault_reset_requests` insert + `reset_vault` become per-user (scope deletes
+      to `auth.uid()`); the dead `migrate_vault_to_wrapped_key` RPC is dropped; and the vault
+      block is removed from `transfer_workspace_ownership` — **transfer now works with a vault
+      present** (the outgoing owner keeps their own vault row).
+    - **App:** new `useMyWorkspaceVault(workspaceId)` hook (the "setup vs unlock" signal);
+      `useSetVaultWrappedKey` / `useRotateVaultPassphrase` write `workspace_vaults`;
+      `Workspace` domain type loses its vault fields, new `WorkspaceVault` type + mapper;
+      `CredentialsModal` / `VaultUnlockPanel` / `ForgotPassphrasePanel` retargeted; the legacy
+      pre-wrapped-key branch + `VaultMigrationPanel` deleted; `exportAccountData` reads the
+      caller's `workspace_vaults` row for the salt; `delete-account` cascade comment updated.
+    - **Behavior-neutral:** the "Credentials Vault" menu item stays owner-only (PR 2 opens it to
+      every member). All existing vault e2e (`credentials`, `vault-recovery`, `data-export`,
+      `ownership-transfer`, `workspace-invitations`, `csp`) pass unchanged — chromium + webkit.
+    - A removed member's `workspace_vaults` + credential rows persist but become RLS-invisible
+      (they fail `has_workspace_access`); re-inviting restores access; account/workspace deletion
+      cascades them away. Deliberate — member removal doesn't destroy that member's own data.
+
 **Production-readiness roadmap (Milestones A–C) is complete and fully deployed.** The system is
 ready for a public beta: legal pages, self-serve account deletion, daily encrypted DB backups,
 `master` branch protection, abuse caps, enforcing CSP, and Turnstile bot protection are all live
@@ -3188,14 +3234,10 @@ and verified. Remaining work is deliberate post-launch iteration, not launch blo
   v4 (config-format rewrite), TS 7 (wait for stable). Next reached 16.3.3 via `#67` (step 89) —
   clean on the full e2e suite. Each remaining one is its own tested piece of work.
 - **Nonce-based CSP** — drop `script-src 'unsafe-inline'`; needs a `middleware.ts`.
-- **Per-member vaults in shared workspaces** — the workspace owner's vault is private by design
-  (credentials/`credential_folders` RLS is owner-only since step 79 — the per-workspace VMK is
-  bound to the owner's passphrase and can't be handed out). The intended model, not yet built:
-  each non-owner member creates their **own** independent vault in that workspace (their own
-  passphrase, their own credential rows, invisible to everyone else). A scoped schema/crypto/RLS
-  change — a new `workspace_vaults` table keyed `(workspace_id, user_id)`, a `user_id` column on
-  `credentials`/`credential_folders`, an RLS rewrite (rls-reviewer), the ~8 vault-crypto hooks
-  retargeted, and a one-time data-migration of the single hosted owner vault. It also lifts
-  `transfer_workspace_ownership`'s "blocked while a vault exists" check (step 87, C5).
+- **Per-member vaults in shared workspaces — PR 2 (UI).** The plumbing shipped as step 92 (new
+  `workspace_vaults` table, per-member credential RLS, ownership-transfer unblocked). PR 2 opens
+  the "Credentials Vault" menu item to **every member** (not just the owner), adjusts the
+  setup/unlock copy for non-owners, and adds a two-user e2e proving each member's vault is
+  independent and invisible to the others.
 - **Real-device iOS Safari testing** — only emulated mobile-safari so far.
 - **Step 79 follow-ups** — a "Resend invite" button (ownership transfer shipped as C5).

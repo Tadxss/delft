@@ -180,10 +180,13 @@ there in depth:
    recursion). It keeps a bare self-only SELECT policy; the role-aware `has_workspace_access()`
    helper the content policies call is `SECURITY INVOKER` and only ever called from policies on
    _other_ tables. Every `workspace_members` write goes through a `SECURITY DEFINER` function.
-4. Credentials/`credential_folders` RLS is **owner-only** in a shared workspace — editors/viewers
-   never see credential rows (the per-workspace vault key can't be shared). Giving each member
-   their own independent vault in a shared workspace is a planned follow-up, not a gap — see
-   `docs/ARCHITECTURE.md` Next Up ("Per-member vaults in shared workspaces").
+4. Credentials/`credential_folders`/`workspace_vaults` RLS is **self-only, any role** (Build Order
+   step 92): `user_id = auth.uid() AND has_workspace_access(ws, any role)`. Each member has their
+   own private vault per workspace — their own passphrase, their own credential rows, invisible to
+   every other member including the owner. The key-wrap material lives in `workspace_vaults`
+   (per `(workspace_id, user_id)`), not on `workspaces`. `user_id` fills from a `default auth.uid()`
+   column so the client never sends it. (PR 1 shipped the plumbing; PR 2 opens the vault UI to
+   non-owner members.)
 5. `enable_confirmations = false` (magic-link-only signup) ⇒ a session's `auth.jwt() ->> 'email'`
    claim can be an _unconfirmed_ address. The invitation RPCs match invitees against
    `auth.users.email_confirmed_at`, never the raw claim.
