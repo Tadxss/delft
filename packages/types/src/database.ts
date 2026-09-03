@@ -86,6 +86,7 @@ export type Database = {
           parent_folder_id: string | null
           position: number
           updated_at: string
+          user_id: string
           workspace_id: string
         }
         Insert: {
@@ -95,6 +96,7 @@ export type Database = {
           parent_folder_id?: string | null
           position?: number
           updated_at?: string
+          user_id?: string
           workspace_id: string
         }
         Update: {
@@ -104,6 +106,7 @@ export type Database = {
           parent_folder_id?: string | null
           position?: number
           updated_at?: string
+          user_id?: string
           workspace_id?: string
         }
         Relationships: [
@@ -135,6 +138,7 @@ export type Database = {
           type: string
           updated_at: string
           url: string | null
+          user_id: string
           workspace_id: string
         }
         Insert: {
@@ -148,6 +152,7 @@ export type Database = {
           type?: string
           updated_at?: string
           url?: string | null
+          user_id?: string
           workspace_id: string
         }
         Update: {
@@ -161,6 +166,7 @@ export type Database = {
           type?: string
           updated_at?: string
           url?: string | null
+          user_id?: string
           workspace_id?: string
         }
         Relationships: [
@@ -423,6 +429,47 @@ export type Database = {
           },
         ]
       }
+      workspace_vaults: {
+        Row: {
+          created_at: string
+          user_id: string
+          vault_recovery_wrapped_key: string
+          vault_recovery_wrapped_key_iv: string
+          vault_salt: string
+          vault_wrapped_key: string
+          vault_wrapped_key_iv: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          user_id?: string
+          vault_recovery_wrapped_key: string
+          vault_recovery_wrapped_key_iv: string
+          vault_salt: string
+          vault_wrapped_key: string
+          vault_wrapped_key_iv: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          user_id?: string
+          vault_recovery_wrapped_key?: string
+          vault_recovery_wrapped_key_iv?: string
+          vault_salt?: string
+          vault_wrapped_key?: string
+          vault_wrapped_key_iv?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_vaults_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspaces: {
         Row: {
           created_at: string
@@ -431,11 +478,6 @@ export type Database = {
           logo_url: string | null
           name: string
           owner_id: string
-          vault_recovery_wrapped_key: string | null
-          vault_recovery_wrapped_key_iv: string | null
-          vault_salt: string | null
-          vault_wrapped_key: string | null
-          vault_wrapped_key_iv: string | null
         }
         Insert: {
           created_at?: string
@@ -444,11 +486,6 @@ export type Database = {
           logo_url?: string | null
           name: string
           owner_id: string
-          vault_recovery_wrapped_key?: string | null
-          vault_recovery_wrapped_key_iv?: string | null
-          vault_salt?: string | null
-          vault_wrapped_key?: string | null
-          vault_wrapped_key_iv?: string | null
         }
         Update: {
           created_at?: string
@@ -457,11 +494,6 @@ export type Database = {
           logo_url?: string | null
           name?: string
           owner_id?: string
-          vault_recovery_wrapped_key?: string | null
-          vault_recovery_wrapped_key_iv?: string | null
-          vault_salt?: string | null
-          vault_wrapped_key?: string | null
-          vault_wrapped_key_iv?: string | null
         }
         Relationships: []
       }
@@ -578,18 +610,6 @@ export type Database = {
       }
       leave_workspace: { Args: { p_workspace_id: string }; Returns: undefined }
       mark_invitation_emailed: { Args: { p_token: string }; Returns: undefined }
-      migrate_vault_to_wrapped_key: {
-        Args: {
-          p_credential_ids: string[]
-          p_credentials: Json
-          p_recovery_wrapped_key: string
-          p_recovery_wrapped_key_iv: string
-          p_workspace_id: string
-          p_wrapped_key: string
-          p_wrapped_key_iv: string
-        }
-        Returns: undefined
-      }
       remove_workspace_member: {
         Args: { p_user_id: string; p_workspace_id: string }
         Returns: undefined

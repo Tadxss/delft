@@ -12,6 +12,7 @@ import type {
   PendingInvitation,
   Profile,
   Workspace,
+  WorkspaceVault,
   WorkspaceInvitation,
   WorkspaceInvitationStatus,
   WorkspaceInvitationSummary,
@@ -29,6 +30,8 @@ type CredentialFolderRow =
   Database["public"]["Tables"]["credential_folders"]["Row"];
 type CanvasRow = Database["public"]["Tables"]["canvases"]["Row"];
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
+type WorkspaceVaultRow =
+  Database["public"]["Tables"]["workspace_vaults"]["Row"];
 type Fn = Database["public"]["Functions"];
 type WorkspaceInvitationRow = Fn["invite_to_workspace"]["Returns"];
 type PendingInvitationRow = Fn["get_my_pending_invitations"]["Returns"][number];
@@ -48,12 +51,19 @@ export function mapWorkspaceRow(row: WorkspaceRow): Workspace {
     name: row.name,
     logoUrl: row.logo_url,
     description: row.description,
-    vaultSalt: row.vault_salt,
-    vaultWrappedKey: row.vault_wrapped_key,
-    vaultWrappedKeyIv: row.vault_wrapped_key_iv,
-    vaultRecoveryWrappedKey: row.vault_recovery_wrapped_key,
-    vaultRecoveryWrappedKeyIv: row.vault_recovery_wrapped_key_iv,
     createdAt: row.created_at,
+  };
+}
+
+export function mapWorkspaceVaultRow(row: WorkspaceVaultRow): WorkspaceVault {
+  return {
+    workspaceId: row.workspace_id,
+    userId: row.user_id,
+    salt: row.vault_salt,
+    wrappedKey: row.vault_wrapped_key,
+    wrappedKeyIv: row.vault_wrapped_key_iv,
+    recoveryWrappedKey: row.vault_recovery_wrapped_key,
+    recoveryWrappedKeyIv: row.vault_recovery_wrapped_key_iv,
   };
 }
 

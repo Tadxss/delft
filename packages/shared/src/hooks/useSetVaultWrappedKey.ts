@@ -1,21 +1,20 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Workspace } from "@crowscribe/types";
+import type { WorkspaceVault } from "@crowscribe/types";
 import { useSupabaseClient } from "../supabase/context";
-import { mapWorkspaceRow } from "../supabase/mappers";
+import { mapWorkspaceVaultRow } from "../supabase/mappers";
 
-// Called exactly once per workspace, the first time its vault is set up under the wrapped-key
-// model (see vaultCrypto.ts's generateVaultMasterKey/wrapVaultMasterKey) — persists the salt and
-// both wrapped copies of the Vault Master Key (under the passphrase-derived key, and under the
-// one-time-shown recovery key) in a single write, so there's never a moment where vault_salt is
-// set without the wrapped-key columns alongside it. The sole first-time-setup write now — every
-// vault created after this model shipped goes through here, never a bare vault_salt-only write.
-// RLS-gated by workspaces_update_owner, same as every other workspace-level vault write.
+// Called exactly once per member per workspace, the first time they set up their vault (see
+// vaultCrypto.ts's generateVaultMasterKey/wrapVaultMasterKey) — inserts the salt and both
+// wrapped copies of the Vault Master Key (under the passphrase-derived key, and under the
+// one-time-shown recovery key) as a single row, so there's never a partial vault. `user_id`
+// fills from the `default auth.uid()` on the column; RLS (workspace_vaults_insert_self) checks
+// it matches and that the caller is a member.
 export function useSetVaultWrappedKey() {
   const supabase = useSupabaseClient();
   const queryClient = useQueryClient();
 
   return useMutation<
-    Workspace,
+    WorkspaceVault,
     Error,
     {
       workspaceId: string;
@@ -35,24 +34,24 @@ export function useSetVaultWrappedKey() {
       recoveryWrappedKeyIv,
     }) => {
       const { data, error } = await supabase
-        .from("workspaces")
-        .update({
+        .from("workspace_vaults")
+        .insert({
+          workspace_id: workspaceId,
           vault_salt: saltB64,
           vault_wrapped_key: wrappedKey,
           vault_wrapped_key_iv: wrappedKeyIv,
           vault_recovery_wrapped_key: recoveryWrappedKey,
           vault_recovery_wrapped_key_iv: recoveryWrappedKeyIv,
         })
-        .eq("id", workspaceId)
         .select()
         .single();
       if (error) throw error;
-      return mapWorkspaceRow(data);
+      return mapWorkspaceVaultRow(data);
     },
-    onSuccess: (workspace) => {
-      queryClient.setQueryData<Workspace>(
-        ["workspace", workspace.id],
-        workspace,
+    onSuccess: (vault) => {
+      queryClient.setQueryData<WorkspaceVault>(
+        ["workspace-vault", vault.workspaceId],
+        vault,
       );
     },
   });

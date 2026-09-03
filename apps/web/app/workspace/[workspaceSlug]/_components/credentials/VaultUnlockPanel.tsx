@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Credential, Workspace } from "@crowscribe/types";
+import type { WorkspaceVault } from "@crowscribe/types";
 import {
-  decryptSecret,
   deriveVaultKey,
   generateRecoveryKey,
   generateSalt,
@@ -19,7 +18,6 @@ import { FormLabel } from "../../../../_components/FormLabel";
 import { Input } from "../../../../_components/Input";
 import { ForgotPassphrasePanel } from "./ForgotPassphrasePanel";
 import { RecoveryKeyDisplay } from "./RecoveryKeyDisplay";
-import { VaultMigrationPanel } from "./VaultMigrationPanel";
 
 const MIN_PASSPHRASE_LENGTH = 8;
 
@@ -34,36 +32,30 @@ interface PreparedSetup {
 type Phase =
   | { kind: "form" }
   | { kind: "setupRecoveryKey"; setup: PreparedSetup }
-  | { kind: "legacyMigration"; oldDirectKey: CryptoKey }
   | { kind: "forgot" };
 
-// Four things this panel can show, depending on the workspace's vault state and what the user just
-// did:
-// - `vaultWrappedKey` set (the normal case for any vault created after the wrapped-key model
-//   shipped, or a legacy vault that's completed its one-time migration): passphrase → derive Kp →
-//   unwrap the Vault Master Key. Unwrap failure IS "wrong passphrase" (an AES-GCM auth-tag check),
-//   same failure semantics every check in this vault uses.
-// - `vaultSalt` set but no `vaultWrappedKey` (a legacy vault): verify the passphrase by
-//   test-decrypting a real credential (or, for an empty legacy vault with nothing to test-decrypt,
-//   proceed unverified — there's nothing to check against), then hand off into VaultMigrationPanel
-//   to re-encrypt everything under a new VMK and (mandatorily) generate this vault's first recovery
-//   key.
-// - `vaultSalt` null: first-time setup — generate salt + VMK + recovery key, wrap the VMK under
-//   both, and require the user to confirm they've saved the recovery key (RecoveryKeyDisplay)
-//   before any of it is persisted.
-// - "Forgot passphrase?" (only shown once a wrapped key exists): ForgotPassphrasePanel recovers via
-//   the saved recovery key and lets the user set a new passphrase, with zero data loss.
+// Three things this panel can show, depending on whether the caller has a vault row for this
+// workspace (useMyWorkspaceVault) and what they just did:
+// - no vault row: first-time setup — generate salt + VMK + recovery key, wrap the VMK under both
+//   the passphrase-derived key and the recovery key, and require the user to confirm they've
+//   saved the recovery key (RecoveryKeyDisplay) before any of it is persisted.
+// - vault row present: passphrase → derive Kp → unwrap the Vault Master Key. Unwrap failure IS
+//   "wrong passphrase" (an AES-GCM auth-tag check), the same failure semantics every check in
+//   this vault uses.
+// - "Forgot passphrase?": ForgotPassphrasePanel recovers via the saved recovery key and lets the
+//   user set a new passphrase, with zero data loss.
+//
+// (The legacy pre-wrapped-key path is gone as of Build Order step 92 — every vault row always has
+// wrapped-key columns.)
 export function VaultUnlockPanel({
-  workspace,
-  credentials,
+  workspaceId,
+  vault,
   onBusyChange,
 }: {
-  workspace: Workspace;
-  credentials: Credential[] | undefined;
+  workspaceId: string;
+  vault: WorkspaceVault | null;
   onBusyChange?: (busy: boolean) => void;
 }) {
-  const { id: workspaceId, vaultSalt, vaultWrappedKey, vaultWrappedKeyIv } =
-    workspace;
   const vaultKey = useVaultKey(workspaceId);
   const setVaultWrappedKey = useSetVaultWrappedKey();
   const [phase, setPhase] = useState<Phase>({ kind: "form" });
@@ -74,21 +66,15 @@ export function VaultUnlockPanel({
   const [error, setError] = useState<string | null>(null);
   const [persistingSetup, setPersistingSetup] = useState(false);
 
-  const isSetup = !vaultSalt;
-  const hasWrappedKey = Boolean(vaultWrappedKey && vaultWrappedKeyIv);
-  const credentialsLoading =
-    !isSetup && !hasWrappedKey && credentials === undefined;
+  const isSetup = !vault;
 
-  // Unsaved recovery-key material exists in memory during these two phases — block the modal from
-  // being closed out from under them (see CredentialsModal's onBusyChange usage). The cleanup is
-  // required, not just tidy: once setup/migration succeeds, this whole component unmounts (the
-  // vault is now unlocked, so CredentialsModal swaps to rendering the credential list instead) —
-  // without it, onBusyChange(false) would never fire and the modal's close button would stay
-  // disabled forever.
+  // Unsaved recovery-key material exists in memory during the setup-recovery-key phase — block the
+  // modal from being closed out from under it (see CredentialsModal's onBusyChange usage). The
+  // cleanup is required, not just tidy: once setup succeeds this whole component unmounts (the
+  // vault is now unlocked, so CredentialsModal swaps to rendering the credential list) — without
+  // it, onBusyChange(false) would never fire and the modal's close button would stay disabled.
   useEffect(() => {
-    onBusyChange?.(
-      phase.kind === "setupRecoveryKey" || phase.kind === "legacyMigration",
-    );
+    onBusyChange?.(phase.kind === "setupRecoveryKey");
     return () => onBusyChange?.(false);
   }, [phase.kind, onBusyChange]);
 
@@ -123,42 +109,18 @@ export function VaultUnlockPanel({
         return;
       }
 
-      const kp = await deriveVaultKey(passphrase, vaultSalt);
-
-      if (hasWrappedKey && vaultWrappedKey && vaultWrappedKeyIv) {
-        try {
-          const vmk = await unwrapVaultMasterKey(
-            vaultWrappedKey,
-            vaultWrappedKeyIv,
-            kp,
-          );
-          vaultKey.setKey(vmk);
-        } catch {
-          setError("Wrong passphrase — please try again.");
-          setPassphrase("");
-        }
-        return;
+      const kp = await deriveVaultKey(passphrase, vault.salt);
+      try {
+        const vmk = await unwrapVaultMasterKey(
+          vault.wrappedKey,
+          vault.wrappedKeyIv,
+          kp,
+        );
+        vaultKey.setKey(vmk);
+      } catch {
+        setError("Wrong passphrase — please try again.");
+        setPassphrase("");
       }
-
-      // Legacy vault (no wrapped key yet) — authenticate by test-decrypting a real credential,
-      // then hand off to VaultMigrationPanel rather than unlocking directly.
-      const testCredential = credentials?.[0];
-      if (testCredential) {
-        try {
-          await decryptSecret(
-            kp,
-            testCredential.secretCiphertext,
-            testCredential.secretIv,
-          );
-        } catch {
-          setError("Wrong passphrase — please try again.");
-          setPassphrase("");
-          return;
-        }
-      }
-      // Either verified via a credential, or nothing anywhere to verify against yet (an empty,
-      // never-migrated vault) — proceed straight to migration either way.
-      setPhase({ kind: "legacyMigration", oldDirectKey: kp });
     } catch {
       setError("Couldn't unlock the vault. Try again.");
     } finally {
@@ -195,21 +157,11 @@ export function VaultUnlockPanel({
     );
   }
 
-  if (phase.kind === "legacyMigration") {
-    return (
-      <VaultMigrationPanel
-        workspaceId={workspaceId}
-        oldDirectKey={phase.oldDirectKey}
-        credentials={credentials ?? []}
-        onMigrated={() => setPhase({ kind: "form" })}
-      />
-    );
-  }
-
-  if (phase.kind === "forgot") {
+  if (phase.kind === "forgot" && vault) {
     return (
       <ForgotPassphrasePanel
-        workspace={workspace}
+        workspaceId={workspaceId}
+        vault={vault}
         onRecovered={() => setPhase({ kind: "form" })}
         onCancel={() => setPhase({ kind: "form" })}
       />
@@ -252,18 +204,12 @@ export function VaultUnlockPanel({
               />
             </>
           )}
-          <Button
-            type="submit"
-            disabled={unlocking || credentialsLoading}
-            className="mt-1"
-          >
+          <Button type="submit" disabled={unlocking} className="mt-1">
             {unlocking
               ? "Unlocking…"
-              : credentialsLoading
-                ? "Loading…"
-                : isSetup
-                  ? "Create vault"
-                  : "Unlock"}
+              : isSetup
+                ? "Create vault"
+                : "Unlock"}
           </Button>
           {mismatch && (
             <p className="text-xs text-red-700">
@@ -272,7 +218,7 @@ export function VaultUnlockPanel({
           )}
           {error && <p className="text-xs text-red-700">{error}</p>}
         </form>
-        {!isSetup && hasWrappedKey && (
+        {!isSetup && (
           <button
             type="button"
             onClick={() => setPhase({ kind: "forgot" })}

@@ -14,9 +14,9 @@ import { Heading } from "../../../_components/Heading";
 // Last resort: reachable only from ForgotPassphrasePanel's "Lost your recovery key too?" link,
 // meaning both the passphrase and the recovery key are gone. A real route rather than modal state
 // — bookmarkable/linkable from the confirmation email, survives a reload between request and
-// confirm. Owner-only (enforced server-side by vault_reset_requests' insert RLS; the button here
-// isn't separately gated on ownership since a non-owner's request would just fail on submit with a
-// clear error — no need to duplicate that check client-side for a page this rarely visited).
+// confirm. Resets only the *calling member's* own vault in this workspace (per-member vaults,
+// Build Order step 92) — enforced server-side by vault_reset_requests' insert RLS + the
+// reset_vault RPC's `user_id = auth.uid()` scoping.
 export default function VaultResetRequestPage() {
   const params = useParams<{ workspaceSlug: string }>();
   const workspaceId = parseWorkspaceSlug(params.workspaceSlug);
@@ -38,9 +38,7 @@ export default function VaultResetRequestPage() {
       });
       setSent(true);
     } catch {
-      setError(
-        "Couldn't start the reset. Only this vault's workspace owner can do this.",
-      );
+      setError("Couldn't start the reset. Try again.");
     }
   }
 

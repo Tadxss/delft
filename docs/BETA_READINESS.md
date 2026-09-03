@@ -378,12 +378,17 @@ invited collaborators" to "safe to open signup to strangers":
 - **Milestone C (step 87) — hardening + deferred features:** CI e2e sharding, CSP flipped to
   **enforcing** (+ Sentry `report-uri`), **Cloudflare Turnstile** on the login page, account data
   export (single JSON, credential secrets ship encrypted + decrypted-when-unlocked), workspace
-  ownership transfer (`SECURITY DEFINER` RPC, refuses while a vault exists), and the
-  `profiles`/`avatars` RLS audit (came back clean).
+  ownership transfer (`SECURITY DEFINER` RPC), and the `profiles`/`avatars` RLS audit (came back
+  clean).
 - **Step 88 follow-ups:** Turnstile CSP subdomain fix (`*.challenges.cloudflare.com`), visible
   widget-failure message, Dependabot rework (patch-only, framework majors ignored), `engines.node`
   pinned `22.x`. Production CAPTCHA verified end-to-end in a real browser.
+- **Steps 89–92:** CI e2e serves a prebuilt build (WebKit-flake fix) + a sign-out token-leak fix
+  (89); Google OAuth reverted to a same-tab redirect (90); "Security & data" Account sub-section
+  with a full-name delete signature (91); **per-member vaults** — each member gets a private
+  vault per workspace, `workspace_vaults` table, ownership transfer no longer blocked by a vault
+  (92, PR 1; UI in PR 2).
 
-**Deferred, not blockers:** Sentry source maps (C7 — Turbopack + `@sentry/nextjs@10.70` don't
-support map upload); framework majors (React 19.2.8 / Next 16.3 / Tailwind v4 / TS 7); nonce-based
-CSP (needs `middleware.ts`); per-member vault-key sharing; real-device iOS Safari testing.
+**Deferred, not blockers:** Sentry source maps (C7 — Turbopack + `@sentry/nextjs` don't support
+map upload); framework majors (React 19.2.8 / Tailwind v4 / TS 7); nonce-based CSP (needs
+`middleware.ts`); real-device iOS Safari testing.

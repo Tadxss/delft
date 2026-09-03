@@ -23,7 +23,9 @@ export function useConfirmVaultReset() {
       queryClient.invalidateQueries({
         queryKey: ["credentialFolders", workspaceId],
       });
-      queryClient.invalidateQueries({ queryKey: ["workspace", workspaceId] });
+      queryClient.invalidateQueries({
+        queryKey: ["workspace-vault", workspaceId],
+      });
     },
   });
 }

@@ -5,8 +5,8 @@ import { X } from "lucide-react";
 import {
   useCredentialFolders,
   useCredentials,
+  useMyWorkspaceVault,
   useVaultKey,
-  useWorkspace,
 } from "@crowscribe/shared";
 import { Modal } from "../../../../_components/Modal";
 import { VaultUnlockPanel } from "./VaultUnlockPanel";
@@ -27,7 +27,11 @@ export function CredentialsModal({
   open: boolean;
   onClose: () => void;
 }) {
-  const { data: workspace } = useWorkspace(workspaceId);
+  // The caller's own vault row for this workspace, or null if they haven't set one up. Self-only
+  // RLS — a member never sees another member's row (Build Order step 92).
+  const { data: vault, isLoading: vaultLoading } = useMyWorkspaceVault(
+    open ? workspaceId : undefined,
+  );
   const vaultKey = useVaultKey(workspaceId);
   // Fetched as soon as the modal opens, independent of vault-lock state: RLS already scopes these
   // rows to workspace members, and secretCiphertext/secretIv stay encrypted regardless — this just
@@ -126,14 +130,14 @@ export function CredentialsModal({
           default align-items:stretch does that for whichever single child renders here, as long
           as that child doesn't set its own conflicting height. */}
       <div className="flex min-h-0 flex-1">
-        {!workspace ? (
+        {vaultLoading ? (
           <p className="flex flex-1 items-center justify-center text-sm text-ink-400">
             Loading…
           </p>
         ) : !vaultKey.isUnlocked || !vaultKey.key ? (
           <VaultUnlockPanel
-            workspace={workspace}
-            credentials={credentials}
+            workspaceId={workspaceId}
+            vault={vault ?? null}
             onBusyChange={setVaultBusy}
           />
         ) : (

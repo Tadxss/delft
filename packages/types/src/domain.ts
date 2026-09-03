@@ -7,17 +7,24 @@ export interface Workspace {
   logoUrl: string | null;
   // Optional free-text description, editable in Workspace settings.
   description: string | null;
-  vaultSalt: string | null;
-  // The Vault Master Key (VMK), AES-GCM wrapped under the passphrase-derived key and, separately,
-  // under a one-time-shown recovery key — see packages/shared/src/lib/vaultCrypto.ts. A workspace
-  // has these once its owner has run (or migrated through) vault setup under the wrapped-key
-  // model; vault_salt alone (no wrapped key) means a legacy, pre-migration vault — VaultUnlockPanel
-  // authenticates that case by test-decrypting an existing credential instead.
-  vaultWrappedKey: string | null;
-  vaultWrappedKeyIv: string | null;
-  vaultRecoveryWrappedKey: string | null;
-  vaultRecoveryWrappedKeyIv: string | null;
   createdAt: string;
+}
+
+// One member's private vault in one workspace (Build Order step 92 — per-member vaults). The
+// key-wrap material used to live on `workspaces` (one vault per workspace, the owner's); it's now
+// a per-(workspace, user) row so every member can have their own independent vault. Held only
+// after that member runs vault setup — no row means "no vault yet" (VaultUnlockPanel shows the
+// setup flow). See packages/shared/src/lib/vaultCrypto.ts for what each field holds.
+export interface WorkspaceVault {
+  workspaceId: string;
+  userId: string;
+  salt: string;
+  // The Vault Master Key (VMK), AES-GCM wrapped under the passphrase-derived key and, separately,
+  // under a one-time-shown recovery key. Either factor alone unwraps the VMK.
+  wrappedKey: string;
+  wrappedKeyIv: string;
+  recoveryWrappedKey: string;
+  recoveryWrappedKeyIv: string;
 }
 
 export type WorkspaceRole = "owner" | "editor" | "viewer";

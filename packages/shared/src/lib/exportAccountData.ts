@@ -14,10 +14,11 @@ import {
 // BlockNote content), canvases (full Excalidraw scene), credential folders, and credentials.
 //
 // Credential secrets are always exported in their **encrypted** form (`secretCiphertext` +
-// `secretIv` + the workspace `vaultSalt`) so the export is complete and self-contained — the
-// user can decrypt them offline with their vault passphrase. When a workspace's vault happens to
-// be unlocked in memory at export time (VaultKeyContext), the decrypted `secret` is included
-// too. Runs entirely client-side.
+// `secretIv` + the caller's own `vaultSalt` for that workspace, from `workspace_vaults`) so the
+// export is complete and self-contained — the user can decrypt them offline with their vault
+// passphrase. When a workspace's vault happens to be unlocked in memory at export time
+// (VaultKeyContext), the decrypted `secret` is included too. Runs entirely client-side. Both the
+// credential rows and the vault row are RLS-scoped to the caller (per-member vaults, step 92).
 
 export interface AccountExport {
   exportedAt: string;
@@ -63,11 +64,16 @@ export async function buildAccountExport(
 
   const out: WorkspaceExport[] = [];
   for (const ws of workspaces) {
-    const [pages, canvases, folders, creds] = await Promise.all([
+    const [pages, canvases, folders, creds, vaultRow] = await Promise.all([
       supabase.from("pages").select("*").eq("workspace_id", ws.id),
       supabase.from("canvases").select("*").eq("workspace_id", ws.id),
       supabase.from("credential_folders").select("*").eq("workspace_id", ws.id),
       supabase.from("credentials").select("*").eq("workspace_id", ws.id),
+      supabase
+        .from("workspace_vaults")
+        .select("vault_salt")
+        .eq("workspace_id", ws.id)
+        .maybeSingle(),
     ]);
 
     const key = getVaultKey(ws.id);
@@ -100,7 +106,7 @@ export async function buildAccountExport(
       name: ws.name,
       role: roleByWs.get(ws.id) ?? null,
       createdAt: ws.createdAt,
-      vaultSalt: ws.vaultSalt,
+      vaultSalt: vaultRow.data?.vault_salt ?? null,
       pages: (pages.data ?? []).map(mapPageRow),
       canvases: (canvases.data ?? []).map(mapCanvasRow),
       credentialFolders: (folders.data ?? []).map(mapCredentialFolderRow),

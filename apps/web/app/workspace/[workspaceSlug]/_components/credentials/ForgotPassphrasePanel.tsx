@@ -2,11 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import type { Workspace } from "@crowscribe/types";
+import type { WorkspaceVault } from "@crowscribe/types";
 import { Button } from "../../../../_components/Button";
 import { Input } from "../../../../_components/Input";
 import {
-  buildWorkspaceHref,
   deriveRecoveryKeyMaterial,
   deriveVaultKey,
   generateSalt,
@@ -22,18 +21,20 @@ const MIN_PASSPHRASE_LENGTH = 8;
 // recovery key (by successfully unwrapping the VMK with it — the same auth-tag-failure check every
 // other unlock path in this vault uses), then pick a new passphrase and re-wrap the *same* VMK
 // under it. No data loss, and no server/email involvement at any point — the recovery key itself
-// is the second factor, entirely client-side. Only vault_salt/vault_wrapped_key(_iv) are rewritten;
-// vault_recovery_wrapped_key(_iv) is untouched, so the same recovery key keeps working afterward.
+// is the second factor, entirely client-side. Only salt/wrappedKey(_iv) are rewritten;
+// recoveryWrappedKey(_iv) is untouched, so the same recovery key keeps working afterward.
 export function ForgotPassphrasePanel({
-  workspace,
+  workspaceId,
+  vault,
   onRecovered,
   onCancel,
 }: {
-  workspace: Workspace;
+  workspaceId: string;
+  vault: WorkspaceVault;
   onRecovered: () => void;
   onCancel: () => void;
 }) {
-  const vaultKey = useVaultKey(workspace.id);
+  const vaultKey = useVaultKey(workspaceId);
   const rotatePassphrase = useRotateVaultPassphrase();
   const [recoveryKeyInput, setRecoveryKeyInput] = useState("");
   const [vmk, setVmk] = useState<CryptoKey | null>(null);
@@ -43,18 +44,8 @@ export function ForgotPassphrasePanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const hasRecoveryKey = Boolean(
-    workspace.vaultRecoveryWrappedKey && workspace.vaultRecoveryWrappedKeyIv,
-  );
-
   async function handleRecoveryKeySubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (
-      !workspace.vaultRecoveryWrappedKey ||
-      !workspace.vaultRecoveryWrappedKeyIv
-    ) {
-      return;
-    }
     setError(null);
     setBusy(true);
     try {
@@ -62,8 +53,8 @@ export function ForgotPassphrasePanel({
       // extractable: true — this recovered VMK is about to be re-wrapped under a new
       // passphrase-derived key below, which needs exportKey; see unwrapVaultMasterKey's comment.
       const recoveredVmk = await unwrapVaultMasterKey(
-        workspace.vaultRecoveryWrappedKey,
-        workspace.vaultRecoveryWrappedKeyIv,
+        vault.recoveryWrappedKey,
+        vault.recoveryWrappedKeyIv,
         kr,
         true,
       );
@@ -91,7 +82,7 @@ export function ForgotPassphrasePanel({
       const kp = await deriveVaultKey(newPassphrase, saltB64);
       const wrapped = await wrapVaultMasterKey(vmk, kp);
       await rotatePassphrase.mutateAsync({
-        workspaceId: workspace.id,
+        workspaceId,
         saltB64,
         wrappedKey: wrapped.ciphertext,
         wrappedKeyIv: wrapped.iv,
@@ -103,26 +94,6 @@ export function ForgotPassphrasePanel({
     } finally {
       setBusy(false);
     }
-  }
-
-  if (!hasRecoveryKey) {
-    return (
-      <div className="flex flex-1 items-center p-10">
-        <div className="mx-auto w-full max-w-sm text-sm text-ink-500">
-          <p>
-            This vault doesn&apos;t have a recovery key set up, so it can&apos;t
-            be recovered this way.
-          </p>
-          <button
-            type="button"
-            onClick={onCancel}
-            className="mt-3 text-xs font-medium text-ink-800 underline"
-          >
-            Back to unlock
-          </button>
-        </div>
-      </div>
-    );
   }
 
   if (vmk) {
@@ -204,7 +175,7 @@ export function ForgotPassphrasePanel({
             <div className="text-xs text-red-700">
               <p>{error}</p>
               <Link
-                href={`${buildWorkspaceHref(workspace)}/vault-reset`}
+                href={`/workspace/${workspaceId}/vault-reset`}
                 className="mt-1 inline-block underline"
               >
                 Lost your recovery key too?
