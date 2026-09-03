@@ -23,8 +23,9 @@ signed in, the sidebar's workspace-name dropdown → "Account settings" opens th
 where a user can set a password, pick a theme, and update their profile
 (name/occupation/company/bio/avatar/username — see Build Order steps 28-29 and 78; a set username
 can be typed on the sign-in page instead of the email). The login page also offers "Continue with
-Google" (opens as a popup — `docs/ARCHITECTURE.md` Build Order step 15) — Google sign-in needs
-real OAuth credentials configured (step 14) and isn't covered by the automated suite.
+Google" (a full-page redirect to Google in the current tab — `docs/ARCHITECTURE.md` Build Order
+step 90, which reverted step 15's popup) — Google sign-in needs real OAuth credentials configured
+(step 14) and isn't covered by the automated suite.
 
 `supabase start` also boots the Edge runtime and serves `send-invitation-email`
 (Build Order step 80) and `delete-account` (step 85). `send-invitation-email` no-ops without
@@ -128,11 +129,10 @@ implementation time, not a permanent spec.
 5. Approach Supabase Storage's free-tier limit (1GB) with real usage and confirm the compression
    settings in `PageEditor.tsx`'s `uploadFile` are still appropriate — this was flagged as a
    zero-cost risk to revisit once there's real data, not a one-time check.
-6. Click "Continue with Google" with real OAuth credentials configured: confirm a small centered
-   popup opens (not a full-tab navigation away from CrowScribe), completes Google's consent screen, then
-   self-closes with the main tab landing signed in on `/workspace`. Separately, block popups for
-   `localhost`/`127.0.0.1` in the browser and confirm it falls back to a full-page redirect instead
-   of silently doing nothing.
+6. Click "Continue with Google" with real OAuth credentials configured: the **current tab**
+   navigates to Google's consent screen (no new window/tab), and after consent returns to the app
+   signed in on `/workspace` (or the onboarding stepper for a brand-new Google account). Confirm
+   the address bar is a clean `…/workspace` with no `#access_token` fragment left behind.
 7. Set up a workspace's vault passphrase, add a few credentials, and confirm the recovery key is
    shown exactly once (Continue stays disabled until "I've saved this" is checked) and can't be
    skipped. Then deliberately "forget" the passphrase (use a different one on the next unlock) —

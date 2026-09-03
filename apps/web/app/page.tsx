@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import {
@@ -79,8 +79,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [usernameNotFound, setUsernameNotFound] = useState(false);
   const [step, setStep] = useState<Step>("email");
-  const [awaitingGooglePopup, setAwaitingGooglePopup] = useState(false);
-  const popupPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Turnstile token is single-use — bump `captchaNonce` after each attempt to remount the widget.
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [captchaNonce, setCaptchaNonce] = useState(0);
@@ -90,36 +88,11 @@ export default function LoginPage() {
     setCaptchaNonce((n) => n + 1);
   }
 
-  // A popup we opened for Google sign-in lands back here (see handleGoogleClick's redirectTo) with
-  // its own fresh session once auth completes — self-close instead of taking over that small
-  // window with the workspace UI. The main tab picks up the new session via GoTrueClient's
-  // cross-tab BroadcastChannel (see useSignInWithGoogle) and redirects itself below as normal.
+  // Magic-link / Google / password sign-in all land back on "/" with a session; once it resolves,
+  // hand off to the workspace.
   useEffect(() => {
-    if (loading || !user) return;
-    const isAuthPopup =
-      typeof window !== "undefined" &&
-      !!window.opener &&
-      new URLSearchParams(window.location.search).has("authPopup");
-    if (isAuthPopup) {
-      window.close();
-      return;
-    }
-    router.replace("/workspace");
+    if (!loading && user) router.replace("/workspace");
   }, [loading, user, router]);
-
-  // Self-clearing poll (no unmount cleanup needed — it stops itself as soon as the popup closes,
-  // which happens either when the user cancels or once the popup detects its own signed-in state
-  // and closes itself, see the effect above).
-  function pollPopupClosed(popup: Window) {
-    if (popupPollRef.current) clearInterval(popupPollRef.current);
-    popupPollRef.current = setInterval(() => {
-      if (popup.closed) {
-        if (popupPollRef.current) clearInterval(popupPollRef.current);
-        popupPollRef.current = null;
-        setAwaitingGooglePopup(false);
-      }
-    }, 500);
-  }
 
   async function handleEmailSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -173,33 +146,12 @@ export default function LoginPage() {
     );
   }
 
-  async function handleGoogleClick() {
-    if (typeof window === "undefined") return;
-    setAwaitingGooglePopup(true);
-    try {
-      const url = await signInWithGoogle.mutateAsync({
-        redirectTo: `${window.location.origin}/?authPopup=1`,
-      });
-      const width = 480;
-      const height = 640;
-      const left =
-        window.screenX + Math.max(0, (window.outerWidth - width) / 2);
-      const top =
-        window.screenY + Math.max(0, (window.outerHeight - height) / 2);
-      const popup = window.open(
-        url,
-        "crowscribe-google-signin",
-        `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,status=no`,
-      );
-      if (!popup) {
-        // Popup blocked — fall back to a full-page redirect rather than dead-ending.
-        window.location.assign(url);
-        return;
-      }
-      pollPopupClosed(popup);
-    } catch {
-      setAwaitingGooglePopup(false);
-    }
+  function handleGoogleClick() {
+    // signInWithOAuth navigates this tab to Google itself; it returns here once consent completes.
+    signInWithGoogle.mutate({
+      redirectTo:
+        typeof window !== "undefined" ? window.location.origin : undefined,
+    });
   }
 
   return (
@@ -225,7 +177,7 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={handleGoogleClick}
-              disabled={signInWithGoogle.isPending || awaitingGooglePopup}
+              disabled={signInWithGoogle.isPending}
               style={
                 mounted && resolvedTheme === "dark"
                   ? {
@@ -242,8 +194,8 @@ export default function LoginPage() {
               className="flex h-10 items-center justify-center gap-3 rounded-md border text-sm font-medium tracking-wide transition-opacity hover:opacity-90 disabled:opacity-60"
             >
               <GoogleLogo />
-              {signInWithGoogle.isPending || awaitingGooglePopup
-                ? "Waiting for Google…"
+              {signInWithGoogle.isPending
+                ? "Redirecting…"
                 : "Continue with Google"}
             </button>
             {signInWithGoogle.isError && (
