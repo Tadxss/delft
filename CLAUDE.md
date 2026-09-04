@@ -29,16 +29,19 @@ invitation emails (PR #44); the `crowscribe.space` domain switch (82), Resend go
 `send.crowscribe.space` (83), and branded email templates (84) via PR #45. All email is now
 branded and live — invite email via the Edge Function, auth (magic-link) email via Resend custom
 SMTP + dashboard templates. **The production-readiness roadmap (Milestones A–C, Build Order steps
-85–90) is complete and deployed** — legal pages (Privacy/Terms/Contact), self-serve account
+85–95) is complete and deployed** — legal pages (Privacy/Terms/Contact), self-serve account
 deletion (`supabase/functions/delete-account/`), daily encrypted DB backup
 (`.github/workflows/db-backup.yml`), branch-protected `master`, DB-level abuse caps, editor
 unsaved-changes + stale-write guards, **enforcing CSP**, **Cloudflare Turnstile on the login
-page**, account data export, and workspace ownership transfer. Steps 89–90 since: CI's e2e suite
-runs against a prebuilt `next start` build (fixed the flaky WebKit shard timeouts) and a
-magic-link token no longer lingers in the URL after sign-out; Google OAuth was reverted from a
-popup to a same-tab redirect. The app is ready for a public beta;
-what's left (Sentry source maps on Turbopack, framework majors, nonce CSP, per-member vault-key
-sharing, real-device iOS) is deliberate post-launch work. See ARCHITECTURE.md's
+page**, account data export, and workspace ownership transfer. Since then: CI's e2e suite runs
+against a prebuilt `next start` build and a magic-link token no longer lingers in the URL after
+sign-out (89); Google OAuth reverted from a popup to a same-tab redirect (90); the Account modal's
+"Security & data" sub-section — export confirmation, delete-by-typing-your-full-name (91);
+**per-member vaults** — every workspace member (any role) now has their own private credentials
+vault, `workspace_vaults` table (92–93); a "Resend invite" button (94); the DB backup restore
+recipe was tested end-to-end, found broken, and fixed (95). The app is ready for a public beta;
+what's left (Sentry source maps on Turbopack, framework majors, nonce CSP, real-device iOS,
+the backup restore's auth/storage half) is deliberate post-launch work. See ARCHITECTURE.md's
 **Next Up** for current focus and the Build Order for how each feature shipped;
 [docs/BETA_READINESS.md](docs/BETA_READINESS.md)'s original audit is closed out as of Build Order
 step 37, with a separate section for the multi-user surface added since.
@@ -185,8 +188,8 @@ there in depth:
    own private vault per workspace — their own passphrase, their own credential rows, invisible to
    every other member including the owner. The key-wrap material lives in `workspace_vaults`
    (per `(workspace_id, user_id)`), not on `workspaces`. `user_id` fills from a `default auth.uid()`
-   column so the client never sends it. (PR 1 shipped the plumbing; PR 2 opens the vault UI to
-   non-owner members.)
+   column so the client never sends it. Every member of any role already sees and can use their
+   own vault in the UI (the "Credentials Vault" menu item is no longer owner-gated).
 5. `enable_confirmations = false` (magic-link-only signup) ⇒ a session's `auth.jwt() ->> 'email'`
    claim can be an _unconfirmed_ address. The invitation RPCs match invitees against
    `auth.users.email_confirmed_at`, never the raw claim.
