@@ -140,7 +140,7 @@ transfer, per-member vault-key sharing, a "Resend invite" button) are still open
 invitations are unrelated to the global signup-gate that was declined above** — that was about who
 can create an account at all; this is about sharing a workspace with someone who already can.
 
-**Production-readiness (Milestones A–C) is complete and deployed** — see Build Order steps 85–94.
+**Production-readiness (Milestones A–C) is complete and deployed** — see Build Order steps 85–95.
 The app is ready for a public beta (legal pages, account deletion, encrypted daily backups,
 branch-protected `master`, abuse caps, enforcing CSP, Cloudflare Turnstile on the login page —
 all live and verified, prod CAPTCHA confirmed end-to-end in a real browser). Step 89 then made
@@ -155,7 +155,9 @@ export shows a confirmation first). **Steps 92–93 shipped per-member vaults** 
 shared workspace now has their own private credentials vault (`workspace_vaults` table,
 per-member RLS, ownership transfer no longer blocked by a vault, legacy pre-wrapped-key path
 removed). Step 94 added a "Resend invite" button to the Members modal (the last step-79 follow-up).
-Steps 88–94's full detail is at the end of the Build Order.
+Step 95 tested the DB backup restore path (it didn't work as written — recipe + workflow fixed;
+`public` schema+data + vault key material verified byte-identical).
+Steps 88–95's full detail is at the end of the Build Order.
 
 **Deploy status:** all migrations through `20260904000000_rpc_rate_limits_rls` are on hosted
 (`supabase db push`; `20260902000000`/`20260903000000`/`20260904000000` for Milestones B–C).
@@ -2948,12 +2950,13 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
       page shows "Your account has been deleted" (AuthGate redirects to `/` the moment the
       session clears, so a query param wouldn't survive). e2e: `account-deletion.spec.ts`
       (solo delete + blocked-by-shared-workspace).
-    - **Scheduled DB backup** ✅ — `.github/workflows/db-backup.yml`, daily `supabase db dump`
-      (roles + schema + data), AES-256-encrypted (`openssl enc -pbkdf2`), kept as a 30-day
-      GitHub Actions artifact. Free-tier Supabase has no self-serve restore, so this is _the_
-      recovery path. **Needs two repo secrets:** `SUPABASE_DB_URL` (hosted connection string) and
-      `BACKUP_PASSPHRASE` (stored outside GitHub — without it the dumps are unrecoverable, by
-      design). Restore recipe is in the workflow header.
+    - **Scheduled DB backup** ✅ — `.github/workflows/db-backup.yml`, daily `supabase db dump`,
+      AES-256-encrypted (`openssl enc -pbkdf2`), kept as a 30-day GitHub Actions artifact.
+      Free-tier Supabase has no self-serve restore, so this is _the_ recovery path. **Needs two
+      repo secrets:** `SUPABASE_DB_URL` (hosted connection string) and `BACKUP_PASSPHRASE` (stored
+      outside GitHub — without it the dumps are unrecoverable, by design). Restore recipe is in
+      the workflow header; **verified end-to-end in Build Order step 95** (roles/schema/data
+      dump artifacts weren't restorable as originally written).
     - **CI gates the `master` deploy** ✅ — branch protection on `master`: all changes via PR,
       `checks` + `e2e` must pass, branch must be up to date; `enforce_admins: false` so the owner
       can force through in an emergency. e2e `timeout-minutes` bumped 20 → 30 (it's now a release
@@ -3246,6 +3249,29 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
     token. e2e: `workspace-invitations.spec.ts` clicks Resend and asserts the "Sent" flash (CI
     has `RESEND_API_KEY` unset → `{skipped:"no-api-key"}` → resolves).
 
+95. **DB backup restore path — tested, and it didn't work.** ✅ _done_. `db-backup.yml` had run
+    daily since step 85 but the restore recipe (a comment in the workflow header) had never been
+    exercised — the single scariest gap, given free-tier Supabase has no other recovery path and
+    the prod DB was just migrated twice for per-member vaults. Ran a real hosted dump (`--linked`)
+    → encrypt → decrypt → restore into a throwaway `public.ecr.aws/supabase/postgres:17.6.1.155`
+    container. Findings:
+    - ✅ `tar | openssl enc -pbkdf2` round-trip is byte-identical.
+    - ✅ `schema.sql` restores clean; **`public` data restores clean** with
+      `SET session_replication_role = replica` — every table's row count matched hosted, and the
+      `workspace_vaults` wrapped-key columns were byte-identical (md5-compared) end to end.
+    - ❌ **`roles.sql` aborts under `-v ON_ERROR_STOP=1`** — it contains a
+      `GRANT SET ON PARAMETER "log_min_messages"` the `postgres` role can't replay. Fix: load it
+      best-effort (no `ON_ERROR_STOP`); its contents are non-critical `statement_timeout` tuning.
+    - ⚠️ **`data.sql` (the only data file the workflow produced) includes `auth.*` + `storage.*`
+      rows**, but `schema.sql` only dumps `public` — so against anything that isn't a fresh
+      Supabase project it dies on `relation "auth.flow_state" does not exist`. Fix: the workflow
+      now **also** dumps `data-public.sql` (`--data-only --schema public`) as the guaranteed-
+      restorable core, and the header recipe has two explicit paths (public-only into any
+      Postgres; full auth+storage only into a fresh Supabase project, `ON_ERROR_STOP` off).
+    `.github/workflows/db-backup.yml` + `docs/TESTING.md` updated. **Still worth doing once:** a
+    real drill into a throwaway Supabase project to confirm the auth/storage path (the local test
+    can't — a bare image has no GoTrue/Storage schema).
+
 **Production-readiness roadmap (Milestones A–C) is complete and fully deployed.** The system is
 ready for a public beta: legal pages, self-serve account deletion, daily encrypted DB backups,
 `master` branch protection, abuse caps, enforcing CSP, and Turnstile bot protection are all live
@@ -3258,3 +3284,7 @@ and verified. Remaining work is deliberate post-launch iteration, not launch blo
   clean on the full e2e suite. Each remaining one is its own tested piece of work.
 - **Nonce-based CSP** — drop `script-src 'unsafe-inline'`; needs a `middleware.ts`.
 - **Real-device iOS Safari testing** — only emulated mobile-safari so far.
+- **Backup restore — the auth/storage path** — step 95 verified the `public` schema+data restore
+  end-to-end; the `auth.users` / `storage.objects` half of `data.sql` can only be tested against
+  a real fresh Supabase project (a bare Postgres has no GoTrue/Storage schema). Worth one real
+  drill into a throwaway project.
