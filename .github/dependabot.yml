@@ -5,10 +5,21 @@
 # framework majors ignored.
 #
 # Step 88 addendum: react/react-dom 19.2.3->19.2.8 + @tiptap/pm 3.30.0->3.30.5 (which Dependabot
-# classifies as *patch*, so the major-ignore below didn't stop them) reproduce a ProseMirror
-# `localsInner` TypeError across the editor/canvas specs on BOTH chromium and webkit (PR #58,
-# and PR #51 before it). Until that regression is bisected and fixed by hand, react* and
-# @tiptap/* are ignored for *every* update type — see the second ignore block.
+# classifies as *patch*, so the major-ignore below didn't stop them) reproduced a ProseMirror
+# `localsInner` TypeError across the editor/canvas specs on BOTH chromium and webkit (PR #58, and
+# PR #51 before it) — so react*/@tiptap/* were held at every update type pending a bisect.
+#
+# Step 96: bisected and fixed. Root cause was a "dual package hazard", not React or @tiptap
+# themselves — apps/web had a redundant, unused direct `@tiptap/pm` dependency (nothing imported
+# it) that gave pnpm's peer-aware resolver a second, competing place to resolve `@tiptap/pm`'s
+# bundled `prosemirror-view`, so two physically different copies of prosemirror-view ended up
+# loaded at once; a Decoration built by one copy's class handed to the other copy's
+# DecorationGroup is exactly what throws `localsInner is not a function`. Fix: dropped the dead
+# dependency, and root `package.json`'s `pnpm.overrides` now pins `@tiptap/pm` +
+# `prosemirror-view` to one version each so pnpm can't resolve two copies again regardless of the
+# peer graph. Verified: single `prosemirror-view` resolution in the lockfile, full e2e suite
+# (chromium/webkit/mobile-safari) green. react*/@tiptap/* are unheld — only the pre-existing
+# semver-major ignore below still applies, same as every other framework package.
 version: 2
 updates:
   - package-ecosystem: npm
@@ -56,14 +67,6 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "turbo"
         update-types: ["version-update:semver-major"]
-
-      # Held at ALL update types (not just major) pending the `localsInner` bisect — see header.
-      - dependency-name: "react"
-      - dependency-name: "react-dom"
-      - dependency-name: "react-is"
-      - dependency-name: "@types/react"
-      - dependency-name: "@types/react-dom"
-      - dependency-name: "@tiptap/*"
 
   - package-ecosystem: github-actions
     directory: "/"

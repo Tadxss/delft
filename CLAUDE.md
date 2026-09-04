@@ -29,7 +29,7 @@ invitation emails (PR #44); the `crowscribe.space` domain switch (82), Resend go
 `send.crowscribe.space` (83), and branded email templates (84) via PR #45. All email is now
 branded and live — invite email via the Edge Function, auth (magic-link) email via Resend custom
 SMTP + dashboard templates. **The production-readiness roadmap (Milestones A–C, Build Order steps
-85–95) is complete and deployed** — legal pages (Privacy/Terms/Contact), self-serve account
+85–96) is complete and deployed** — legal pages (Privacy/Terms/Contact), self-serve account
 deletion (`supabase/functions/delete-account/`), daily encrypted DB backup
 (`.github/workflows/db-backup.yml`), branch-protected `master`, DB-level abuse caps, editor
 unsaved-changes + stale-write guards, **enforcing CSP**, **Cloudflare Turnstile on the login
@@ -39,9 +39,12 @@ sign-out (89); Google OAuth reverted from a popup to a same-tab redirect (90); t
 "Security & data" sub-section — export confirmation, delete-by-typing-your-full-name (91);
 **per-member vaults** — every workspace member (any role) now has their own private credentials
 vault, `workspace_vaults` table (92–93); a "Resend invite" button (94); the DB backup restore
-recipe was tested end-to-end, found broken, and fixed (95). The app is ready for a public beta;
-what's left (Sentry source maps on Turbopack, framework majors, nonce CSP, real-device iOS,
-the backup restore's auth/storage half) is deliberate post-launch work. See ARCHITECTURE.md's
+recipe was tested end-to-end, found broken, and fixed (95); the `localsInner` ProseMirror
+regression was bisected to a dual `prosemirror-view` module-instance hazard (not React) and fixed
+via a `pnpm.overrides` pin — `react`/`react-dom`/`@tiptap/*` are no longer Dependabot-frozen (96).
+The app is ready for a public beta; what's left (Sentry source maps on Turbopack, Tailwind v4,
+TS 7, nonce CSP, real-device iOS, the backup restore's auth/storage half) is deliberate
+post-launch work. See ARCHITECTURE.md's
 **Next Up** for current focus and the Build Order for how each feature shipped;
 [docs/BETA_READINESS.md](docs/BETA_READINESS.md)'s original audit is closed out as of Build Order
 step 37, with a separate section for the multi-user surface added since.

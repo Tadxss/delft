@@ -20,7 +20,10 @@ test("a user can set a password from the Account modal and sign in with it after
   await page.click('button:has-text("Sign out")');
   await expect(page).toHaveURL("http://127.0.0.1:3000/");
 
-  await page.fill("#identifier", email);
+  // Same hydration-race workaround as signIn() in helpers.ts — a bare fill() can land before
+  // React attaches its listeners on the freshly-loaded login page and get silently wiped.
+  await page.locator("#identifier").click();
+  await page.locator("#identifier").pressSequentially(email, { delay: 20 });
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   await page.fill("#password", "Correct-Horse-Battery9");
   await page.getByRole("button", { name: "Continue", exact: true }).click();
