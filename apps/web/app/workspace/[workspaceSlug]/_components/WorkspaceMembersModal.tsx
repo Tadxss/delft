@@ -7,6 +7,7 @@ import {
   useAuthUser,
   useInviteToWorkspace,
   useRemoveWorkspaceMember,
+  useResendWorkspaceInvitation,
   useRevokeWorkspaceInvitation,
   useSetWorkspaceMemberRole,
   useTransferWorkspaceOwnership,
@@ -124,7 +125,7 @@ export function WorkspaceMembersModal({
           </div>
           <p className="-mt-1 text-xs text-ink-400">
             Editors can create and edit pages &amp; canvases; viewers are
-            read-only. The credentials vault stays owner-only.
+            read-only. Each member gets their own private credentials vault.
           </p>
           {invite.isError && (
             <p className="text-xs text-red-700">{invite.error.message}</p>
@@ -260,6 +261,7 @@ export function WorkspaceMembersModal({
             <ul className="flex flex-col gap-1">
               {(invitations.data ?? []).map((inv) => {
                 const link = inviteLink(inv.token);
+                const expired = new Date(inv.expiresAt).getTime() <= Date.now();
                 return (
                   <li
                     key={inv.id}
@@ -273,6 +275,14 @@ export function WorkspaceMembersModal({
                     <span className="shrink-0 text-xs text-ink-400">
                       {inv.role}
                     </span>
+                    {inv.invitedEmail &&
+                      (expired ? (
+                        <span className="shrink-0 text-xs text-ink-400">
+                          expired — revoke &amp; re-invite
+                        </span>
+                      ) : (
+                        <ResendButton token={inv.token} />
+                      ))}
                     <button
                       type="button"
                       onClick={() => copy(link)}
@@ -299,5 +309,45 @@ export function WorkspaceMembersModal({
         )}
       </div>
     </Modal>
+  );
+}
+
+// Re-sends the invitation email for one pending email invite. Owns its own hook + transient
+// label so each row is independent (mirrors the per-row Copy/Revoke buttons above).
+function ResendButton({ token }: { token: string }) {
+  const resend = useResendWorkspaceInvitation();
+  const [flash, setFlash] = useState<string | null>(null);
+
+  function handleClick() {
+    setFlash(null);
+    resend.mutate(
+      { token },
+      {
+        onSuccess: () => {
+          setFlash("Sent");
+          setTimeout(() => setFlash(null), 2500);
+        },
+        onError: (e) => {
+          setFlash(e.message);
+          setTimeout(() => setFlash(null), 4000);
+        },
+      },
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={resend.isPending}
+      title={flash ?? "Resend the invitation email"}
+      className={`shrink-0 rounded px-1.5 py-0.5 text-xs hover:bg-paper-100 disabled:opacity-60 ${
+        flash && flash !== "Sent"
+          ? "text-red-700"
+          : "text-ink-400 hover:text-ink-700"
+      }`}
+    >
+      {resend.isPending ? "…" : (flash ?? "Resend")}
+    </button>
   );
 }

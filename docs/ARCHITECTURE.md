@@ -140,7 +140,7 @@ transfer, per-member vault-key sharing, a "Resend invite" button) are still open
 invitations are unrelated to the global signup-gate that was declined above** — that was about who
 can create an account at all; this is about sharing a workspace with someone who already can.
 
-**Production-readiness (Milestones A–C) is complete and deployed** — see Build Order steps 85–93.
+**Production-readiness (Milestones A–C) is complete and deployed** — see Build Order steps 85–94.
 The app is ready for a public beta (legal pages, account deletion, encrypted daily backups,
 branch-protected `master`, abuse caps, enforcing CSP, Cloudflare Turnstile on the login page —
 all live and verified, prod CAPTCHA confirmed end-to-end in a real browser). Step 89 then made
@@ -154,8 +154,8 @@ post-launch work, not blockers: Sentry source maps (C7, deferred on Turbopack), 
 export shows a confirmation first). **Steps 92–93 shipped per-member vaults** — every member of a
 shared workspace now has their own private credentials vault (`workspace_vaults` table,
 per-member RLS, ownership transfer no longer blocked by a vault, legacy pre-wrapped-key path
-removed).
-Steps 88–93's full detail is at the end of the Build Order.
+removed). Step 94 added a "Resend invite" button to the Members modal (the last step-79 follow-up).
+Steps 88–94's full detail is at the end of the Build Order.
 
 **Deploy status:** all migrations through `20260904000000_rpc_rate_limits_rls` are on hosted
 (`supabase db push`; `20260902000000`/`20260903000000`/`20260904000000` for Milestones B–C).
@@ -3234,6 +3234,18 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
       vault ever shows the other's row. `workspace-invitations.spec.ts` flipped (viewer B now
       sees "Credentials Vault"); `credentials.spec.ts` copy assertions updated.
 
+94. **"Resend invite" button.** ✅ _done_. The last step-79 follow-up. The Members modal's
+    "Pending invitations" list now has a **Resend** button next to each pending *email* invite
+    (`@username` invites never send an email). It's a pure UI addition — `send-invitation-email`
+    was already idempotent (re-checks caller is inviter/owner, invite is pending + has an email,
+    60s per-invite throttle via `last_emailed_at`), so a new `useResendWorkspaceInvitation` hook
+    just invokes it again with the token and surfaces `sent` / `throttled` / error as a transient
+    button label. No migration, RPC, or Edge Function change. An **expired** pending invite
+    (still shown to the owner) gets an "expired — revoke & re-invite" hint instead of the button,
+    since resend deliberately doesn't extend `expires_at` and the accept RPC rejects an expired
+    token. e2e: `workspace-invitations.spec.ts` clicks Resend and asserts the "Sent" flash (CI
+    has `RESEND_API_KEY` unset → `{skipped:"no-api-key"}` → resolves).
+
 **Production-readiness roadmap (Milestones A–C) is complete and fully deployed.** The system is
 ready for a public beta: legal pages, self-serve account deletion, daily encrypted DB backups,
 `master` branch protection, abuse caps, enforcing CSP, and Turnstile bot protection are all live
@@ -3246,4 +3258,3 @@ and verified. Remaining work is deliberate post-launch iteration, not launch blo
   clean on the full e2e suite. Each remaining one is its own tested piece of work.
 - **Nonce-based CSP** — drop `script-src 'unsafe-inline'`; needs a `middleware.ts`.
 - **Real-device iOS Safari testing** — only emulated mobile-safari so far.
-- **Step 79 follow-ups** — a "Resend invite" button (ownership transfer shipped as C5).
