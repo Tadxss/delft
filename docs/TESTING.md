@@ -148,6 +148,18 @@ implementation time, not a permanent spec.
 8. Open a canvas and confirm there's no way to insert an image (the tool is intentionally hidden —
    see `docs/ARCHITECTURE.md` Build Order step 17). Draw a variety of shapes/text, reload, and
    confirm everything survived; confirm dark/light theme switches correctly.
+9. **DB backup restore drill** (re-run after any migration that changes table shape). Verified in
+   Build Order step 95; recipe lives in `.github/workflows/db-backup.yml`'s header.
+   - `public` path (any Postgres): download the newest `db-backup-*` artifact → `openssl enc -d`
+     → `tar -xz` → `docker run --rm -d -e POSTGRES_PASSWORD=postgres -p 5433:5432
+     public.ecr.aws/supabase/postgres:<tag>` → load `roles.sql` (no `ON_ERROR_STOP`), then
+     `schema.sql` and `data-public.sql` (`-v ON_ERROR_STOP=1`, the latter with
+     `SET session_replication_role = replica`). Diff every table's `count(*)` against hosted
+     (`supabase db query --linked`), and `md5()`-compare a `workspace_vaults` row's wrapped-key
+     columns — they must be byte-identical.
+   - `auth`/`storage` path (fresh Supabase project only): restore `data.sql` instead of
+     `data-public.sql`, `ON_ERROR_STOP` off — confirm `auth.users` / `auth.identities` /
+     `storage.objects` land with their original ids so `public` FKs stay valid.
 
 ## Resetting between test runs
 

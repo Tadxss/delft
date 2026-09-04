@@ -1,8 +1,12 @@
 name: DB backup
 
 # Free-tier Supabase has no self-serve restore (production-readiness item 4), so this is the
-# recovery path for a bad migration or an accidental delete on hosted. Daily `supabase db dump`
-# (roles + schema + data), AES-256 encrypted, kept as a GitHub Actions artifact for 30 days.
+# recovery path for a bad migration or an accidental delete on hosted. Daily `supabase db dump`,
+# AES-256 encrypted, kept as a GitHub Actions artifact for 30 days. Four files:
+#   roles.sql        — role tuning (statement_timeout overrides + one telemetry GRANT)
+#   schema.sql       — the `public` schema (tables, functions, triggers, RLS policies, grants)
+#   data-public.sql  — every row in `public` (the app's data). THE core restore target.
+#   data.sql         — data-public PLUS auth.users/identities/sessions + storage.buckets/objects
 #
 # Required repo secrets:
 #   SUPABASE_DB_URL     — hosted DB connection string (Supabase dashboard → Project Settings →
@@ -11,13 +15,29 @@ name: DB backup
 #                         this repo/GitHub (a password manager). Without it the dumps are
 #                         unrecoverable — that's the point.
 #
-# Restore (into a CLEAN / recovery database, not over live data):
+# ─── Restore (verified end-to-end for the `public` path, Build Order step 95 — see
+#     docs/TESTING.md for the drill). Restore into a NEW database, never over live data. ───
+#
 #   openssl enc -d -aes-256-cbc -pbkdf2 -in backup.tar.gz.enc -pass pass:"$BACKUP_PASSPHRASE" | tar -xz
-#   psql "$DB_URL" -v ON_ERROR_STOP=1 -f roles.sql -f schema.sql
-#   psql "$DB_URL" -v ON_ERROR_STOP=1 -c "SET session_replication_role = replica" -f data.sql
-# The `session_replication_role = replica` on the data load is required — the schema has circular
-# FKs (self-referential pages.parent_id, workspaces<->workspace_members) that a plain --data-only
-# COPY order can't satisfy (pg_dump warns about this during the dump; it's expected).
+#
+#   # 1. Role tuning — best-effort, NO `-v ON_ERROR_STOP=1`: it has a `GRANT SET ON PARAMETER`
+#   #    the `postgres` role can't replay, and the settings are non-critical.
+#   psql "$DB_URL" -f roles.sql
+#
+#   # 2. Schema + app data. `session_replication_role = replica` defers FK checks past the schema's
+#   #    circular refs (pages.parent_id, workspaces↔workspace_members, workspace_vaults↔workspaces).
+#   psql "$DB_URL" -v ON_ERROR_STOP=1 -f schema.sql
+#   psql "$DB_URL" -v ON_ERROR_STOP=1 -c "SET session_replication_role = replica" -f data-public.sql
+#
+#   # 3. Auth + storage — ONLY when the target is a fresh Supabase project (its auth/storage
+#   #    schemas are GoTrue/Storage-managed; a bare Postgres has neither). Restores auth.users +
+#   #    auth.identities (so people can still log in with the same user ids) and storage.objects
+#   #    metadata (the files themselves live in the storage bucket, out of scope here). Run WITHOUT
+#   #    ON_ERROR_STOP — a fresh project's default buckets / any transient session rows may
+#   #    conflict; that's expected. This re-inserts the `public` rows too, so run it INSTEAD of
+#   #    step 2's data-public.sql (not after):
+#   #      psql "$DB_URL" -f schema.sql   # (no ON_ERROR_STOP if the project pre-created any public objects)
+#   #      psql "$DB_URL" -c "SET session_replication_role = replica" -f data.sql
 
 on:
   schedule:
@@ -54,6 +74,7 @@ jobs:
           mkdir -p backup
           supabase db dump --db-url "$DB_URL" -f backup/roles.sql --role-only
           supabase db dump --db-url "$DB_URL" -f backup/schema.sql
+          supabase db dump --db-url "$DB_URL" -f backup/data-public.sql --data-only --schema public
           supabase db dump --db-url "$DB_URL" -f backup/data.sql --data-only
           tar -czf - -C backup . \
             | openssl enc -aes-256-cbc -pbkdf2 -salt -pass pass:"$PASSPHRASE" \
