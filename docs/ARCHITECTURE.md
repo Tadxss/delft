@@ -3364,6 +3364,30 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
     updated to point at the scratch-project recipe instead of "fresh Supabase project only" (which
     read as hosted-only and was the reason this half kept getting deferred).
 
+100. **"Duplicate" page action, Notion-style.** ✅ _done_. The page sidebar's row menu (Rename,
+     Delete) gained a third item, Duplicate, matching Notion: duplicating a page copies its whole
+     descendant subtree in one shot, same convention as "Delete this page and all of its
+     sub-pages?" already uses. `duplicate_page` (`supabase/migrations`) is a new RPC —
+     `SECURITY INVOKER`, not `DEFINER`: `pages_insert_member`'s RLS already lets any workspace
+     member create pages directly (see `useCreatePage.ts`), so this isn't a privilege-escalation
+     shim like every other RPC in this file, it exists purely so a multi-row subtree copy is one
+     atomic transaction instead of a client-side loop that could leave a half-duplicated tree
+     behind on a partial failure. Implemented as a `plpgsql` loop (one `insert` per descendant,
+     parent-before-child), not a single `insert ... select` — `check_page_parent`'s
+     `before insert ... of parent_id` trigger looks up the new parent row by id, which isn't
+     visible to a sibling inserted earlier in the *same* statement (Postgres only advances the
+     command counter between statements, not between rows of one). Never copies
+     `is_published`/`published_slug` (the latter's `unique` constraint would hard-fail an insert
+     that copied it verbatim) — every duplicate is a private draft, like a freshly created page.
+     Storage has no SQL access, so the RPC can't touch a duplicated page's embedded images itself;
+     the client (`useDuplicatePage.ts` + `duplicatePageImages.ts`) copies each new page's Storage
+     objects to its own path and rewrites the content JSON's URLs afterward (best-effort, same
+     "a Storage hiccup shouldn't undo an already-successful row duplication" stance as
+     `removePageImages.ts`) — otherwise the duplicate's images would silently 404 the moment the
+     *original* page was later deleted. Verified manually end-to-end: duplicated a 2-level subtree
+     with an embedded image, confirmed two independent Storage objects existed, then deleted the
+     *original* page and confirmed the duplicate's image still rendered.
+
 **Production-readiness roadmap (Milestones A–C) is complete and fully deployed.** The system is
 ready for a public beta: legal pages, self-serve account deletion, daily encrypted DB backups,
 `master` branch protection, abuse caps, enforcing CSP, and Turnstile bot protection are all live

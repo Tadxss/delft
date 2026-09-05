@@ -49,10 +49,13 @@ fixed with an `ignoreErrors` filter and scoping both alert rules to `environment
 The `auth`/`storage` half of the backup restore drill — the one gap step 95 couldn't cover — was
 finally run: `BACKUP_PASSPHRASE` had been lost (rotated, new one saved durably in two places) and
 a genuinely blank scratch Supabase project confirmed `auth.users`/`auth.identities`/
-`storage.objects` restore with zero orphaned FKs (99).
+`storage.objects` restore with zero orphaned FKs (99). The page sidebar's row menu gained a
+Notion-style "Duplicate" action — copies a page's whole descendant subtree atomically via a new
+`SECURITY INVOKER` RPC (not `DEFINER`: RLS already permits every insert it does, the RPC exists
+only for transaction atomicity), then best-effort copies each duplicated page's Storage images so
+the copy survives the original being deleted later (100).
 The app is ready for a public beta; what's left (Sentry source maps on Turbopack, Tailwind v4,
-TS 7, nonce CSP, real-device iOS, the backup restore's auth/storage half) is deliberate
-post-launch work. See ARCHITECTURE.md's
+TS 7, nonce CSP, real-device iOS) is deliberate post-launch work. See ARCHITECTURE.md's
 **Next Up** for current focus and the Build Order for how each feature shipped;
 [docs/BETA_READINESS.md](docs/BETA_READINESS.md)'s original audit is closed out as of Build Order
 step 37, with a separate section for the multi-user surface added since.
@@ -204,3 +207,9 @@ there in depth:
 5. `enable_confirmations = false` (magic-link-only signup) ⇒ a session's `auth.jwt() ->> 'email'`
    claim can be an _unconfirmed_ address. The invitation RPCs match invitees against
    `auth.users.email_confirmed_at`, never the raw claim.
+6. Not every RPC is `SECURITY DEFINER` — `duplicate_page` (Build Order step 100) is
+   `SECURITY INVOKER` on purpose: `pages_insert_member`'s RLS already lets any member insert
+   directly, so the RPC exists only to make a multi-row subtree copy one atomic transaction, not
+   to bypass a policy. It must loop row-by-row rather than one `insert ... select` —
+   `check_page_parent`'s `before insert` trigger can't see a sibling row inserted earlier in the
+   _same_ statement.
