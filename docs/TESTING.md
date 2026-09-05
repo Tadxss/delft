@@ -148,8 +148,13 @@ implementation time, not a permanent spec.
 8. Open a canvas and confirm there's no way to insert an image (the tool is intentionally hidden —
    see `docs/ARCHITECTURE.md` Build Order step 17). Draw a variety of shapes/text, reload, and
    confirm everything survived; confirm dark/light theme switches correctly.
-9. **DB backup restore drill** (re-run after any migration that changes table shape). Verified in
-   Build Order step 95; recipe lives in `.github/workflows/db-backup.yml`'s header.
+9. **DB backup restore drill** (re-run after any migration that changes table shape). `public`
+   path verified in Build Order step 95, `auth`/`storage` path in step 99; recipe lives in
+   `.github/workflows/db-backup.yml`'s header. Both drills need a real `BACKUP_PASSPHRASE` to
+   decrypt — if it's genuinely lost (not just misplaced — check everywhere first), every existing
+   encrypted dump is permanently unrecoverable by design; rotate it (`gh secret set
+   BACKUP_PASSPHRASE`) and save the new one durably in at least two places before doing anything
+   else.
    - `public` path (any Postgres): download the newest `db-backup-*` artifact → `openssl enc -d`
      → `tar -xz` → `docker run --rm -d -e POSTGRES_PASSWORD=postgres -p 5433:5432
      public.ecr.aws/supabase/postgres:<tag>` → load `roles.sql` (no `ON_ERROR_STOP`), then
@@ -157,9 +162,19 @@ implementation time, not a permanent spec.
      `SET session_replication_role = replica`). Diff every table's `count(*)` against hosted
      (`supabase db query --linked`), and `md5()`-compare a `workspace_vaults` row's wrapped-key
      columns — they must be byte-identical.
-   - `auth`/`storage` path (fresh Supabase project only): restore `data.sql` instead of
-     `data-public.sql`, `ON_ERROR_STOP` off — confirm `auth.users` / `auth.identities` /
-     `storage.objects` land with their original ids so `public` FKs stay valid.
+   - `auth`/`storage` path — needs a genuinely blank project (its own real GoTrue/Storage schema,
+     zero app migrations), which the existing local dev stack isn't (it already has delft's
+     schema) and a hosted project costs a free-tier slot. Cheapest zero-cost way: a scratch
+     `npx supabase init` in a throwaway directory with every port in its `config.toml` shifted
+     (e.g. +1000) so it doesn't collide with the repo's own running stack, then `npx supabase
+     start`. If no `psql` binary is on PATH, pipe the SQL files into `docker exec -i
+     supabase_db_<project_id> psql -U postgres -d postgres` instead. Restore `schema.sql` then
+     `data.sql` (`ON_ERROR_STOP` off, `SET session_replication_role = replica`) — confirm
+     `auth.users`/`auth.identities`/`storage.objects` land with their original hosted ids and
+     `encrypted_password`/`confirmed_at`/`instance_id` intact, and that zero rows are orphaned on
+     every FK from `public` into `auth.users` or `storage.buckets`. Afterwards, `npx supabase stop
+     --no-backup` and delete the scratch directory and every decrypted plaintext file — this
+     drill handles real production auth/vault data end to end.
 
 ## Resetting between test runs
 

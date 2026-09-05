@@ -15,8 +15,11 @@ name: DB backup
 #                         this repo/GitHub (a password manager). Without it the dumps are
 #                         unrecoverable — that's the point.
 #
-# ─── Restore (verified end-to-end for the `public` path, Build Order step 95 — see
-#     docs/TESTING.md for the drill). Restore into a NEW database, never over live data. ───
+# ─── Restore (verified end-to-end — `public` path in Build Order step 95, `auth`/`storage` path
+#     in step 99 — see docs/TESTING.md for the drill). Restore into a NEW database, never over
+#     live data. If BACKUP_PASSPHRASE is ever lost (not just misplaced), every existing encrypted
+#     dump is permanently unrecoverable by design — rotate it and save the new one durably in at
+#     least two places. ───
 #
 #   openssl enc -d -aes-256-cbc -pbkdf2 -in backup.tar.gz.enc -pass pass:"$BACKUP_PASSPHRASE" | tar -xz
 #
@@ -29,15 +32,20 @@ name: DB backup
 #   psql "$DB_URL" -v ON_ERROR_STOP=1 -f schema.sql
 #   psql "$DB_URL" -v ON_ERROR_STOP=1 -c "SET session_replication_role = replica" -f data-public.sql
 #
-#   # 3. Auth + storage — ONLY when the target is a fresh Supabase project (its auth/storage
-#   #    schemas are GoTrue/Storage-managed; a bare Postgres has neither). Restores auth.users +
-#   #    auth.identities (so people can still log in with the same user ids) and storage.objects
-#   #    metadata (the files themselves live in the storage bucket, out of scope here). Run WITHOUT
-#   #    ON_ERROR_STOP — a fresh project's default buckets / any transient session rows may
-#   #    conflict; that's expected. This re-inserts the `public` rows too, so run it INSTEAD of
-#   #    step 2's data-public.sql (not after):
+#   # 3. Auth + storage — ONLY when the target is a genuinely blank Supabase project (its
+#   #    auth/storage schemas are GoTrue/Storage-managed; a bare Postgres has neither, and the
+#   #    repo's own local dev stack already has delft's schema applied). Zero-cost way to get one:
+#   #    `npx supabase init` in a scratch directory with every port in its config.toml shifted
+#   #    (e.g. +1000) so it doesn't collide with the repo's running stack, then `npx supabase
+#   #    start`. Restores auth.users + auth.identities (so people can still log in with the same
+#   #    user ids) and storage.objects metadata (the files themselves live in the storage bucket,
+#   #    out of scope here). Run WITHOUT ON_ERROR_STOP — a fresh project's default buckets / any
+#   #    transient session rows may conflict; that's expected. This re-inserts the `public` rows
+#   #    too, so run it INSTEAD of step 2's data-public.sql (not after):
 #   #      psql "$DB_URL" -f schema.sql   # (no ON_ERROR_STOP if the project pre-created any public objects)
 #   #      psql "$DB_URL" -c "SET session_replication_role = replica" -f data.sql
+#   # No `psql` on PATH? Pipe into the container instead:
+#   #   docker exec -i supabase_db_<project_id> psql -U postgres -d postgres < schema.sql
 
 on:
   schedule:

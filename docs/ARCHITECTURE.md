@@ -140,7 +140,7 @@ transfer, per-member vault-key sharing, a "Resend invite" button) are still open
 invitations are unrelated to the global signup-gate that was declined above** — that was about who
 can create an account at all; this is about sharing a workspace with someone who already can.
 
-**Production-readiness (Milestones A–C) is complete and deployed** — see Build Order steps 85–98.
+**Production-readiness (Milestones A–C) is complete and deployed** — see Build Order steps 85–99.
 The app is ready for a public beta (legal pages, account deletion, encrypted daily backups,
 branch-protected `master`, abuse caps, enforcing CSP, Cloudflare Turnstile on the login page —
 all live and verified, prod CAPTCHA confirmed end-to-end in a real browser). Step 89 then made
@@ -155,11 +155,13 @@ removed). Step 94 added a "Resend invite" button to the Members modal (the last 
 follow-up). Step 95 tested the DB backup restore path (it didn't work as written — recipe +
 workflow fixed; `public` schema+data + vault key material verified byte-identical). **Step 96
 bisected and fixed the `localsInner` regression** — a dual `prosemirror-view` module instance
-(not a React bug); `react`/`react-dom`/`@tiptap/*` are no longer Dependabot-frozen. What's left
-is deliberate post-launch work, not blockers: Sentry source maps (C7, deferred on Turbopack),
-Tailwind v4, TS 7, nonce-based CSP, real-device iOS testing, the backup restore's auth/storage
-half.
-Steps 88–98's full detail is at the end of the Build Order.
+(not a React bug); `react`/`react-dom`/`@tiptap/*` are no longer Dependabot-frozen. Step 97 added
+Sentry issue alerting; step 98 filtered out the dev-session noise it surfaced. **Step 99 drilled
+the backup restore's last untested half** — a lost-and-rotated `BACKUP_PASSPHRASE`, then a full
+`auth`/`storage` restore into a genuinely blank scratch Supabase project, zero orphaned FKs. What's
+left is deliberate post-launch work, not blockers: Sentry source maps (C7, deferred on Turbopack),
+Tailwind v4, TS 7, nonce-based CSP, real-device iOS testing.
+Steps 88–99's full detail is at the end of the Build Order.
 
 **Deploy status:** all migrations through `20260904000000_rpc_rate_limits_rls` are on hosted
 (`supabase db push`; `20260902000000`/`20260903000000`/`20260904000000` for Milestones B–C).
@@ -3335,6 +3337,32 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
     when attempting to fetch resource`) so it's dropped in every environment; both Sentry alert
     rules were scoped to `environment:production` in the dashboard so local/dev traffic can no
     longer trigger an email at all.
+
+99. **`BACKUP_PASSPHRASE` was lost, rotated, and the `auth`/`storage` restore half was finally
+    drilled.** ✅ _done_. Attempting to finally run the `auth`/`storage` half of the restore drill
+    (the one gap step 95 couldn't cover — a bare Postgres container has no GoTrue/Storage schema)
+    surfaced that the `BACKUP_PASSPHRASE` set up for step 85's backup workflow had been lost —
+    stored outside GitHub as the workflow deliberately requires, but nowhere it could be found
+    again. By design that made every encrypted daily dump up to that point permanently
+    unrecoverable — no code or access can decrypt AES-256 without the passphrase, that's the
+    point. Rotated `BACKUP_PASSPHRASE` to a freshly generated random value via `gh secret set`,
+    confirmed durably saved in two places this time, and triggered a fresh
+    `workflow_dispatch` run to get a dump under the new passphrase. Drilled the actual restore
+    with it: `npx supabase init` in a scratch directory (ports shifted +1000 to not collide with
+    the repo's own local stack) gives a genuinely blank Supabase project — real GoTrue/Storage
+    schemas, zero app migrations — closer to "restore into a fresh hosted project" than the local
+    dev stack (which already has delft's own schema) would be. Restored `schema.sql` then
+    `data.sql` (`session_replication_role = replica`, no `ON_ERROR_STOP` per the recipe) via
+    `docker exec ... psql` (no local `psql` binary on PATH). Zero errors either restore. Verified:
+    real row counts landed in `auth.users`/`auth.identities`/`storage.objects`/`storage.buckets`;
+    zero orphans on every FK checked (`workspaces.owner_id`, `workspace_vaults.user_id`,
+    `credentials.user_id`, `identities.user_id`, `storage.objects.bucket_id`); restored `auth.users`
+    rows carry their original hosted UUIDs and emails (not regenerated) with `encrypted_password`,
+    `confirmed_at`, `instance_id`, `aud`/`role` all intact — everything GoTrue needs to authenticate
+    them. Scratch project and all decrypted plaintext (real user auth/vault data) were deleted
+    immediately after verification, never committed. `docs/TESTING.md`'s restore-drill checklist
+    updated to point at the scratch-project recipe instead of "fresh Supabase project only" (which
+    read as hosted-only and was the reason this half kept getting deferred).
 
 **Production-readiness roadmap (Milestones A–C) is complete and fully deployed.** The system is
 ready for a public beta: legal pages, self-serve account deletion, daily encrypted DB backups,
