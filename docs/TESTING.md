@@ -148,7 +148,13 @@ implementation time, not a permanent spec.
 8. Open a canvas and confirm there's no way to insert an image (the tool is intentionally hidden —
    see `docs/ARCHITECTURE.md` Build Order step 17). Draw a variety of shapes/text, reload, and
    confirm everything survived; confirm dark/light theme switches correctly.
-9. **DB backup restore drill** (re-run after any migration that changes table shape). `public`
+9. **Duplicate a page** (Build Order step 100) that has a sub-page and an embedded image. Confirm
+   the copy appears right after the original with `" (copy)"` appended only to the root's title,
+   the sub-page keeps its own title, and the image renders in the copy. Confirm the copy is a
+   private draft even if the original was published (`is_published`/`published_slug` are never
+   copied). Then delete the *original* page and confirm the duplicate's content/image still work —
+   proves its Storage images were actually copied, not left pointing at the original's objects.
+10. **DB backup restore drill** (re-run after any migration that changes table shape). `public`
    path verified in Build Order step 95, `auth`/`storage` path in step 99; recipe lives in
    `.github/workflows/db-backup.yml`'s header. Both drills need a real `BACKUP_PASSPHRASE` to
    decrypt — if it's genuinely lost (not just misplaced — check everywhere first), every existing

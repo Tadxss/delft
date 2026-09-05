@@ -9,9 +9,11 @@ import { m } from "motion/react";
 import { ChevronDown, ChevronRight, MoreHorizontal, Plus } from "lucide-react";
 import type { PageSummary } from "@crowscribe/types";
 import {
+  computeReorderPosition,
   pageQueryOptions,
   parseWorkspaceSlug,
   useDeletePage,
+  useDuplicatePage,
   useSupabaseClient,
   useUpdatePage,
 } from "@crowscribe/shared";
@@ -53,6 +55,7 @@ function PageTreeNodeImpl({
   const workspaceId = parseWorkspaceSlug(params.workspaceSlug);
   const updatePage = useUpdatePage();
   const deletePage = useDeletePage();
+  const duplicatePage = useDuplicatePage();
   const queryClient = useQueryClient();
   const supabase = useSupabaseClient();
   // Warms the TanStack Query cache for this page's full content on hover/focus, before the click —
@@ -138,6 +141,20 @@ function PageTreeNodeImpl({
   function cancelRename() {
     setTitle(page.title);
     setRenaming(false);
+  }
+
+  function handleDuplicate() {
+    setMenuOpen(false);
+    // Lands right after the original among its own siblings — same math Sidebar.tsx's drag-drop
+    // handler uses for an ordinary reorder-onto-a-strip drop.
+    const siblings = childrenByParent.get(page.parentId) ?? [];
+    const index = siblings.findIndex((p) => p.id === page.id);
+    const next = siblings[index + 1] ?? null;
+    duplicatePage.mutate({
+      id: page.id,
+      workspaceId,
+      newPosition: computeReorderPosition(page.position, next?.position ?? null),
+    });
   }
 
   function handleDelete() {
@@ -241,6 +258,14 @@ function PageTreeNodeImpl({
                 className="block w-full px-3 py-1.5 text-left text-sm text-ink-600 hover:bg-paper-100 hover:text-ink-800"
               >
                 Rename
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={handleDuplicate}
+                className="block w-full px-3 py-1.5 text-left text-sm text-ink-600 hover:bg-paper-100 hover:text-ink-800"
+              >
+                Duplicate
               </button>
               <button
                 type="button"

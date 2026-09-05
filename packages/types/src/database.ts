@@ -510,6 +510,16 @@ export type Database = {
         Args: { p_token: string }
         Returns: undefined
       }
+      duplicate_page: {
+        Args: { p_new_position: number; p_source_id: string }
+        Returns: {
+          content: Json
+          is_root: boolean
+          new_id: string
+          old_id: string
+          workspace_id: string
+        }[]
+      }
       get_email_for_username: { Args: { p_username: string }; Returns: string }
       get_invitation_for_email: {
         Args: { p_token: string }

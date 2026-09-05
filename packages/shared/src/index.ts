@@ -42,6 +42,7 @@ export * from "./hooks/usePage";
 export * from "./hooks/useCreatePage";
 export * from "./hooks/useUpdatePage";
 export * from "./hooks/useDeletePage";
+export * from "./hooks/useDuplicatePage";
 export * from "./hooks/usePublishPage";
 export * from "./hooks/useUnpublishPage";
 export * from "./hooks/useUploadPageImage";
