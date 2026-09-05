@@ -3400,7 +3400,3 @@ and verified. Remaining work is deliberate post-launch iteration, not launch blo
   pin). Each remaining item is its own tested piece of work.
 - **Nonce-based CSP** — drop `script-src 'unsafe-inline'`; needs a `middleware.ts`.
 - **Real-device iOS Safari testing** — only emulated mobile-safari so far.
-- **Backup restore — the auth/storage path** — step 95 verified the `public` schema+data restore
-  end-to-end; the `auth.users` / `storage.objects` half of `data.sql` can only be tested against
-  a real fresh Supabase project (a bare Postgres has no GoTrue/Storage schema). Worth one real
-  drill into a throwaway project.
