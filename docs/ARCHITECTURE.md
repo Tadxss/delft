@@ -140,7 +140,7 @@ transfer, per-member vault-key sharing, a "Resend invite" button) are still open
 invitations are unrelated to the global signup-gate that was declined above** — that was about who
 can create an account at all; this is about sharing a workspace with someone who already can.
 
-**Production-readiness (Milestones A–C) is complete and deployed** — see Build Order steps 85–96.
+**Production-readiness (Milestones A–C) is complete and deployed** — see Build Order steps 85–97.
 The app is ready for a public beta (legal pages, account deletion, encrypted daily backups,
 branch-protected `master`, abuse caps, enforcing CSP, Cloudflare Turnstile on the login page —
 all live and verified, prod CAPTCHA confirmed end-to-end in a real browser). Step 89 then made
@@ -159,7 +159,7 @@ bisected and fixed the `localsInner` regression** — a dual `prosemirror-view` 
 is deliberate post-launch work, not blockers: Sentry source maps (C7, deferred on Turbopack),
 Tailwind v4, TS 7, nonce-based CSP, real-device iOS testing, the backup restore's auth/storage
 half.
-Steps 88–96's full detail is at the end of the Build Order.
+Steps 88–97's full detail is at the end of the Build Order.
 
 **Deploy status:** all migrations through `20260904000000_rpc_rate_limits_rls` are on hosted
 (`supabase db push`; `20260902000000`/`20260903000000`/`20260904000000` for Milestones B–C).
@@ -3310,6 +3310,14 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
       pre-existing semver-major ignore remains, same treatment as `next`/`tailwindcss`/etc.
       Dependabot can propose patch/minor bumps for these again, including the new
       `pnpm.overrides` entries directly.
+
+97. **Sentry issue alerting.** ✅ _done_. Step 61 shipped error *capture* only — no alerting, so
+    both step 58's production vault-unlock incidents were noticed by chance, not by Sentry.
+    Dashboard-only, no code: confirmed Sentry's auto-created default rule ("Send a notification
+    for high priority issues" → email) targets the right address, and added a second rule
+    (**"A new issue is created"**, unfiltered by priority, → email) so a real bug that doesn't
+    clear Sentry's own high-priority bar still surfaces instead of going unnoticed. Both live on
+    the `crowscribe` project.
 
 **Production-readiness roadmap (Milestones A–C) is complete and fully deployed.** The system is
 ready for a public beta: legal pages, self-serve account deletion, daily encrypted DB backups,
