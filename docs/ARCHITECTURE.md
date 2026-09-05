@@ -140,24 +140,26 @@ transfer, per-member vault-key sharing, a "Resend invite" button) are still open
 invitations are unrelated to the global signup-gate that was declined above** — that was about who
 can create an account at all; this is about sharing a workspace with someone who already can.
 
-**Production-readiness (Milestones A–C) is complete and deployed** — see Build Order steps 85–95.
+**Production-readiness (Milestones A–C) is complete and deployed** — see Build Order steps 85–96.
 The app is ready for a public beta (legal pages, account deletion, encrypted daily backups,
 branch-protected `master`, abuse caps, enforcing CSP, Cloudflare Turnstile on the login page —
 all live and verified, prod CAPTCHA confirmed end-to-end in a real browser). Step 89 then made
 CI's e2e serve a prebuilt `next start` build (fixing the intermittent WebKit shard timeouts) and
 fixed a real bug it surfaced — a magic-link `#access_token` left in the URL after sign-out; step 90
-reverted Google OAuth from a popup back to a same-tab redirect. What's left is deliberate
-post-launch work, not blockers: Sentry source maps (C7, deferred on Turbopack), framework majors
-(React 19.2.8 / Tailwind v4 / TS 7 — Dependabot no longer auto-proposes these; Next reached
-16.3.3 via #67), nonce-based CSP, real-device iOS testing. Step 91 grouped "Export my data" +
+reverted Google OAuth from a popup back to a same-tab redirect. Step 91 grouped "Export my data" +
 "Delete account" under a "Security & data" sub-section (delete now takes a full-name signature;
 export shows a confirmation first). **Steps 92–93 shipped per-member vaults** — every member of a
 shared workspace now has their own private credentials vault (`workspace_vaults` table,
 per-member RLS, ownership transfer no longer blocked by a vault, legacy pre-wrapped-key path
-removed). Step 94 added a "Resend invite" button to the Members modal (the last step-79 follow-up).
-Step 95 tested the DB backup restore path (it didn't work as written — recipe + workflow fixed;
-`public` schema+data + vault key material verified byte-identical).
-Steps 88–95's full detail is at the end of the Build Order.
+removed). Step 94 added a "Resend invite" button to the Members modal (the last step-79
+follow-up). Step 95 tested the DB backup restore path (it didn't work as written — recipe +
+workflow fixed; `public` schema+data + vault key material verified byte-identical). **Step 96
+bisected and fixed the `localsInner` regression** — a dual `prosemirror-view` module instance
+(not a React bug); `react`/`react-dom`/`@tiptap/*` are no longer Dependabot-frozen. What's left
+is deliberate post-launch work, not blockers: Sentry source maps (C7, deferred on Turbopack),
+Tailwind v4, TS 7, nonce-based CSP, real-device iOS testing, the backup restore's auth/storage
+half.
+Steps 88–96's full detail is at the end of the Build Order.
 
 **Deploy status:** all migrations through `20260904000000_rpc_rate_limits_rls` are on hosted
 (`supabase db push`; `20260902000000`/`20260903000000`/`20260904000000` for Milestones B–C).
@@ -3272,16 +3274,53 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
     real drill into a throwaway Supabase project to confirm the auth/storage path (the local test
     can't — a bare image has no GoTrue/Storage schema).
 
+96. **`localsInner` regression bisected and fixed — react/@tiptap unfrozen.** ✅ _done_. Since
+    step 88, `.github/dependabot.yml` fully froze `react`/`react-dom`/`react-is`/`@types/react*`/
+    `@tiptap/*` after two grouped bumps (#51, #58) reproduced
+    `TypeError: Cannot read properties of undefined (reading 'localsInner')` across editor/canvas
+    specs on chromium **and** webkit. It was frozen, never actually bisected — until now.
+    - **Root cause: a "dual package hazard", not a React bug.** `localsInner` is a private method
+      on `prosemirror-view`'s `DecorationSet`/`DecorationGroup` classes (confirmed by grepping
+      `node_modules/.pnpm` — it exists nowhere else). The crash is two *different physical
+      copies* of `prosemirror-view` loaded at once: a `Decoration` built by one copy's class
+      handed to a `DecorationGroup` from the other copy doesn't have the method on its prototype.
+      `@tiptap/pm` bundles its own `prosemirror-view` (`3.30.0` → `1.42.2`, `3.30.5` → `1.42.3`);
+      `apps/web/package.json` had a **direct `@tiptap/pm` dependency that nothing in the app
+      imported** (confirmed empty across `apps/web/app` and `packages/shared/src`) — a second,
+      redundant top-level consumer that gave pnpm's peer-aware resolver a reason to split
+      `@blocknote/core`'s own `prosemirror-view` resolution (via its wide `y-prosemirror` peer
+      range) into two coexisting flavors. The lockfile proved it directly: **two distinct
+      `@blocknote/core@0.54.0(...)` entries**, one resolving `prosemirror-view@1.42.2`, the other
+      `@1.42.3`, simultaneously present — while every *other* `prosemirror-*` package
+      (`-state`/`-model`/`-transform`/`-commands`/`-keymap`/`-history`) had exactly one resolved
+      version. Step 89's earlier finding (Next 16.3.3 alone was clean on the full suite) already
+      pointed away from React; this confirms it — React was never the cause.
+    - **Fix:** dropped the dead `@tiptap/pm` dependency from `apps/web/package.json` (it wasn't
+      enough alone — the split persisted, driven by `@blocknote/core`'s own dependency family).
+      Root `package.json`'s `pnpm.overrides` (previously just pinning `react`/`react-dom` to
+      `19.2.3` as a second, harder freeze) now pins `@tiptap/pm: 3.30.5` and
+      `prosemirror-view: 1.42.3` — forcing pnpm to a single resolution tree-wide regardless of
+      how the peer graph shifts. `react`/`react-dom`/`@types/react*` are back to caret ranges on
+      latest (`^19.2.8`), no more exact-pin or override.
+    - **Verified, not assumed:** `pnpm-lock.yaml` collapsed to one `prosemirror-view` version and
+      one `@blocknote/core@0.54.0(...)` flavor; `pnpm lint`/`check-types`/`build` clean; the
+      **full** e2e suite (all three Playwright projects — chromium, webkit, mobile-safari) green,
+      zero `localsInner` or any other console error.
+    - `.github/dependabot.yml`'s react*/`@tiptap/*` full-freeze block removed — only the
+      pre-existing semver-major ignore remains, same treatment as `next`/`tailwindcss`/etc.
+      Dependabot can propose patch/minor bumps for these again, including the new
+      `pnpm.overrides` entries directly.
+
 **Production-readiness roadmap (Milestones A–C) is complete and fully deployed.** The system is
 ready for a public beta: legal pages, self-serve account deletion, daily encrypted DB backups,
 `master` branch protection, abuse caps, enforcing CSP, and Turnstile bot protection are all live
 and verified. Remaining work is deliberate post-launch iteration, not launch blockers:
 - **C7 — Sentry source maps** — deferred; Turbopack + `@sentry/nextjs@10.70` don't support map
   upload. Revisit when the SDK does.
-- **Framework upgrades** — React 19.2.8 (still needs the `localsInner` ProseMirror regression —
-  chromium + webkit — bisected; `react*`/`@tiptap/*` are Dependabot-ignored until then), Tailwind
-  v4 (config-format rewrite), TS 7 (wait for stable). Next reached 16.3.3 via `#67` (step 89) —
-  clean on the full e2e suite. Each remaining one is its own tested piece of work.
+- **Framework upgrades** — Tailwind v4 (config-format rewrite), TS 7 (wait for stable). Next
+  reached 16.3.3 via `#67` (step 89); React 19.2.8 + `@tiptap/pm` 3.30.5 landed via step 96 (the
+  `localsInner` bisect — a dual-`prosemirror-view` packaging hazard, fixed with a `pnpm.overrides`
+  pin). Each remaining item is its own tested piece of work.
 - **Nonce-based CSP** — drop `script-src 'unsafe-inline'`; needs a `middleware.ts`.
 - **Real-device iOS Safari testing** — only emulated mobile-safari so far.
 - **Backup restore — the auth/storage path** — step 95 verified the `public` schema+data restore

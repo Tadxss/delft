@@ -40,7 +40,13 @@ test("set a username, sign in with it, and confirm an unknown username is reject
 
   // Unknown username is rejected right at the identifier step — never advances to a password
   // prompt, since there's no email to send a magic link to either in that case.
-  await page.fill("#identifier", "definitely-not-a-real-username");
+  // Same hydration-race workaround as signIn() in helpers.ts — a bare fill() can land before
+  // React attaches its listeners on the freshly-loaded login page and get silently wiped.
+  await page.locator("#identifier").click();
+  await page.locator("#identifier").pressSequentially(
+    "definitely-not-a-real-username",
+    { delay: 20 },
+  );
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   await expect(
     page.getByText("No account found with that username."),
@@ -50,6 +56,10 @@ test("set a username, sign in with it, and confirm an unknown username is reject
   await expect(page.locator("#password")).toHaveCount(0);
 
   // Sign in via username — resolves to the real email (shown on the password step) and signs in.
+  // Plain fill() is fine here (unlike the two identifier fills above): the page is already
+  // hydrated at this point — this isn't a fresh navigation, just a client-side state reset after
+  // the previous error — and fill() also clears the field first, which pressSequentially doesn't
+  // (it would append onto "definitely-not-a-real-username" still sitting in the input).
   await page.fill("#identifier", username);
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   await expect(page.getByText(email)).toBeVisible({ timeout: 10000 });

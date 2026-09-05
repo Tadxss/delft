@@ -19,8 +19,8 @@
   },
   "pnpm": {
     "overrides": {
-      "react": "19.2.3",
-      "react-dom": "19.2.3"
+      "@tiptap/pm": "3.30.5",
+      "prosemirror-view": "1.42.3"
     }
   },
   "dependencies": {
