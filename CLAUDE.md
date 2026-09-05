@@ -29,7 +29,7 @@ invitation emails (PR #44); the `crowscribe.space` domain switch (82), Resend go
 `send.crowscribe.space` (83), and branded email templates (84) via PR #45. All email is now
 branded and live — invite email via the Edge Function, auth (magic-link) email via Resend custom
 SMTP + dashboard templates. **The production-readiness roadmap (Milestones A–C, Build Order steps
-85–98) is complete and deployed** — legal pages (Privacy/Terms/Contact), self-serve account
+85–99) is complete and deployed** — legal pages (Privacy/Terms/Contact), self-serve account
 deletion (`supabase/functions/delete-account/`), daily encrypted DB backup
 (`.github/workflows/db-backup.yml`), branch-protected `master`, DB-level abuse caps, editor
 unsaved-changes + stale-write guards, **enforcing CSP**, **Cloudflare Turnstile on the login
@@ -46,6 +46,10 @@ Sentry issue alerting was configured dashboard-side, closing the gap where error
 no notification path (97); a real-device iOS test session's `Load failed` noise turned out to be
 local-dev traffic hitting the same prod Sentry project plus a generic Safari fetch-abort message —
 fixed with an `ignoreErrors` filter and scoping both alert rules to `environment:production` (98).
+The `auth`/`storage` half of the backup restore drill — the one gap step 95 couldn't cover — was
+finally run: `BACKUP_PASSPHRASE` had been lost (rotated, new one saved durably in two places) and
+a genuinely blank scratch Supabase project confirmed `auth.users`/`auth.identities`/
+`storage.objects` restore with zero orphaned FKs (99).
 The app is ready for a public beta; what's left (Sentry source maps on Turbopack, Tailwind v4,
 TS 7, nonce CSP, real-device iOS, the backup restore's auth/storage half) is deliberate
 post-launch work. See ARCHITECTURE.md's
