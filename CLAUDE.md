@@ -53,7 +53,10 @@ a genuinely blank scratch Supabase project confirmed `auth.users`/`auth.identiti
 Notion-style "Duplicate" action — copies a page's whole descendant subtree atomically via a new
 `SECURITY INVOKER` RPC (not `DEFINER`: RLS already permits every insert it does, the RPC exists
 only for transaction atomicity), then best-effort copies each duplicated page's Storage images so
-the copy survives the original being deleted later (100).
+the copy survives the original being deleted later (100). When the same dev-session `Load failed`
+Sentry noise resurfaced, the root cause got the proper fix over step 98's string filter: all three
+`Sentry.init()` sites now set `enabled` so only real production reports — local dev, CI `next start`,
+and preview deploys send nothing unless `NEXT_PUBLIC_SENTRY_FORCE_ENABLE=1` (101).
 The app is ready for a public beta; what's left (Sentry source maps on Turbopack, Tailwind v4,
 TS 7, nonce CSP, real-device iOS) is deliberate post-launch work. See ARCHITECTURE.md's
 **Next Up** for current focus and the Build Order for how each feature shipped;
