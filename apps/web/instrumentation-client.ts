@@ -18,6 +18,15 @@ if (
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
   tracesSampleRate: 0,
+  // Report only from real production. `.env.local` (gitignored) has the production DSN filled in,
+  // so without this gate every `pnpm dev` session reports into the prod project (just tagged
+  // `environment: development`) — e.g. a real iPhone pointed at a LAN dev server whose Supabase
+  // calls all fail with WebKit's generic "Load failed". Set NEXT_PUBLIC_SENTRY_FORCE_ENABLE=1 to
+  // opt a local session back in when testing Sentry itself.
+  enabled:
+    process.env.NODE_ENV === "production" ||
+    process.env.NEXT_PUBLIC_SENTRY_FORCE_ENABLE === "1",
+  environment: process.env.NEXT_PUBLIC_VERCEL_ENV ?? process.env.NODE_ENV,
   // Generic WebKit/Safari messages for an aborted fetch() — backgrounded tab, LAN drop, page
   // navigating away mid-request. Global-handler-caught (auto.browser.global_handlers.onerror),
   // a single minified frame, never actionable app-code noise. First seen from a real-device

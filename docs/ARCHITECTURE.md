@@ -3388,6 +3388,23 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
      with an embedded image, confirmed two independent Storage objects existed, then deleted the
      *original* page and confirmed the duplicate's image still rendered.
 
+101. **Sentry now reports only from real production — the proper fix for step 98's dev-noise.** ✅
+     _done_. Another `TypeError: Load failed` on `/workspace` (Mobile Safari, `environment:
+     development`, `url: http://127.0.0.1:3000/workspace`) showed up in the dashboard: the same
+     real-device-iOS test session against a LAN dev server whose Supabase calls all fail. Step 98's
+     `ignoreErrors: ["Load failed", …]` is string-fragile and, more importantly, only muffles one
+     message family — it does nothing about dev / `next start` / Vercel-preview traffic consuming
+     free-tier event quota and cluttering the issue list, all because `apps/web/.env.local`
+     (gitignored) has the production `NEXT_PUBLIC_SENTRY_DSN` filled in. Root-cause fix: all three
+     `Sentry.init()` sites (`instrumentation-client.ts`, `sentry.server.config.ts`,
+     `sentry.edge.config.ts`) gained
+     `enabled: process.env.NODE_ENV === "production" || process.env.NEXT_PUBLIC_SENTRY_FORCE_ENABLE === "1"`
+     plus an explicit `environment` (`VERCEL_ENV ?? NODE_ENV`; `NEXT_PUBLIC_VERCEL_ENV` in the
+     client file). Local dev, CI's `next start`, and preview deploys now send nothing unless a
+     developer sets `NEXT_PUBLIC_SENTRY_FORCE_ENABLE=1` to test Sentry itself. `ignoreErrors` is
+     kept as a cheap second layer for the rare genuine prod fetch-abort; the "loud warn if a prod
+     build ships without a DSN" tell is unaffected (still gated on `NODE_ENV === "production"`).
+
 **Production-readiness roadmap (Milestones A–C) is complete and fully deployed.** The system is
 ready for a public beta: legal pages, self-serve account deletion, daily encrypted DB backups,
 `master` branch protection, abuse caps, enforcing CSP, and Turnstile bot protection are all live

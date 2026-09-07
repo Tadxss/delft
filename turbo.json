@@ -1,7 +1,7 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
   "ui": "tui",
-  "globalEnv": ["NEXT_RUNTIME", "NODE_ENV", "CI"],
+  "globalEnv": ["NEXT_RUNTIME", "NODE_ENV", "CI", "VERCEL_ENV"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

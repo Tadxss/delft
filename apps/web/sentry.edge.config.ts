@@ -5,4 +5,9 @@ import * as Sentry from "@sentry/nextjs";
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
   tracesSampleRate: 0,
+  // Report only from real production — same rationale/escape hatch as sentry.server.config.ts.
+  enabled:
+    process.env.NODE_ENV === "production" ||
+    process.env.NEXT_PUBLIC_SENTRY_FORCE_ENABLE === "1",
+  environment: process.env.VERCEL_ENV ?? process.env.NODE_ENV,
 });
