@@ -145,12 +145,14 @@ runs against `pnpm dev` via `reuseExistingServer`. Each shard runs on its own ru
 own `supabase start`, so
 the wall-clock stays well under the timeout as the suite grows. A tiny `e2e` gate job `needs` all
 shards and is the stable status-check name for branch protection. Node 22. `supabase/setup-cli`
-is pinned (not `latest`). `.github/dependabot.yml` (reworked in Build Order step 88 after a bad
-first run): npm updates are **patch-only grouped** — minors arrive as isolated individual PRs,
-and `semver-major` is **ignored** for the framework/toolchain set (typescript, next, react*,
-tailwindcss, eslint*, `@blocknote/*`, `@excalidraw/*`, `@tanstack/react-query`, `@playwright/test`,
-turbo, `@types/*`) since those need deliberate tested upgrades; github-actions stays
-weekly-grouped. `engines.node` is pinned `"22.x"` (root + `apps/web`) — local dev on Node 20
+is pinned (not `latest`). `.github/dependabot.yml` (reworked in Build Order step 88, then step 102):
+npm **patch + minor updates are grouped** into one weekly `deps` PR — except the framework/toolchain
+set (react*, `@tiptap/*`, next, next-themes, tailwindcss, typescript, eslint, `@blocknote/*`,
+`@excalidraw/*`, `@tanstack/react-query`, `@playwright/test`, turbo), which stays as isolated
+individual PRs (`exclude-patterns`) so a regression is bisectable — this is what step 102 changed,
+after "every minor is its own PR" meant a weekly pile-up of conflicting lockfile PRs. `semver-major`
+is **ignored** for that same set (plus `@types/*`) since those need deliberate tested upgrades;
+github-actions stays weekly-grouped. `engines.node` is pinned `"22.x"` (root + `apps/web`) — local dev on Node 20
 warns but works.
 
 `master` is **branch-protected** (Build Order step 85): all changes land via PR with `checks` +

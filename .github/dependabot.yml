@@ -4,6 +4,14 @@
 # must be deliberate, tested upgrades — not auto-PRs. So: patch bumps grouped, minors individual,
 # framework majors ignored.
 #
+# Step 102 addendum: "minors individual" meant a typical Monday opened ~4 separate PRs that each
+# rewrite pnpm-lock.yaml, so merging the first left the rest CONFLICTING and needing
+# `@dependabot rebase` — pure busywork. Fix: one `deps` group now covers patch *and* minor for the
+# low-risk bulk (one lockfile-touching PR/week), while the packages with a history of quietly
+# breaking CI stay carved out as individual PRs via `exclude-patterns` — same "know which bump
+# broke it" property as before, just only where it's earned. Framework majors still ignored below.
+# If a grouped PR fails CI: `@dependabot recreate` after adding the culprit to the ignore list.
+#
 # Step 88 addendum: react/react-dom 19.2.3->19.2.8 + @tiptap/pm 3.30.0->3.30.5 (which Dependabot
 # classifies as *patch*, so the major-ignore below didn't stop them) reproduced a ProseMirror
 # `localsInner` TypeError across the editor/canvas specs on BOTH chromium and webkit (PR #58, and
@@ -27,10 +35,29 @@ updates:
     schedule:
       interval: weekly
       day: monday
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 5
     groups:
-      patch:
-        update-types: [patch]
+      deps:
+        # Patch + minor for everything EXCEPT the packages that have silently broken CI before
+        # (react/@tiptap → step 88's localsInner; the rest are framework-coupled enough to want an
+        # isolated, individually-revertible PR). Excluded packages still get individual minor PRs;
+        # their majors are ignored below.
+        update-types: [patch, minor]
+        exclude-patterns:
+          - "react"
+          - "react-dom"
+          - "react-is"
+          - "@tiptap/*"
+          - "@blocknote/*"
+          - "@excalidraw/*"
+          - "next"
+          - "next-themes"
+          - "@tanstack/react-query"
+          - "typescript"
+          - "tailwindcss"
+          - "eslint"
+          - "@playwright/test"
+          - "turbo"
     ignore:
       # Framework / toolchain — upgrade by hand with a full test pass, never via Dependabot.
       - dependency-name: "typescript"
