@@ -3422,6 +3422,22 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
      behind the group. Recovery if a grouped PR fails CI: `@dependabot recreate` after adding the
      culprit to the `ignore` list.
 
+103. **Dependabot auto-merge — the ~1 residual conflict/week goes to zero.** ✅ _done_. Step 102 cut
+     the weekly scatter to one `deps` group PR plus the odd carve-out PR, but the two still race for
+     `pnpm-lock.yaml` whenever both are open (seen immediately: merging #91 conflicted #92). Real
+     fix is not to let a mergeable bump sit open. New `.github/workflows/dependabot-auto-merge.yml`
+     (`on: pull_request`, `dependabot/fetch-metadata@v2`) calls `gh pr merge --auto --squash` on
+     Dependabot PRs, so branch protection (`checks` + `e2e`, `strict`) merges each the moment its CI
+     is green; GitHub serialises the queue and Dependabot's default `rebase-strategy: auto` rebases
+     whatever's behind. A shell step holds back `semver-major` and the framework/toolchain carve-out
+     set (same list as dependabot.yml's `deps` `exclude-patterns`) for a human look. Repo setting
+     `allow_auto_merge` was flipped on (was off — `gh pr merge --auto` is a hard error without it);
+     merge method is **squash** (dep bumps stop adding a merge commit + a bump commit each to
+     `master`'s history). Branch protection needs no change — `required_approving_review_count` is
+     already 0, so `GITHUB_TOKEN` + the `permissions:` block is enough to enable auto-merge.
+     Recovery if an auto-merged bump breaks `master`: revert the squash commit, add the package to
+     dependabot.yml's `ignore`.
+
 **Production-readiness roadmap (Milestones A–C) is complete and fully deployed.** The system is
 ready for a public beta: legal pages, self-serve account deletion, daily encrypted DB backups,
 `master` branch protection, abuse caps, enforcing CSP, and Turnstile bot protection are all live
