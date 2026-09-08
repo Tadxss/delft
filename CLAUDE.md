@@ -56,7 +56,11 @@ only for transaction atomicity), then best-effort copies each duplicated page's 
 the copy survives the original being deleted later (100). When the same dev-session `Load failed`
 Sentry noise resurfaced, the root cause got the proper fix over step 98's string filter: all three
 `Sentry.init()` sites now set `enabled` so only real production reports — local dev, CI `next start`,
-and preview deploys send nothing unless `NEXT_PUBLIC_SENTRY_FORCE_ENABLE=1` (101).
+and preview deploys send nothing unless `NEXT_PUBLIC_SENTRY_FORCE_ENABLE=1` (101). Dependabot was
+reworked to stop the weekly lockfile-conflict pile-up: patch+minor grouped into one `deps` PR
+(framework/toolchain set still individual for bisectability) (102), plus a `dependabot-auto-merge.yml`
+workflow that auto-merges the non-carve-out bumps the moment CI is green so they never sit open
+racing each other (103).
 The app is ready for a public beta; what's left (Sentry source maps on Turbopack, Tailwind v4,
 TS 7, nonce CSP, real-device iOS) is deliberate post-launch work. See ARCHITECTURE.md's
 **Next Up** for current focus and the Build Order for how each feature shipped;
@@ -154,6 +158,13 @@ after "every minor is its own PR" meant a weekly pile-up of conflicting lockfile
 is **ignored** for that same set (plus `@types/*`) since those need deliberate tested upgrades;
 github-actions stays weekly-grouped. `engines.node` is pinned `"22.x"` (root + `apps/web`) — local dev on Node 20
 warns but works.
+
+`.github/workflows/dependabot-auto-merge.yml` (Build Order step 103) enables GitHub auto-merge
+(`gh pr merge --auto --squash`) on Dependabot PRs so they merge the instant `checks` + `e2e` pass,
+instead of sitting open racing each other for `pnpm-lock.yaml`. It holds back `semver-major` and the
+same framework/toolchain carve-out set for a manual look. Repo setting `allow_auto_merge` is on.
+If an auto-merged bump breaks `master`: revert the squash commit, add the package to
+`dependabot.yml`'s `ignore`.
 
 `master` is **branch-protected** (Build Order step 85): all changes land via PR with `checks` +
 `e2e` green and the branch up to date; `enforce_admins` is off so the owner can force through in
