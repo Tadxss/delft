@@ -3405,6 +3405,23 @@ check-types`/`lint` clean; 18 e2e tests (`credentials.spec.ts`, `credential-fold
      kept as a cheap second layer for the rare genuine prod fetch-abort; the "loud warn if a prod
      build ships without a DSN" tell is unaffected (still gated on `NODE_ENV === "production"`).
 
+102. **Dependabot grouping — stop the weekly lockfile-conflict pile-up.** ✅ _done_. Step 88's
+     "patch grouped, minors individual" rule meant a normal Monday opened ~4 separate PRs that each
+     rewrite `pnpm-lock.yaml`; merging the first left the rest `CONFLICTING` (or `BEHIND`), so every
+     batch needed a round of `@dependabot rebase` babysitting. Root issue is concurrent
+     lockfile-touching PRs, not the base branch — retargeting Dependabot at `develop` was
+     considered and rejected (it moves the identical conflicts one branch earlier, adds a
+     `develop→master` hop, and delays security patches). Fix in `.github/dependabot.yml`: a single
+     `deps` group now covers **patch + minor** for the low-risk bulk (one lockfile PR/week), with
+     `exclude-patterns` keeping the packages that have quietly broken CI before
+     (`react`/`react-dom`/`react-is`/`@tiptap/*`/`@blocknote/*`/`@excalidraw/*`/`next`/`next-themes`/
+     `@tanstack/react-query`/`typescript`/`tailwindcss`/`eslint`/`@playwright/test`/`turbo`) as
+     individual, individually-revertible PRs — same "know which bump broke it" property as step 88,
+     just only where it's been earned. `semver-major` for that set stays fully ignored (unchanged).
+     `open-pull-requests-limit` raised 3→5 so a busy framework week can't starve those isolated PRs
+     behind the group. Recovery if a grouped PR fails CI: `@dependabot recreate` after adding the
+     culprit to the `ignore` list.
+
 **Production-readiness roadmap (Milestones A–C) is complete and fully deployed.** The system is
 ready for a public beta: legal pages, self-serve account deletion, daily encrypted DB backups,
 `master` branch protection, abuse caps, enforcing CSP, and Turnstile bot protection are all live
