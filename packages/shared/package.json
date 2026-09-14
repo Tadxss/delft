@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@crowscribe/types": "workspace:*",
-    "@supabase/supabase-js": "^2.115.0",
+    "@supabase/supabase-js": "^2.116.0",
     "@tanstack/react-query": "^5.102.8"
   },
   "peerDependencies": {
