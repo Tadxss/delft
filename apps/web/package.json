@@ -20,7 +20,7 @@
     "@blocknote/code-block": "^0.54.0",
     "@blocknote/core": "^0.54.0",
     "@blocknote/mantine": "^0.54.0",
-    "@blocknote/react": "^0.54.0",
+    "@blocknote/react": "^0.54.2",
     "@crowscribe/shared": "workspace:*",
     "@crowscribe/types": "workspace:*",
     "@dnd-kit/core": "^6.3.1",
